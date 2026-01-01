@@ -15,7 +15,7 @@ final class NotchState: ObservableObject {
 final class NotchWindow: NSWindow {
 
     private let windowWidth: CGFloat = 380  // Extra width for outward curves (40 each side)
-    private let windowHeight: CGFloat = 130
+    private let windowHeight: CGFloat = 100
     let notchState = NotchState()
 
     init() {

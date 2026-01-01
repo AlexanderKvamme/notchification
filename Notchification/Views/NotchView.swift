@@ -12,15 +12,15 @@ struct NotchView: View {
     @State private var isExpanded: Bool = false
 
     // Dimensions
-    private let expandedHeight: CGFloat = 120
+    private let expandedHeight: CGFloat = 90
     private let notchWidth: CGFloat = 300
     private let frameWidth: CGFloat = 380  // Extra 80 for outward curves
 
     // Content dimensions
-    private let logoSize: CGFloat = 32
-    private let progressBarWidth: CGFloat = 180
-    private let progressBarHeight: CGFloat = 16
-    private let contentPadding: CGFloat = 24
+    private let logoSize: CGFloat = 28
+    private let progressBarHeight: CGFloat = 14
+    private let horizontalPadding: CGFloat = 20
+    private let contentBottomPadding: CGFloat = 16
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -34,17 +34,25 @@ struct NotchView: View {
                     anchor: .top
                 )
 
-            // Content: Claude logo + progress bar
-            HStack(alignment: .center, spacing: 16) {
-                ClaudeLogo()
-                    .frame(width: logoSize, height: logoSize)
+            // Content: Logo + Progress bar
+            if let process = notchState.activeProcesses.first {
+                HStack(alignment: .center, spacing: 12) {
+                    ProcessLogo(processType: process)
+                        .frame(width: logoSize, height: logoSize)
 
-                AnimatedProgressBar(isActive: isExpanded)
-                    .frame(width: progressBarWidth, height: progressBarHeight)
+                    AnimatedProgressBar(
+                        isActive: isExpanded,
+                        baseColor: process.color,
+                        waveColor: process.color.opacity(0.6)
+                    )
+                    .frame(height: progressBarHeight)
+                }
+                .padding(.horizontal, horizontalPadding)
+                .frame(width: notchWidth)
+                .offset(y: expandedHeight - contentBottomPadding - logoSize)
+                .opacity(isExpanded ? 1 : 0)
+                .scaleEffect(isExpanded ? 1 : 0.5)
             }
-            .offset(y: expandedHeight - contentPadding - logoSize - 4)
-            .opacity(isExpanded ? 1 : 0)
-            .scaleEffect(isExpanded ? 1 : 0.5)
         }
         .frame(width: frameWidth, height: expandedHeight, alignment: .top)
         .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: isExpanded)
@@ -61,86 +69,269 @@ struct NotchView: View {
     }
 }
 
+// MARK: - Process Logo
+
+struct ProcessLogo: View {
+    let processType: ProcessType
+
+    var body: some View {
+        switch processType {
+        case .claude:
+            ClaudeLogo()
+        case .androidStudio:
+            AndroidStudioLogo()
+        case .xcode:
+            XcodeLogo()
+        }
+    }
+}
+
+// MARK: - Android Studio Logo
+
+struct AndroidStudioLogo: View {
+    var body: some View {
+        AndroidStudioLogoShape()
+            .fill(Color(red: 0.24, green: 0.86, blue: 0.52))  // #3DDC84 Android Green
+    }
+}
+
+struct AndroidStudioLogoShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 32.0
+        var path = Path()
+
+        path.move(to: p(13.8, 4, s))
+        path.addLine(to: p(18.3, 4, s))
+        path.addLine(to: p(18.3, 6.2, s))
+        path.addLine(to: p(19.5, 6.2, s))
+        path.addCurve(to: p(20.5, 7.2, s), control1: p(20.1, 6.2, s), control2: p(20.5, 6.6, s))
+        path.addLine(to: p(20.5, 11.8, s))
+        path.addLine(to: p(19.9, 12.6, s))
+        path.addLine(to: p(26.1, 23.4, s))
+        path.addLine(to: p(27, 27.3, s))
+        path.addCurve(to: p(26.1, 27.8, s), control1: p(27.1, 27.8, s), control2: p(26.5, 28.2, s))
+        path.addLine(to: p(23.2, 25.1, s))
+        path.addLine(to: p(21.2, 21.6, s))
+        path.addCurve(to: p(16, 23, s), control1: p(19.6, 22.5, s), control2: p(17.9, 23, s))
+        path.addCurve(to: p(10.9, 21.6, s), control1: p(14.1, 23, s), control2: p(12.4, 22.5, s))
+        path.addLine(to: p(8.9, 25.1, s))
+        path.addLine(to: p(6, 27.8, s))
+        path.addCurve(to: p(5.1, 27.3, s), control1: p(5.6, 28.2, s), control2: p(5, 27.8, s))
+        path.addLine(to: p(6, 23.4, s))
+        path.addLine(to: p(8.3, 19.3, s))
+        path.addCurve(to: p(6, 12.9, s), control1: p(6.8, 17.6, s), control2: p(6, 15.3, s))
+        path.addCurve(to: p(6.1, 11.8, s), control1: p(6, 12.5, s), control2: p(6, 12.1, s))
+        path.addLine(to: p(9.1, 11.8, s))
+        path.addCurve(to: p(9, 12.9, s), control1: p(9, 12.2, s), control2: p(9, 12.5, s))
+        path.addCurve(to: p(10, 16.5, s), control1: p(9, 14.2, s), control2: p(9.4, 15.4, s))
+        path.addLine(to: p(12.3, 12.6, s))
+        path.addLine(to: p(11.7, 11.8, s))
+        path.addLine(to: p(11.7, 7.2, s))
+        path.addCurve(to: p(12.7, 6.2, s), control1: p(11.7, 6.6, s), control2: p(12.1, 6.2, s))
+        path.addLine(to: p(13.9, 6.2, s))
+        path.closeSubpath()
+
+        // Inner details
+        path.move(to: p(14.4, 15.4, s))
+        path.addLine(to: p(12.4, 19, s))
+        path.addCurve(to: p(16, 20, s), control1: p(13.5, 19.6, s), control2: p(14.7, 20, s))
+        path.addCurve(to: p(19.6, 19, s), control1: p(17.3, 20, s), control2: p(18.6, 19.6, s))
+        path.addLine(to: p(17.5, 15.4, s))
+        path.addLine(to: p(16.7, 16.4, s))
+        path.addCurve(to: p(15.1, 16.4, s), control1: p(16.3, 16.9, s), control2: p(15.5, 16.9, s))
+        path.closeSubpath()
+
+        // Eye area
+        path.move(to: p(14.1, 11.8, s))
+        path.addCurve(to: p(16, 12.9, s), control1: p(14.5, 12.5, s), control2: p(15.2, 12.9, s))
+        path.addCurve(to: p(17.9, 11.8, s), control1: p(16.8, 12.9, s), control2: p(17.5, 12.5, s))
+        path.addCurve(to: p(18.2, 10.7, s), control1: p(18.1, 11.5, s), control2: p(18.2, 11.1, s))
+        path.addCurve(to: p(16, 8.5, s), control1: p(18.2, 9.5, s), control2: p(17.2, 8.5, s))
+        path.addCurve(to: p(13.8, 10.7, s), control1: p(14.8, 8.5, s), control2: p(13.8, 9.5, s))
+        path.addCurve(to: p(14.1, 11.8, s), control1: p(13.8, 11.1, s), control2: p(13.9, 11.5, s))
+        path.closeSubpath()
+
+        let bounds = path.boundingRect
+        let xOffset = (rect.width - bounds.width) / 2 - bounds.minX
+        let yOffset = (rect.height - bounds.height) / 2 - bounds.minY
+        return path.offsetBy(dx: xOffset, dy: yOffset)
+    }
+
+    private func p(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) -> CGPoint {
+        CGPoint(x: x * s, y: y * s)
+    }
+}
+
+// MARK: - Xcode Logo
+
+struct XcodeLogo: View {
+    var body: some View {
+        XcodeLogoShape()
+            .fill(Color(red: 0.08, green: 0.49, blue: 0.98))  // #147EFB Xcode Blue
+    }
+}
+
+struct XcodeLogoShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 24.0
+        var path = Path()
+
+        path.move(to: p(20, 4.8, s))
+        path.addCurve(to: p(20.9, 4.4, s), control1: p(20.4, 4.6, s), control2: p(20.6, 4.4, s))
+        path.addCurve(to: p(21.8, 4.9, s), control1: p(21.4, 4.4, s), control2: p(21.6, 4.7, s))
+        path.addCurve(to: p(23, 5.4, s), control1: p(22, 5.2, s), control2: p(22.7, 5.4, s))
+        path.addCurve(to: p(23.7, 4.1, s), control1: p(23.2, 5.4, s), control2: p(23.5, 4.7, s))
+        path.addCurve(to: p(23.8, 2.7, s), control1: p(23.9, 3.5, s), control2: p(23.9, 2.8, s))
+        path.addCurve(to: p(22.7, 2.4, s), control1: p(23.7, 2.6, s), control2: p(22.9, 2.4, s))
+        path.addCurve(to: p(22, 2.6, s), control1: p(22.6, 2.5, s), control2: p(22.4, 2.6, s))
+        path.addCurve(to: p(20.9, 2, s), control1: p(21.6, 2.6, s), control2: p(21.2, 2.3, s))
+        path.addCurve(to: p(19.2, 1.1, s), control1: p(20.4, 1.5, s), control2: p(19.8, 1.3, s))
+        path.addCurve(to: p(17.3, 0.9, s), control1: p(18.6, 0.9, s), control2: p(17.9, 0.9, s))
+        path.addCurve(to: p(14.5, 1.1, s), control1: p(16.4, 0.8, s), control2: p(15.4, 0.8, s))
+        path.addCurve(to: p(13.4, 1.5, s), control1: p(14.1, 1.2, s), control2: p(13.8, 1.4, s))
+        path.addCurve(to: p(12.9, 1.7, s), control1: p(13.3, 1.6, s), control2: p(13, 1.7, s))
+        path.addCurve(to: p(12.9, 1.9, s), control1: p(12.8, 1.8, s), control2: p(12.8, 1.9, s))
+        path.addLine(to: p(13.4, 1.8, s))
+        path.addCurve(to: p(12.9, 2.2, s), control1: p(13.4, 1.8, s), control2: p(12.9, 2, s))
+        path.addLine(to: p(13, 2.3, s))
+        path.addCurve(to: p(13.5, 2.2, s), control1: p(13, 2.3, s), control2: p(13.3, 2.2, s))
+        path.addCurve(to: p(15, 2, s), control1: p(13.9, 2.2, s), control2: p(14.5, 2, s))
+        path.addCurve(to: p(16.8, 2.8, s), control1: p(15.6, 2, s), control2: p(16.2, 2.2, s))
+        path.addCurve(to: p(17.6, 5.6, s), control1: p(17.7, 3.9, s), control2: p(17.6, 5.3, s))
+        path.addCurve(to: p(12.5, 21.4, s), control1: p(17.4, 7.7, s), control2: p(12.7, 20.5, s))
+        path.addCurve(to: p(13.4, 23.1, s), control1: p(12.3, 22.3, s), control2: p(12.3, 23.1, s))
+        path.addCurve(to: p(15.1, 22.7, s), control1: p(14.5, 23.4, s), control2: p(14.9, 23.1, s))
+        path.addCurve(to: p(20, 4.8, s), control1: p(15.2, 22, s), control2: p(18.2, 6.2, s))
+        path.closeSubpath()
+
+        path.move(to: p(16.1, 3.8, s))
+        path.addLine(to: p(0, 6.3, s))
+        path.addLine(to: p(2.6, 23, s))
+        path.addLine(to: p(11.2, 21.6, s))
+        path.addCurve(to: p(13.8, 13.8, s), control1: p(11.1, 20.9, s), control2: p(13.4, 15.1, s))
+        path.addLine(to: p(9.4, 14.5, s))
+        path.addLine(to: p(10, 12.7, s))
+        path.addLine(to: p(13.1, 12.2, s))
+        path.addLine(to: p(13.9, 13.2, s))
+        path.addCurve(to: p(14.1, 12.5, s), control1: p(14.1, 12.7, s), control2: p(14.1, 12.5, s))
+        path.addLine(to: p(9.8, 7.2, s))
+        path.addCurve(to: p(9.9, 6.3, s), control1: p(9.6, 6.9, s), control2: p(9.6, 6.5, s))
+        path.addLine(to: p(10.1, 6.1, s))
+        path.addCurve(to: p(11, 6.2, s), control1: p(10.4, 5.9, s), control2: p(10.8, 5.9, s))
+        path.addLine(to: p(14.8, 10.6, s))
+        path.addCurve(to: p(16.3, 5.4, s), control1: p(15.6, 8.2, s), control2: p(16.3, 6.1, s))
+        path.addCurve(to: p(16.1, 3.8, s), control1: p(16.4, 5.2, s), control2: p(16.4, 4.5, s))
+        path.closeSubpath()
+
+        path.move(to: p(4.1, 13.7, s))
+        path.addLine(to: p(6.8, 13.2, s))
+        path.addLine(to: p(6.1, 15, s))
+        path.addLine(to: p(4.3, 15.3, s))
+        path.closeSubpath()
+
+        path.move(to: p(9.9, 8.6, s))
+        path.addLine(to: p(10.2, 8.7, s))
+        path.addCurve(to: p(10.6, 9.6, s), control1: p(10.6, 8.8, s), control2: p(10.7, 9.1, s))
+        path.addLine(to: p(7.6, 17.6, s))
+        path.addLine(to: p(5.8, 20, s))
+        path.addLine(to: p(6, 17, s))
+        path.addLine(to: p(9, 9, s))
+        path.addCurve(to: p(9.9, 8.6, s), control1: p(9.1, 8.6, s), control2: p(9.5, 8.4, s))
+        path.closeSubpath()
+
+        path.move(to: p(20.7, 5.8, s))
+        path.addCurve(to: p(18.8, 11.3, s), control1: p(20.3, 6.2, s), control2: p(19.8, 7.5, s))
+        path.addLine(to: p(18.9, 11.3, s))
+        path.addLine(to: p(19.2, 12.9, s))
+        path.addLine(to: p(18.4, 13, s))
+        path.addCurve(to: p(18, 14.6, s), control1: p(18.3, 13.5, s), control2: p(18.2, 14, s))
+        path.addCurve(to: p(18.7, 17.7, s), control1: p(19.7, 15.5, s), control2: p(18.8, 17.7, s))
+        path.addLine(to: p(18.6, 17.6, s))
+        path.addCurve(to: p(18.4, 17.1, s), control1: p(18.6, 17.6, s), control2: p(18.7, 17.2, s))
+        path.addCurve(to: p(17.5, 16.7, s), control1: p(18.2, 17, s), control2: p(17.8, 16.9, s))
+        path.addCurve(to: p(16.6, 20.8, s), control1: p(17.2, 17.9, s), control2: p(16.9, 19.3, s))
+        path.addLine(to: p(22.9, 19.8, s))
+        path.addLine(to: p(20.8, 5.7, s))
+        path.closeSubpath()
+
+        let bounds = path.boundingRect
+        let xOffset = (rect.width - bounds.width) / 2 - bounds.minX
+        let yOffset = (rect.height - bounds.height) / 2 - bounds.minY
+        return path.offsetBy(dx: xOffset, dy: yOffset)
+    }
+
+    private func p(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) -> CGPoint {
+        CGPoint(x: x * s, y: y * s)
+    }
+}
+
 // MARK: - Animated Progress Bar
 
 struct AnimatedProgressBar: View {
     let isActive: Bool
+    var baseColor: Color = Color(red: 0.85, green: 0.47, blue: 0.34)
+    var waveColor: Color = Color(red: 0.98, green: 0.65, blue: 0.5)
 
-    @State private var baseProgress: CGFloat = 0
-    @State private var waveProgress: CGFloat = 0
-    @State private var waveOpacity: CGFloat = 1.0
-
-    private let baseColor = Color(red: 0.85, green: 0.47, blue: 0.34)
-    private let waveColor = Color(red: 0.98, green: 0.65, blue: 0.5)
     private let animationDuration: Double = 1.5
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                // Base layer (solid, always visible once filled)
+                // Base layer (solid, stays filled)
                 Capsule()
                     .fill(baseColor)
-                    .frame(width: geometry.size.width * baseProgress)
+                    .frame(width: isActive ? geometry.size.width : 0)
+                    .animation(.easeOut(duration: animationDuration), value: isActive)
 
-                // Wave layer (draws across while fading out)
-                Capsule()
-                    .fill(waveColor)
-                    .frame(width: geometry.size.width * waveProgress)
-                    .opacity(waveOpacity)
+                // Wave layer (sweeps across and fades out, repeating)
+                if isActive {
+                    WaveLayer(color: waveColor, duration: animationDuration)
+                }
             }
         }
         .clipShape(Capsule())
-        .onChange(of: isActive) { _, active in
-            if active {
-                startAnimation()
-            } else {
-                resetAnimation()
-            }
+    }
+}
+
+/// Separate view for the wave animation - uses TimelineView for continuous animation
+struct WaveLayer: View {
+    let color: Color
+    let duration: Double
+
+    @State private var phase: Int = 0
+    @State private var progress: CGFloat = 0
+    @State private var opacity: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { geometry in
+            Capsule()
+                .fill(color)
+                .frame(width: geometry.size.width * progress)
+                .opacity(opacity)
         }
         .onAppear {
-            if isActive {
-                startAnimation()
+            // Start after a delay (let base fill first)
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                startWaveCycle()
             }
         }
     }
 
-    private func startAnimation() {
-        resetAnimation()
+    private func startWaveCycle() {
+        // Reset to start
+        progress = 0
+        opacity = 1.0
 
-        // First: fill base layer
-        withAnimation(.easeOut(duration: animationDuration)) {
-            baseProgress = 1.0
+        // Animate to full while fading
+        withAnimation(.easeInOut(duration: duration)) {
+            progress = 1.0
+            opacity = 0.0
         }
 
-        // Start wave animation after base fills
-        DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) {
-            animateWave()
+        // Schedule next cycle
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) {
+            startWaveCycle()
         }
-    }
-
-    private func animateWave() {
-        guard isActive else { return }
-
-        // Reset wave
-        waveProgress = 0
-        waveOpacity = 1.0
-
-        // Animate wave: progress to full while fading out
-        withAnimation(.easeInOut(duration: animationDuration)) {
-            waveProgress = 1.0
-            waveOpacity = 0.0
-        }
-
-        // Repeat
-        DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) {
-            animateWave()
-        }
-    }
-
-    private func resetAnimation() {
-        baseProgress = 0
-        waveProgress = 0
-        waveOpacity = 1.0
     }
 }
 

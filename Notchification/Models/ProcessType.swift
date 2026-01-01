@@ -22,9 +22,9 @@ enum ProcessType: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .claude: return Color(red: 0.91, green: 0.45, blue: 0.32) // Orange-red
-        case .xcode: return Color(red: 0.95, green: 0.77, blue: 0.29) // Yellow
-        case .androidStudio: return Color(red: 0.29, green: 0.56, blue: 0.31) // Green
+        case .claude: return Color(red: 0.85, green: 0.47, blue: 0.34) // #D97757 Claude orange
+        case .xcode: return Color(red: 0.08, green: 0.49, blue: 0.98) // #147EFB Xcode blue
+        case .androidStudio: return Color(red: 0.24, green: 0.86, blue: 0.52) // #3DDC84 Android green
         }
     }
 

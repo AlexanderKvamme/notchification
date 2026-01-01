@@ -17,6 +17,23 @@ struct NotchificationApp: App {
     }
 }
 
+/// Debug settings
+final class DebugSettings: ObservableObject {
+    static let shared = DebugSettings()
+
+    @Published var debugClaude: Bool {
+        didSet { UserDefaults.standard.set(debugClaude, forKey: "debugClaude") }
+    }
+    @Published var debugAndroid: Bool {
+        didSet { UserDefaults.standard.set(debugAndroid, forKey: "debugAndroid") }
+    }
+
+    private init() {
+        self.debugClaude = UserDefaults.standard.object(forKey: "debugClaude") as? Bool ?? false
+        self.debugAndroid = UserDefaults.standard.object(forKey: "debugAndroid") as? Bool ?? true
+    }
+}
+
 /// Main app state that coordinates monitoring and UI
 final class AppState: ObservableObject {
     @Published var isMonitoring: Bool = true
@@ -33,8 +50,8 @@ final class AppState: ObservableObject {
     private var mockTimer: Timer?
 
     init() {
-        // Load setting (default to true)
-        self.showMockOnLaunch = UserDefaults.standard.object(forKey: "showMockOnLaunch") as? Bool ?? true
+        // Load setting (default to false)
+        self.showMockOnLaunch = UserDefaults.standard.object(forKey: "showMockOnLaunch") as? Bool ?? false
 
         setupBindings()
 
@@ -123,6 +140,7 @@ final class AppState: ObservableObject {
 /// Menu bar dropdown view
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var debugSettings = DebugSettings.shared
 
     var body: some View {
         VStack {
@@ -139,6 +157,12 @@ struct MenuBarView: View {
             Divider()
 
             Toggle("Show Mock on Launch", isOn: $appState.showMockOnLaunch)
+
+            Divider()
+
+            Text("Debug Logging").font(.caption).foregroundColor(.secondary)
+            Toggle("Claude", isOn: $debugSettings.debugClaude)
+            Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
 
             Divider()
 

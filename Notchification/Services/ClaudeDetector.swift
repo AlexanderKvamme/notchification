@@ -51,8 +51,10 @@ final class ClaudeDetector: ObservableObject {
     }
 
     private func checkClaudeStatus() {
+        let debug = DebugSettings.shared.debugClaude
+
         guard let pid = getClaudePID() else {
-            print("⚪️ No claude process found")
+            if debug { print("🔶 Claude: No process found") }
             consecutiveHighReadings = 0
             consecutiveLowReadings += 1
             if consecutiveLowReadings >= requiredLowToHide {
@@ -67,7 +69,7 @@ final class ClaudeDetector: ObservableObject {
             // HIGH (20+) - count towards showing
             consecutiveHighReadings += 1
             consecutiveLowReadings = 0
-            print("🔴 HIGH: \(String(format: "%.1f", cpu))% | high: \(consecutiveHighReadings)/\(requiredHighToShow) | active: \(isActive)")
+            if debug { print("🔶 Claude HIGH: \(String(format: "%.1f", cpu))% | high: \(consecutiveHighReadings)/\(requiredHighToShow) | active: \(isActive)") }
             if consecutiveHighReadings >= requiredHighToShow {
                 updateStatus(isActive: true)
             }
@@ -75,13 +77,13 @@ final class ClaudeDetector: ObservableObject {
             // LOW (0-10) - count towards hiding
             consecutiveLowReadings += 1
             consecutiveHighReadings = 0
-            print("🟢 LOW: \(String(format: "%.1f", cpu))% | low: \(consecutiveLowReadings)/\(requiredLowToHide) | active: \(isActive)")
+            if debug { print("🔶 Claude LOW: \(String(format: "%.1f", cpu))% | low: \(consecutiveLowReadings)/\(requiredLowToHide) | active: \(isActive)") }
             if consecutiveLowReadings >= requiredLowToHide {
                 updateStatus(isActive: false)
             }
         } else {
             // MEDIUM (10-20) - neutral, don't count
-            print("🟡 MED: \(String(format: "%.1f", cpu))% | active: \(isActive)")
+            if debug { print("🔶 Claude MED: \(String(format: "%.1f", cpu))% | active: \(isActive)") }
         }
     }
 
@@ -108,7 +110,9 @@ final class ClaudeDetector: ObservableObject {
 
     private func updateStatus(isActive: Bool) {
         if self.isActive != isActive {
-            print("⚡️ STATUS CHANGED: \(isActive ? "ACTIVE ▶️" : "INACTIVE ⏹️")")
+            if DebugSettings.shared.debugClaude {
+                print("🔶 Claude STATUS: \(isActive ? "ACTIVE ▶️" : "INACTIVE ⏹️")")
+            }
             DispatchQueue.main.async {
                 self.isActive = isActive
             }

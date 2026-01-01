@@ -11,6 +11,7 @@ final class ProcessMonitor: ObservableObject {
     @Published private(set) var activeProcesses: [ProcessType] = []
 
     private let claudeDetector = ClaudeDetector()
+    private let androidStudioDetector = AndroidStudioDetector()
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -19,16 +20,24 @@ final class ProcessMonitor: ObservableObject {
 
     func startMonitoring() {
         claudeDetector.startMonitoring()
+        androidStudioDetector.startMonitoring()
         // Future: xcodeDetector.startMonitoring()
-        // Future: androidStudioDetector.startMonitoring()
     }
 
     func stopMonitoring() {
         claudeDetector.stopMonitoring()
+        androidStudioDetector.stopMonitoring()
     }
 
     private func setupBindings() {
         claudeDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        androidStudioDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateActiveProcesses()
@@ -43,8 +52,11 @@ final class ProcessMonitor: ObservableObject {
             processes.append(.claude)
         }
 
+        if androidStudioDetector.isActive {
+            processes.append(.androidStudio)
+        }
+
         // Future: Check xcode detector
-        // Future: Check android studio detector
 
         activeProcesses = processes
     }
