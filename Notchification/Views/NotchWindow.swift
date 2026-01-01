@@ -14,8 +14,12 @@ final class NotchState: ObservableObject {
 /// A borderless window that displays the notch indicator at the top of the screen
 final class NotchWindow: NSWindow {
 
-    private let windowWidth: CGFloat = 380  // Extra width for outward curves (40 each side)
-    private let windowHeight: CGFloat = 100
+    private var windowWidth: CGFloat {
+        NSScreen.main?.frame.width ?? 1440
+    }
+    private var windowHeight: CGFloat {
+        NSScreen.main?.frame.height ?? 900
+    }
     let notchState = NotchState()
 
     init() {
@@ -52,24 +56,21 @@ final class NotchWindow: NSWindow {
     private func positionAtNotch() {
         guard let screen = NSScreen.main else { return }
 
-        let fullFrame = screen.frame
-
-        // Center horizontally, flush with top of screen
-        let x = fullFrame.midX - (windowWidth / 2)
-        let y = fullFrame.maxY - windowHeight
-
-        setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
+        // Full screen window
+        setFrame(screen.frame, display: true)
     }
 
     private func setupContent() {
+        let width = windowWidth
+        let height = windowHeight
         let hostingView = NSHostingView(rootView:
             VStack(spacing: 0) {
-                NotchView(notchState: notchState)
+                NotchView(notchState: notchState, screenWidth: width, screenHeight: height)
                 Spacer()
             }
-            .frame(width: windowWidth, height: windowHeight)
+            .frame(width: width, height: height, alignment: .top)
         )
-        hostingView.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
+        hostingView.frame = NSRect(x: 0, y: 0, width: width, height: height)
         contentView = hostingView
     }
 

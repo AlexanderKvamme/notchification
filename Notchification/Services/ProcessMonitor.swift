@@ -12,6 +12,7 @@ final class ProcessMonitor: ObservableObject {
 
     private let claudeDetector = ClaudeDetector()
     private let androidStudioDetector = AndroidStudioDetector()
+    private let xcodeDetector = XcodeDetector()
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -27,12 +28,15 @@ final class ProcessMonitor: ObservableObject {
         if trackingSettings.trackAndroidStudio {
             androidStudioDetector.startMonitoring()
         }
-        // Future: if trackingSettings.trackXcode { xcodeDetector.startMonitoring() }
+        if trackingSettings.trackXcode {
+            xcodeDetector.startMonitoring()
+        }
     }
 
     func stopMonitoring() {
         claudeDetector.stopMonitoring()
         androidStudioDetector.stopMonitoring()
+        xcodeDetector.stopMonitoring()
     }
 
     private func setupBindings() {
@@ -45,6 +49,13 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         androidStudioDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        xcodeDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateActiveProcesses()
@@ -77,6 +88,19 @@ final class ProcessMonitor: ObservableObject {
                 self.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackXcode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.xcodeDetector.startMonitoring()
+                } else {
+                    self.xcodeDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -90,7 +114,9 @@ final class ProcessMonitor: ObservableObject {
             processes.append(.androidStudio)
         }
 
-        // Future: Check xcode detector with trackingSettings.trackXcode
+        if trackingSettings.trackXcode && xcodeDetector.isActive {
+            processes.append(.xcode)
+        }
 
         activeProcesses = processes
     }

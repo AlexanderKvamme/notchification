@@ -27,10 +27,14 @@ final class DebugSettings: ObservableObject {
     @Published var debugAndroid: Bool {
         didSet { UserDefaults.standard.set(debugAndroid, forKey: "debugAndroid") }
     }
+    @Published var debugXcode: Bool {
+        didSet { UserDefaults.standard.set(debugXcode, forKey: "debugXcode") }
+    }
 
     private init() {
         self.debugClaude = UserDefaults.standard.object(forKey: "debugClaude") as? Bool ?? false
         self.debugAndroid = UserDefaults.standard.object(forKey: "debugAndroid") as? Bool ?? true
+        self.debugXcode = UserDefaults.standard.object(forKey: "debugXcode") as? Bool ?? true
     }
 }
 
@@ -55,13 +59,30 @@ final class TrackingSettings: ObservableObject {
     }
 }
 
+/// Which process type to mock on launch
+enum MockProcessType: String, CaseIterable {
+    case none = "None"
+    case claude = "Claude"
+    case android = "Android"
+    case xcode = "Xcode"
+
+    var processType: ProcessType? {
+        switch self {
+        case .none: return nil
+        case .claude: return .claude
+        case .android: return .androidStudio
+        case .xcode: return .xcode
+        }
+    }
+}
+
 /// Main app state that coordinates monitoring and UI
 final class AppState: ObservableObject {
     @Published var isMonitoring: Bool = true
     @Published var isMocking: Bool = false
-    @Published var showMockOnLaunch: Bool {
+    @Published var mockOnLaunchType: MockProcessType {
         didSet {
-            UserDefaults.standard.set(showMockOnLaunch, forKey: "showMockOnLaunch")
+            UserDefaults.standard.set(mockOnLaunchType.rawValue, forKey: "mockOnLaunchType")
         }
     }
 
@@ -71,13 +92,14 @@ final class AppState: ObservableObject {
     private var mockTimer: Timer?
 
     init() {
-        // Load setting (default to false)
-        self.showMockOnLaunch = UserDefaults.standard.object(forKey: "showMockOnLaunch") as? Bool ?? false
+        // Load settings
+        let savedMockType = UserDefaults.standard.string(forKey: "mockOnLaunchType") ?? "None"
+        self.mockOnLaunchType = MockProcessType(rawValue: savedMockType) ?? .none
 
         setupBindings()
 
-        // Show mock on launch if enabled
-        if showMockOnLaunch {
+        // Show mock on launch if a process type is selected
+        if mockOnLaunchType != .none {
             runLaunchMock()
         } else {
             startMonitoring()
@@ -95,8 +117,13 @@ final class AppState: ObservableObject {
     }
 
     private func runLaunchMock() {
+        guard let processType = mockOnLaunchType.processType else {
+            startMonitoring()
+            return
+        }
+
         isMocking = true
-        windowController.update(with: [.claude])
+        windowController.update(with: [processType])
 
         // Hide after 5 seconds and start monitoring
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
@@ -185,13 +212,21 @@ struct MenuBarView: View {
 
             Divider()
 
-            Toggle("Show Mock on Launch", isOn: $appState.showMockOnLaunch)
+            Text("Mock on Launch").font(.caption).foregroundColor(.secondary)
+            Picker("Mock Type", selection: $appState.mockOnLaunchType) {
+                ForEach(MockProcessType.allCases, id: \.self) { type in
+                    Text(type.rawValue).tag(type)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
 
             Divider()
 
             Text("Debug Logging").font(.caption).foregroundColor(.secondary)
             Toggle("Claude", isOn: $debugSettings.debugClaude)
             Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
+            Toggle("Xcode", isOn: $debugSettings.debugXcode)
 
             Divider()
 

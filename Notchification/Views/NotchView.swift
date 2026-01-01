@@ -4,23 +4,30 @@
 //
 
 import SwiftUI
+import ConfettiSwiftUI
 
 struct NotchView: View {
     @ObservedObject var notchState: NotchState
+    var screenWidth: CGFloat = 1440
+    var screenHeight: CGFloat = 900
 
     // Animation state
     @State private var isExpanded: Bool = false
+    @State private var previousProcesses: Set<ProcessType> = []
+    @State private var confettiTrigger: Int = 0
+    @State private var confettiColor: Color = .orange
+    @State private var confettiId: UUID = UUID()
 
     // Dimensions
     private let notchWidth: CGFloat = 300
-    private let frameWidth: CGFloat = 380  // Extra 80 for outward curves
+    private let notchFrameWidth: CGFloat = 380  // Extra 80 for outward curves
 
     // Content dimensions
     private let logoSize: CGFloat = 24
     private let progressBarHeight: CGFloat = 12
     private let horizontalPadding: CGFloat = 20
     private let rowSpacing: CGFloat = 8
-    private let topPadding: CGFloat = 18  // Space below notch cutout
+    private let topPadding: CGFloat = 38  // Space below physical notch cutout (~34px)
 
     // Dynamic height based on number of processes
     private var expandedHeight: CGFloat {
@@ -40,6 +47,12 @@ struct NotchView: View {
                     y: isExpanded ? 1 : 0,
                     anchor: .top
                 )
+                .overlay(alignment: .top) {
+                    // Confetti cannon - overlay so it doesn't affect layout
+                    ConfettiEmitter(trigger: $confettiTrigger, color: confettiColor)
+                        .id(confettiId)
+                        .allowsHitTesting(false)
+                }
 
             // Content: Multiple processes stacked vertically
             if !notchState.activeProcesses.isEmpty {
@@ -65,13 +78,39 @@ struct NotchView: View {
                 .scaleEffect(isExpanded ? 1 : 0.5)
             }
         }
-        .frame(width: frameWidth, height: expandedHeight, alignment: .top)
-        .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: isExpanded)
+        .frame(width: screenWidth, height: screenHeight, alignment: .top)
+        .animation(isExpanded
+            ? .spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)  // Bouncy open
+            : .easeOut(duration: 0.3),  // Smooth close
+            value: isExpanded
+        )
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
             isExpanded = !isEmpty
         }
+        .onChange(of: notchState.activeProcesses) { oldValue, newValue in
+            // Check if a process was removed
+            let oldSet = Set(oldValue)
+            let newSet = Set(newValue)
+            let removed = oldSet.subtracting(newSet)
+
+            if let removedProcess = removed.first {
+                // Set confetti color and new ID, then trigger after delay to ensure view updates
+                confettiColor = removedProcess.color
+                confettiId = UUID()
+
+                // Debug log
+                print("🎉 Confetti triggered for \(removedProcess) with color: \(removedProcess.color)")
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    confettiTrigger += 1
+                }
+            }
+
+            previousProcesses = newSet
+        }
         .onAppear {
+            previousProcesses = Set(notchState.activeProcesses)
             if !notchState.activeProcesses.isEmpty {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isExpanded = true
@@ -306,7 +345,6 @@ struct AnimatedProgressBar: View {
                     .opacity(waveOpacity)
             }
             .onChange(of: isActive) { _, active in
-                print("🎨 isActive changed to: \(active), geometry.width=\(geometry.size.width)")
                 if active {
                     startAnimation(width: geometry.size.width)
                 } else {
@@ -314,7 +352,6 @@ struct AnimatedProgressBar: View {
                 }
             }
             .onAppear {
-                print("🎨 onAppear isActive=\(isActive), geometry.width=\(geometry.size.width)")
                 if isActive {
                     startAnimation(width: geometry.size.width)
                 }
@@ -324,8 +361,6 @@ struct AnimatedProgressBar: View {
     }
 
     private func startAnimation(width: CGFloat) {
-        print("🎨 startAnimation width=\(width)")
-
         // Reset
         baseWidth = 0
         waveWidth = 0
@@ -335,21 +370,15 @@ struct AnimatedProgressBar: View {
         withAnimation(.easeOut(duration: animationDuration)) {
             baseWidth = width
         }
-        print("🎨 base animating to \(width)")
 
         // Start wave loop after base fills
         DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) {
-            print("🎨 starting wave loop")
             self.startWaveLoop(width: width)
         }
     }
 
     private func startWaveLoop(width: CGFloat) {
-        print("🎨 startWaveLoop isActive=\(isActive)")
-        guard isActive else {
-            print("🎨 NOT ACTIVE - stopping wave")
-            return
-        }
+        guard isActive else { return }
 
         // Reset wave instantly (no animation)
         var transaction = Transaction()
@@ -358,7 +387,6 @@ struct AnimatedProgressBar: View {
             waveWidth = 0
             waveOpacity = 1.0
         }
-        print("🎨 wave reset: width=0, opacity=1")
 
         // Small delay to let reset apply, then animate
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -378,7 +406,6 @@ struct AnimatedProgressBar: View {
     }
 
     private func stopAnimation() {
-        print("🎨 stopAnimation")
         withAnimation(.easeOut(duration: 0.3)) {
             baseWidth = 0
             waveWidth = 0
@@ -578,48 +605,53 @@ struct ClaudeLogoShape: Shape {
     }
 }
 
+// MARK: - Confetti Emitter
+
+struct ConfettiEmitter: View {
+    @Binding var trigger: Int
+    let color: Color
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 300, height: 50)
+            .confettiCannon(
+                counter: $trigger,
+                num: 100,
+                colors: [color],
+                confettiSize: 12,
+                rainHeight: 200,
+                openingAngle: Angle(degrees: 180),
+                closingAngle: Angle(degrees: 360),
+                radius: 300
+            )
+    }
+}
+
 #Preview("Single Process") {
     let state = NotchState()
     state.activeProcesses = [.claude]
-    return VStack(spacing: 0) {
-        Rectangle()
-            .fill(Color.gray.opacity(0.3))
-            .frame(height: 24)
-
-        NotchView(notchState: state)
-
-        Spacer()
+    return ZStack(alignment: .top) {
+        Color.gray.opacity(0.2)
+        NotchView(notchState: state, screenWidth: 400, screenHeight: 300)
     }
     .frame(width: 400, height: 300)
-    .background(Color.gray.opacity(0.2))
 }
 
 #Preview("Multiple Processes") {
     let state = NotchState()
     state.activeProcesses = [.claude, .androidStudio]
-    return VStack(spacing: 0) {
-        Rectangle()
-            .fill(Color.gray.opacity(0.3))
-            .frame(height: 24)
-
-        NotchView(notchState: state)
-
-        Spacer()
+    return ZStack(alignment: .top) {
+        Color.gray.opacity(0.2)
+        NotchView(notchState: state, screenWidth: 400, screenHeight: 300)
     }
     .frame(width: 400, height: 300)
-    .background(Color.gray.opacity(0.2))
 }
 
 #Preview("Empty") {
-    VStack(spacing: 0) {
-        Rectangle()
-            .fill(Color.gray.opacity(0.3))
-            .frame(height: 24)
-
-        NotchView(notchState: NotchState())
-
-        Spacer()
+    ZStack(alignment: .top) {
+        Color.gray.opacity(0.2)
+        NotchView(notchState: NotchState(), screenWidth: 400, screenHeight: 300)
     }
     .frame(width: 400, height: 300)
-    .background(Color.gray.opacity(0.2))
 }

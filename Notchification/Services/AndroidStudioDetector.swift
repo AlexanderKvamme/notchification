@@ -25,7 +25,6 @@ final class AndroidStudioDetector: ObservableObject {
     private var consecutiveInactiveReadings: Int = 0
 
     init() {
-        print("🤖 AndroidStudioDetector init")
         findGradlePath()
     }
 
@@ -41,7 +40,6 @@ final class AndroidStudioDetector: ObservableObject {
         for path in possiblePaths {
             if FileManager.default.fileExists(atPath: path) {
                 gradlePath = path
-                print("🤖 Found gradle at: \(path)")
                 return
             }
         }
@@ -61,15 +59,13 @@ final class AndroidStudioDetector: ObservableObject {
             if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !path.isEmpty {
                 gradlePath = path
-                print("🤖 Found gradle at: \(path)")
             }
         } catch {
-            print("🤖 Could not find gradle: \(error)")
+            // Silently fail - gradle not found
         }
     }
 
     func startMonitoring() {
-        print("🤖 startMonitoring called, gradlePath=\(gradlePath ?? "nil")")
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
 
@@ -96,22 +92,25 @@ final class AndroidStudioDetector: ObservableObject {
             guard let self = self else { return }
 
             let (building, details) = self.isGradleBusy()
+            let debug = DebugSettings.shared.debugAndroid
 
             DispatchQueue.main.async {
-                print("🤖 building=\(building) | \(details)")
+                if debug {
+                    print("🤖 Android building=\(building) | \(details)")
+                }
 
                 if building {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0
                     if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
-                        print("🤖 >>> SHOWING INDICATOR")
+                        if debug { print("🤖 >>> SHOWING ANDROID INDICATOR") }
                         self.isActive = true
                     }
                 } else {
                     self.consecutiveInactiveReadings += 1
                     self.consecutiveActiveReadings = 0
                     if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
-                        print("🤖 >>> HIDING INDICATOR")
+                        if debug { print("🤖 >>> HIDING ANDROID INDICATOR") }
                         self.isActive = false
                     }
                 }
@@ -161,7 +160,8 @@ final class AndroidStudioDetector: ObservableObject {
 
         let combined = output + errOutput
 
-        if !combined.isEmpty {
+        // Only log if debug enabled and not just boilerplate messages
+        if DebugSettings.shared.debugAndroid && !combined.isEmpty && !combined.contains("Only Daemons for the current Gradle version") {
             print("🤖 gradle output: \(combined.prefix(200))")
         }
 

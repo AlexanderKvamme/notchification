@@ -23,7 +23,10 @@
       "Bash(git -C /Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification log --oneline -5)",
       "Bash(git -C /Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification diff Notchification/)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(killall:*)",
+      "Bash(kill:*)",
+      "Bash(codesign:*)"
     ]
   }
 }
