@@ -14,6 +14,7 @@ struct NotchView: View {
     // Dimensions
     private let expandedHeight: CGFloat = 120
     private let notchWidth: CGFloat = 300
+    private let frameWidth: CGFloat = 380  // Extra 80 for outward curves
 
     // Pill dimensions
     private let pillHeight: CGFloat = 8
@@ -43,7 +44,7 @@ struct NotchView: View {
                 .scaleEffect(isExpanded ? 1 : 0.5)
             }
         }
-        .frame(width: notchWidth, height: expandedHeight, alignment: .top)
+        .frame(width: frameWidth, height: expandedHeight, alignment: .top)
         .animation(.spring(response: 0.5, dampingFraction: 0.7), value: isExpanded)
         .onChange(of: activeProcesses.isEmpty) { _, isEmpty in
             isExpanded = !isEmpty

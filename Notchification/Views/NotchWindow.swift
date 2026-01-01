@@ -9,7 +9,7 @@ import SwiftUI
 /// A borderless window that displays the notch indicator at the top of the screen
 final class NotchWindow: NSWindow {
 
-    private let windowWidth: CGFloat = 300
+    private let windowWidth: CGFloat = 380  // Extra width for outward curves (40 each side)
     private let windowHeight: CGFloat = 130
 
     init() {
@@ -47,9 +47,9 @@ final class NotchWindow: NSWindow {
 
         let fullFrame = screen.frame
 
-        // Center horizontally, position 10 pixels down from top so entire shape is visible
+        // Center horizontally, flush with top of screen
         let x = fullFrame.midX - (windowWidth / 2)
-        let y = fullFrame.maxY - windowHeight - 10
+        let y = fullFrame.maxY - windowHeight
 
         setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
     }

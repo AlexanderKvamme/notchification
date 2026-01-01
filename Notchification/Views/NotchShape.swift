@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct NotchShape: Shape {
-    var cornerRadius: CGFloat = 40
+    var cornerRadius: CGFloat = 30
     
     func path(in rect: CGRect) -> Path {
         let width = rect.width
