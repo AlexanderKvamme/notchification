@@ -30,6 +30,11 @@ final class AppState: ObservableObject {
     init() {
         setupBindings()
         startMonitoring()
+
+        // Toggle mock mode every 3 seconds for demo
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.startMockLoop()
+        }
     }
 
     private func setupBindings() {
@@ -63,14 +68,16 @@ final class AppState: ObservableObject {
 
     // MARK: - Mock Mode
 
-    func startMock(duration: TimeInterval, processes: [ProcessType] = [.claude]) {
-        stopMock() // Cancel any existing mock
-        isMocking = true
-        windowController.update(with: processes)
-
-        mockTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
-            self?.stopMock()
+    private func startMockLoop() {
+        mockTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            self?.toggleMock()
         }
+        toggleMock() // Start immediately
+    }
+
+    private func toggleMock() {
+        isMocking.toggle()
+        windowController.update(with: isMocking ? [.claude] : [])
     }
 
     func stopMock() {
@@ -92,30 +99,6 @@ struct MenuBarView: View {
                     get: { appState.isMonitoring },
                     set: { _ in appState.toggleMonitoring() }
                    ))
-
-            Divider()
-
-            Text("Mock Mode")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Button("Mock Claude (3s)") {
-                appState.startMock(duration: 3, processes: [.claude])
-            }
-
-            Button("Mock Claude (10s)") {
-                appState.startMock(duration: 10, processes: [.claude])
-            }
-
-            Button("Mock All (5s)") {
-                appState.startMock(duration: 5, processes: [.claude, .xcode, .androidStudio])
-            }
-
-            if appState.isMocking {
-                Button("Stop Mock") {
-                    appState.stopMock()
-                }
-            }
 
             Divider()
 

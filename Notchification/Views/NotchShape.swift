@@ -2,67 +2,62 @@ import SwiftUI
 
 struct NotchShape: Shape {
     var cornerRadius: CGFloat = 30
-    
+
     func path(in rect: CGRect) -> Path {
         let width = rect.width
         let height = rect.height
-        let radius = min(cornerRadius, min(width/2, height/2))
-        
+        let r = min(cornerRadius, min(width/2, height/2))
+
+        // Smoothness factor - higher = smoother transition (0.55 ≈ circle, 0.7+ = squircle)
+        let k: CGFloat = 0.7
+
         var path = Path()
-        
-        // Start at top-left
-        path.move(to: CGPoint(x: -cornerRadius, y: 0))
-        
+
+        // Start at top-left ear
+        path.move(to: CGPoint(x: -r, y: 0))
+
         // Top edge
-        path.addLine(to: CGPoint(x: width+cornerRadius, y: 0))
-        
-        // Curve down from the top right
-        path.addArc(
-            center: CGPoint(x: width+cornerRadius, y: cornerRadius),
-            radius: radius,
-            startAngle: Angle(degrees: -90),
-            endAngle: Angle(degrees: -180),
-            clockwise: true
+        path.addLine(to: CGPoint(x: width + r, y: 0))
+
+        // Top-right outward curve (smooth bezier)
+        path.addCurve(
+            to: CGPoint(x: width, y: r),
+            control1: CGPoint(x: width + r * (1 - k), y: 0),
+            control2: CGPoint(x: width, y: r * (1 - k))
         )
-        
-        // Right edge down to the corner
-        path.addLine(to: CGPoint(x: width, y: height - radius))
-        
-        // Bottom-right corner
-        path.addArc(
-            center: CGPoint(x: width - radius, y: height - radius),
-            radius: radius,
-            startAngle: Angle(degrees: 0),
-            endAngle: Angle(degrees: 90),
-            clockwise: false
+
+        // Right edge
+        path.addLine(to: CGPoint(x: width, y: height - r))
+
+        // Bottom-right inward curve (smooth bezier)
+        path.addCurve(
+            to: CGPoint(x: width - r, y: height),
+            control1: CGPoint(x: width, y: height - r * (1 - k)),
+            control2: CGPoint(x: width - r * (1 - k), y: height)
         )
-        
+
         // Bottom edge
-        path.addLine(to: CGPoint(x: radius, y: height))
-        
-        // Bottom-left corner
-        path.addArc(
-            center: CGPoint(x: radius, y: height - radius),
-            radius: radius,
-            startAngle: Angle(degrees: 90),
-            endAngle: Angle(degrees: 180),
-            clockwise: false
+        path.addLine(to: CGPoint(x: r, y: height))
+
+        // Bottom-left inward curve (smooth bezier)
+        path.addCurve(
+            to: CGPoint(x: 0, y: height - r),
+            control1: CGPoint(x: r * (1 - k), y: height),
+            control2: CGPoint(x: 0, y: height - r * (1 - k))
         )
-        
-        // Left edge back to top
-        path.addLine(to: CGPoint(x: 0, y: radius))
-        
-        // Round up and to the left
-        path.addArc(
-            center: CGPoint(x: 0-radius, y: radius),
-            radius: radius,
-            startAngle: Angle(degrees: 0),
-            endAngle: Angle(degrees: 270),
-            clockwise: true
+
+        // Left edge
+        path.addLine(to: CGPoint(x: 0, y: r))
+
+        // Top-left outward curve (smooth bezier)
+        path.addCurve(
+            to: CGPoint(x: -r, y: 0),
+            control1: CGPoint(x: 0, y: r * (1 - k)),
+            control2: CGPoint(x: -r * (1 - k), y: 0)
         )
-        
+
         path.closeSubpath()
-        
+
         return path
     }
 }

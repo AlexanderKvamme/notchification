@@ -6,11 +6,17 @@
 import AppKit
 import SwiftUI
 
+/// Observable state for the notch view
+final class NotchState: ObservableObject {
+    @Published var activeProcesses: [ProcessType] = []
+}
+
 /// A borderless window that displays the notch indicator at the top of the screen
 final class NotchWindow: NSWindow {
 
     private let windowWidth: CGFloat = 380  // Extra width for outward curves (40 each side)
     private let windowHeight: CGFloat = 130
+    let notchState = NotchState()
 
     init() {
         super.init(
@@ -22,6 +28,7 @@ final class NotchWindow: NSWindow {
 
         configureWindow()
         positionAtNotch()
+        setupContent()
     }
 
     private func configureWindow() {
@@ -54,17 +61,21 @@ final class NotchWindow: NSWindow {
         setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
     }
 
-    /// Update the content view with new active processes
-    func updateContent(with processes: [ProcessType]) {
+    private func setupContent() {
         let hostingView = NSHostingView(rootView:
             VStack(spacing: 0) {
-                NotchView(activeProcesses: processes)
+                NotchView(notchState: notchState)
                 Spacer()
             }
             .frame(width: windowWidth, height: windowHeight)
         )
         hostingView.frame = NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight)
         contentView = hostingView
+    }
+
+    /// Update the active processes
+    func updateProcesses(_ processes: [ProcessType]) {
+        notchState.activeProcesses = processes
     }
 }
 
@@ -75,12 +86,11 @@ final class NotchWindowController: ObservableObject {
     init() {
         // Create window immediately and show it (animation happens inside)
         window = NotchWindow()
-        window?.updateContent(with: [])
         window?.orderFrontRegardless()
     }
 
     func update(with processes: [ProcessType]) {
-        window?.updateContent(with: processes)
+        window?.updateProcesses(processes)
         // Keep window always visible - the NotchView animates in/out
         window?.orderFrontRegardless()
     }
