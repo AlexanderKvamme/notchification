@@ -8,7 +8,8 @@
       "Bash(open:*)",
       "Bash(pkill:*)",
       "Bash(log show:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:ph-files.imgix.net)"
     ]
   }
 }

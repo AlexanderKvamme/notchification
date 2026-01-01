@@ -50,7 +50,7 @@ final class AppState: ObservableObject {
     func stopMonitoring() {
         isMonitoring = false
         processMonitor.stopMonitoring()
-        windowController.hide()
+        windowController.update(with: [])
     }
 
     func toggleMonitoring() {
@@ -77,7 +77,7 @@ final class AppState: ObservableObject {
         mockTimer?.invalidate()
         mockTimer = nil
         isMocking = false
-        windowController.hide()
+        windowController.update(with: [])
     }
 }
 

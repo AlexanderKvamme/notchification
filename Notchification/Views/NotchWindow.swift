@@ -9,8 +9,8 @@ import SwiftUI
 /// A borderless window that displays the notch indicator at the top of the screen
 final class NotchWindow: NSWindow {
 
-    private let windowWidth: CGFloat = 280
-    private let windowHeight: CGFloat = 100
+    private let windowWidth: CGFloat = 300
+    private let windowHeight: CGFloat = 130
 
     init() {
         super.init(
@@ -45,12 +45,11 @@ final class NotchWindow: NSWindow {
     private func positionAtNotch() {
         guard let screen = NSScreen.main else { return }
 
-        let screenFrame = screen.visibleFrame
         let fullFrame = screen.frame
 
-        // Center horizontally, position at the absolute top of screen (above menu bar)
+        // Center horizontally, position 10 pixels down from top so entire shape is visible
         let x = fullFrame.midX - (windowWidth / 2)
-        let y = fullFrame.maxY - windowHeight  // Flush with top of screen
+        let y = fullFrame.maxY - windowHeight - 10
 
         setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
     }
@@ -74,25 +73,15 @@ final class NotchWindowController: ObservableObject {
     private var window: NotchWindow?
 
     init() {
-        // Create window immediately so it's ready
+        // Create window immediately and show it (animation happens inside)
         window = NotchWindow()
-    }
-
-    func show(with processes: [ProcessType]) {
-        window?.updateContent(with: processes)
+        window?.updateContent(with: [])
         window?.orderFrontRegardless()
     }
 
-    func hide() {
-        // Don't actually hide - just show empty state
-        window?.updateContent(with: [])
-    }
-
     func update(with processes: [ProcessType]) {
-        if processes.isEmpty {
-            hide()
-        } else {
-            show(with: processes)
-        }
+        window?.updateContent(with: processes)
+        // Keep window always visible - the NotchView animates in/out
+        window?.orderFrontRegardless()
     }
 }
