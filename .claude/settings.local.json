@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.producthunt.com)",
+      "WebSearch",
+      "Bash(tree:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(open:*)",
+      "Bash(pkill:*)",
+      "Bash(log show:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}
