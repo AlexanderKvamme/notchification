@@ -12,15 +12,22 @@ struct NotchView: View {
     @State private var isExpanded: Bool = false
 
     // Dimensions
-    private let expandedHeight: CGFloat = 90
     private let notchWidth: CGFloat = 300
     private let frameWidth: CGFloat = 380  // Extra 80 for outward curves
 
     // Content dimensions
-    private let logoSize: CGFloat = 28
-    private let progressBarHeight: CGFloat = 14
+    private let logoSize: CGFloat = 24
+    private let progressBarHeight: CGFloat = 12
     private let horizontalPadding: CGFloat = 20
-    private let contentBottomPadding: CGFloat = 16
+    private let rowSpacing: CGFloat = 8
+    private let topPadding: CGFloat = 18  // Space below notch cutout
+
+    // Dynamic height based on number of processes
+    private var expandedHeight: CGFloat {
+        let processCount = max(1, notchState.activeProcesses.count)
+        let contentHeight = CGFloat(processCount) * logoSize + CGFloat(processCount - 1) * rowSpacing
+        return topPadding + contentHeight + 16  // 16 bottom padding
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -34,28 +41,33 @@ struct NotchView: View {
                     anchor: .top
                 )
 
-            // Content: Logo + Progress bar
-            if let process = notchState.activeProcesses.first {
-                HStack(alignment: .center, spacing: 12) {
-                    ProcessLogo(processType: process)
-                        .frame(width: logoSize, height: logoSize)
+            // Content: Multiple processes stacked vertically
+            if !notchState.activeProcesses.isEmpty {
+                VStack(alignment: .leading, spacing: rowSpacing) {
+                    ForEach(notchState.activeProcesses) { process in
+                        HStack(alignment: .center, spacing: 10) {
+                            ProcessLogo(processType: process)
+                                .frame(width: logoSize, height: logoSize)
 
-                    AnimatedProgressBar(
-                        isActive: isExpanded,
-                        baseColor: process.color,
-                        waveColor: process.waveColor
-                    )
-                    .frame(height: progressBarHeight)
+                            AnimatedProgressBar(
+                                isActive: isExpanded,
+                                baseColor: process.color,
+                                waveColor: process.waveColor
+                            )
+                            .frame(height: progressBarHeight)
+                        }
+                    }
                 }
                 .padding(.horizontal, horizontalPadding)
                 .frame(width: notchWidth)
-                .offset(y: expandedHeight - contentBottomPadding - logoSize)
+                .offset(y: topPadding)
                 .opacity(isExpanded ? 1 : 0)
                 .scaleEffect(isExpanded ? 1 : 0.5)
             }
         }
         .frame(width: frameWidth, height: expandedHeight, alignment: .top)
         .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0), value: isExpanded)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
             isExpanded = !isEmpty
         }
@@ -276,7 +288,7 @@ struct AnimatedProgressBar: View {
     @State private var waveWidth: CGFloat = 0
     @State private var waveOpacity: CGFloat = 1.0
 
-    private let animationDuration: Double = 1.5
+    private let animationDuration: Double = 3.0
 
     var body: some View {
         GeometryReader { geometry in
@@ -566,9 +578,25 @@ struct ClaudeLogoShape: Shape {
     }
 }
 
-#Preview("Expanded") {
+#Preview("Single Process") {
     let state = NotchState()
     state.activeProcesses = [.claude]
+    return VStack(spacing: 0) {
+        Rectangle()
+            .fill(Color.gray.opacity(0.3))
+            .frame(height: 24)
+
+        NotchView(notchState: state)
+
+        Spacer()
+    }
+    .frame(width: 400, height: 300)
+    .background(Color.gray.opacity(0.2))
+}
+
+#Preview("Multiple Processes") {
+    let state = NotchState()
+    state.activeProcesses = [.claude, .androidStudio]
     return VStack(spacing: 0) {
         Rectangle()
             .fill(Color.gray.opacity(0.3))
