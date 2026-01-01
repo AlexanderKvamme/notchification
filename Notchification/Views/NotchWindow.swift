@@ -82,6 +82,7 @@ final class NotchWindow: NSWindow {
 /// Controller to manage the notch window visibility
 final class NotchWindowController: ObservableObject {
     private var window: NotchWindow?
+    private(set) var isShowing: Bool = false
 
     init() {
         // Create window immediately and show it (animation happens inside)
@@ -90,6 +91,7 @@ final class NotchWindowController: ObservableObject {
     }
 
     func update(with processes: [ProcessType]) {
+        isShowing = !processes.isEmpty
         window?.updateProcesses(processes)
         // Keep window always visible - the NotchView animates in/out
         window?.orderFrontRegardless()

@@ -30,11 +30,6 @@ final class AppState: ObservableObject {
     init() {
         setupBindings()
         startMonitoring()
-
-        // Toggle mock mode every 3 seconds for demo
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.startMockLoop()
-        }
     }
 
     private func setupBindings() {
@@ -62,25 +57,36 @@ final class AppState: ObservableObject {
         if isMonitoring {
             stopMonitoring()
         } else {
+            if isMocking { stopMockLoop() }
             startMonitoring()
         }
     }
 
     // MARK: - Mock Mode
 
-    private func startMockLoop() {
-        mockTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            self?.toggleMock()
+    func toggleMockMode() {
+        if isMocking {
+            stopMockLoop()
+        } else {
+            if isMonitoring { stopMonitoring() }
+            startMockLoop()
         }
-        toggleMock() // Start immediately
     }
 
-    private func toggleMock() {
-        isMocking.toggle()
-        windowController.update(with: isMocking ? [.claude] : [])
+    private func startMockLoop() {
+        isMocking = true
+        mockTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            self?.toggleMockState()
+        }
+        toggleMockState() // Start immediately
     }
 
-    func stopMock() {
+    private func toggleMockState() {
+        let isShowing = windowController.isShowing
+        windowController.update(with: isShowing ? [] : [.claude])
+    }
+
+    private func stopMockLoop() {
         mockTimer?.invalidate()
         mockTimer = nil
         isMocking = false
@@ -94,11 +100,15 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack {
-            Toggle(appState.isMonitoring ? "Monitoring Active" : "Monitoring Paused",
-                   isOn: Binding(
-                    get: { appState.isMonitoring },
-                    set: { _ in appState.toggleMonitoring() }
-                   ))
+            Toggle("Monitoring", isOn: Binding(
+                get: { appState.isMonitoring },
+                set: { _ in appState.toggleMonitoring() }
+            ))
+
+            Toggle("Mock Mode", isOn: Binding(
+                get: { appState.isMocking },
+                set: { _ in appState.toggleMockMode() }
+            ))
 
             Divider()
 

@@ -9,7 +9,11 @@
       "Bash(pkill:*)",
       "Bash(log show:*)",
       "Bash(cat:*)",
-      "WebFetch(domain:ph-files.imgix.net)"
+      "WebFetch(domain:ph-files.imgix.net)",
+      "Bash(pgrep:*)",
+      "Bash(lsof:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

@@ -7,21 +7,32 @@ import Foundation
 import Combine
 
 /// Detects if Claude CLI is actively "thinking" (generating a response)
-/// by monitoring CPU usage of the claude process.
+/// Uses CPU-based state machine with rolling average (inspired by ClaudeCodeMonitor)
 final class ClaudeDetector: ObservableObject {
     @Published private(set) var isActive: Bool = false
 
     private var timer: DispatchSourceTimer?
-    private let pollingInterval: TimeInterval = 0.5
-    private let cpuThresholdHigh: Double = 3.0  // CPU% above this = working
-    private let cpuThresholdLow: Double = 1.0   // CPU% below this = idle
-    private var consecutiveLowReadings: Int = 0
-    private let requiredLowReadings: Int = 4    // 2 seconds of low CPU to go idle
+    private let pollingInterval: TimeInterval = 0.3
     private let queue = DispatchQueue(label: "com.notchification.claudedetector", qos: .utility)
+
+    // CPU thresholds
+    private let cpuLowMax: Double = 10.0      // 0-10 = LOW
+    private let cpuMedMax: Double = 20.0      // 10-20 = MEDIUM
+    // 20+ = HIGH
+
+    // Consecutive readings required
+    private let requiredHighToShow: Int = 2   // 2 consecutive highs → show
+    private let requiredLowToHide: Int = 2    // 2 consecutive lows → hide
+
+    // Counters
+    private var consecutiveHighReadings: Int = 0
+    private var consecutiveLowReadings: Int = 0
 
     init() {}
 
     func startMonitoring() {
+        consecutiveHighReadings = 0
+        consecutiveLowReadings = 0
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: pollingInterval)
         timer.setEventHandler { [weak self] in
@@ -34,29 +45,68 @@ final class ClaudeDetector: ObservableObject {
     func stopMonitoring() {
         timer?.cancel()
         timer = nil
+        DispatchQueue.main.async {
+            self.isActive = false
+        }
     }
 
     private func checkClaudeStatus() {
         guard let pid = getClaudePID() else {
-            updateStatus(isActive: false)
+            print("⚪️ No claude process found")
+            consecutiveHighReadings = 0
+            consecutiveLowReadings += 1
+            if consecutiveLowReadings >= requiredLowToHide {
+                updateStatus(isActive: false)
+            }
             return
         }
 
-        let cpuUsage = getCPUUsage(for: pid)
+        let cpu = getCPUUsage(for: pid)
 
-        if cpuUsage > cpuThresholdHigh {
+        if cpu >= cpuMedMax {
+            // HIGH (20+) - count towards showing
+            consecutiveHighReadings += 1
             consecutiveLowReadings = 0
-            updateStatus(isActive: true)
-        } else if cpuUsage < cpuThresholdLow {
+            print("🔴 HIGH: \(String(format: "%.1f", cpu))% | high: \(consecutiveHighReadings)/\(requiredHighToShow) | active: \(isActive)")
+            if consecutiveHighReadings >= requiredHighToShow {
+                updateStatus(isActive: true)
+            }
+        } else {
+            // MEDIUM or LOW (0-20) - count towards hiding
             consecutiveLowReadings += 1
-            if consecutiveLowReadings >= requiredLowReadings {
+            consecutiveHighReadings = 0
+            let label = cpu <= cpuLowMax ? "🟢 LOW" : "🟡 MED"
+            print("\(label): \(String(format: "%.1f", cpu))% | low: \(consecutiveLowReadings)/\(requiredLowToHide) | active: \(isActive)")
+            if consecutiveLowReadings >= requiredLowToHide {
                 updateStatus(isActive: false)
             }
         }
     }
 
+    /// Get process state (R = running, S = sleeping)
+    private func getProcessState(for pid: Int32) -> String {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/ps")
+        task.arguments = ["-o", "state=", "-p", "\(pid)"]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            return "S"
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "S"
+    }
+
     private func updateStatus(isActive: Bool) {
         if self.isActive != isActive {
+            print("⚡️ STATUS CHANGED: \(isActive ? "ACTIVE ▶️" : "INACTIVE ⏹️")")
             DispatchQueue.main.async {
                 self.isActive = isActive
             }
