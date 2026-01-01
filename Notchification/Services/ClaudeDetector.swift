@@ -71,15 +71,17 @@ final class ClaudeDetector: ObservableObject {
             if consecutiveHighReadings >= requiredHighToShow {
                 updateStatus(isActive: true)
             }
-        } else {
-            // MEDIUM or LOW (0-20) - count towards hiding
+        } else if cpu <= cpuLowMax {
+            // LOW (0-10) - count towards hiding
             consecutiveLowReadings += 1
             consecutiveHighReadings = 0
-            let label = cpu <= cpuLowMax ? "🟢 LOW" : "🟡 MED"
-            print("\(label): \(String(format: "%.1f", cpu))% | low: \(consecutiveLowReadings)/\(requiredLowToHide) | active: \(isActive)")
+            print("🟢 LOW: \(String(format: "%.1f", cpu))% | low: \(consecutiveLowReadings)/\(requiredLowToHide) | active: \(isActive)")
             if consecutiveLowReadings >= requiredLowToHide {
                 updateStatus(isActive: false)
             }
+        } else {
+            // MEDIUM (10-20) - neutral, don't count
+            print("🟡 MED: \(String(format: "%.1f", cpu))% | active: \(isActive)")
         }
     }
 

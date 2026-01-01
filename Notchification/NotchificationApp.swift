@@ -21,6 +21,11 @@ struct NotchificationApp: App {
 final class AppState: ObservableObject {
     @Published var isMonitoring: Bool = true
     @Published var isMocking: Bool = false
+    @Published var showMockOnLaunch: Bool {
+        didSet {
+            UserDefaults.standard.set(showMockOnLaunch, forKey: "showMockOnLaunch")
+        }
+    }
 
     private let processMonitor = ProcessMonitor()
     private let windowController = NotchWindowController()
@@ -28,8 +33,17 @@ final class AppState: ObservableObject {
     private var mockTimer: Timer?
 
     init() {
+        // Load setting (default to true)
+        self.showMockOnLaunch = UserDefaults.standard.object(forKey: "showMockOnLaunch") as? Bool ?? true
+
         setupBindings()
-        startMonitoring()
+
+        // Show mock on launch if enabled
+        if showMockOnLaunch {
+            runLaunchMock()
+        } else {
+            startMonitoring()
+        }
     }
 
     private func setupBindings() {
@@ -40,6 +54,18 @@ final class AppState: ObservableObject {
                 self.windowController.update(with: processes)
             }
             .store(in: &cancellables)
+    }
+
+    private func runLaunchMock() {
+        isMocking = true
+        windowController.update(with: [.claude])
+
+        // Hide after 5 seconds and start monitoring
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            self?.windowController.update(with: [])
+            self?.isMocking = false
+            self?.startMonitoring()
+        }
     }
 
     func startMonitoring() {
@@ -109,6 +135,10 @@ struct MenuBarView: View {
                 get: { appState.isMocking },
                 set: { _ in appState.toggleMockMode() }
             ))
+
+            Divider()
+
+            Toggle("Show Mock on Launch", isOn: $appState.showMockOnLaunch)
 
             Divider()
 
