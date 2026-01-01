@@ -43,7 +43,7 @@ struct NotchView: View {
                     AnimatedProgressBar(
                         isActive: isExpanded,
                         baseColor: process.color,
-                        waveColor: process.color.opacity(0.6)
+                        waveColor: process.waveColor
                     )
                     .frame(height: progressBarHeight)
                 }
@@ -270,67 +270,107 @@ struct XcodeLogoShape: Shape {
 struct AnimatedProgressBar: View {
     let isActive: Bool
     var baseColor: Color = Color(red: 0.85, green: 0.47, blue: 0.34)
-    var waveColor: Color = Color(red: 0.98, green: 0.65, blue: 0.5)
+    var waveColor: Color = Color(red: 0.95, green: 0.60, blue: 0.48)
+
+    @State private var baseWidth: CGFloat = 0
+    @State private var waveWidth: CGFloat = 0
+    @State private var waveOpacity: CGFloat = 1.0
 
     private let animationDuration: Double = 1.5
 
     var body: some View {
         GeometryReader { geometry in
+            let height = geometry.size.height
             ZStack(alignment: .leading) {
                 // Base layer (solid, stays filled)
                 Capsule()
                     .fill(baseColor)
-                    .frame(width: isActive ? geometry.size.width : 0)
-                    .animation(.easeOut(duration: animationDuration), value: isActive)
+                    .frame(width: baseWidth, height: height)
 
-                // Wave layer (sweeps across and fades out, repeating)
+                // Wave layer (sweeps across and fades out)
+                Capsule()
+                    .fill(waveColor)
+                    .frame(width: waveWidth, height: height)
+                    .opacity(waveOpacity)
+            }
+            .onChange(of: isActive) { _, active in
+                print("🎨 isActive changed to: \(active), geometry.width=\(geometry.size.width)")
+                if active {
+                    startAnimation(width: geometry.size.width)
+                } else {
+                    stopAnimation()
+                }
+            }
+            .onAppear {
+                print("🎨 onAppear isActive=\(isActive), geometry.width=\(geometry.size.width)")
                 if isActive {
-                    WaveLayer(color: waveColor, duration: animationDuration)
+                    startAnimation(width: geometry.size.width)
                 }
             }
         }
         .clipShape(Capsule())
     }
-}
 
-/// Separate view for the wave animation - uses TimelineView for continuous animation
-struct WaveLayer: View {
-    let color: Color
-    let duration: Double
+    private func startAnimation(width: CGFloat) {
+        print("🎨 startAnimation width=\(width)")
 
-    @State private var phase: Int = 0
-    @State private var progress: CGFloat = 0
-    @State private var opacity: CGFloat = 0
+        // Reset
+        baseWidth = 0
+        waveWidth = 0
+        waveOpacity = 1.0
 
-    var body: some View {
-        GeometryReader { geometry in
-            Capsule()
-                .fill(color)
-                .frame(width: geometry.size.width * progress)
-                .opacity(opacity)
+        // Animate base to full
+        withAnimation(.easeOut(duration: animationDuration)) {
+            baseWidth = width
         }
-        .onAppear {
-            // Start after a delay (let base fill first)
-            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                startWaveCycle()
+        print("🎨 base animating to \(width)")
+
+        // Start wave loop after base fills
+        DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) {
+            print("🎨 starting wave loop")
+            self.startWaveLoop(width: width)
+        }
+    }
+
+    private func startWaveLoop(width: CGFloat) {
+        print("🎨 startWaveLoop isActive=\(isActive)")
+        guard isActive else {
+            print("🎨 NOT ACTIVE - stopping wave")
+            return
+        }
+
+        // Reset wave instantly (no animation)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            waveWidth = 0
+            waveOpacity = 1.0
+        }
+        print("🎨 wave reset: width=0, opacity=1")
+
+        // Small delay to let reset apply, then animate
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard self.isActive else { return }
+
+            // Animate wave: sweep across while fading out
+            withAnimation(.easeInOut(duration: self.animationDuration)) {
+                self.waveWidth = width
+                self.waveOpacity = 0.0  // Fade to fully invisible
+            }
+
+            // Schedule next wave with 1 second pause
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.animationDuration + 1.0) {
+                self.startWaveLoop(width: width)
             }
         }
     }
 
-    private func startWaveCycle() {
-        // Reset to start
-        progress = 0
-        opacity = 1.0
-
-        // Animate to full while fading
-        withAnimation(.easeInOut(duration: duration)) {
-            progress = 1.0
-            opacity = 0.0
-        }
-
-        // Schedule next cycle
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) {
-            startWaveCycle()
+    private func stopAnimation() {
+        print("🎨 stopAnimation")
+        withAnimation(.easeOut(duration: 0.3)) {
+            baseWidth = 0
+            waveWidth = 0
+            waveOpacity = 1.0
         }
     }
 }

@@ -34,6 +34,27 @@ final class DebugSettings: ObservableObject {
     }
 }
 
+/// Tracking settings - which apps to monitor
+final class TrackingSettings: ObservableObject {
+    static let shared = TrackingSettings()
+
+    @Published var trackClaude: Bool {
+        didSet { UserDefaults.standard.set(trackClaude, forKey: "trackClaude") }
+    }
+    @Published var trackAndroidStudio: Bool {
+        didSet { UserDefaults.standard.set(trackAndroidStudio, forKey: "trackAndroidStudio") }
+    }
+    @Published var trackXcode: Bool {
+        didSet { UserDefaults.standard.set(trackXcode, forKey: "trackXcode") }
+    }
+
+    private init() {
+        self.trackClaude = UserDefaults.standard.object(forKey: "trackClaude") as? Bool ?? true
+        self.trackAndroidStudio = UserDefaults.standard.object(forKey: "trackAndroidStudio") as? Bool ?? true
+        self.trackXcode = UserDefaults.standard.object(forKey: "trackXcode") as? Bool ?? true
+    }
+}
+
 /// Main app state that coordinates monitoring and UI
 final class AppState: ObservableObject {
     @Published var isMonitoring: Bool = true
@@ -141,6 +162,7 @@ final class AppState: ObservableObject {
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var debugSettings = DebugSettings.shared
+    @ObservedObject var trackingSettings = TrackingSettings.shared
 
     var body: some View {
         VStack {
@@ -153,6 +175,13 @@ struct MenuBarView: View {
                 get: { appState.isMocking },
                 set: { _ in appState.toggleMockMode() }
             ))
+
+            Divider()
+
+            Text("Track Apps").font(.caption).foregroundColor(.secondary)
+            Toggle("Claude", isOn: $trackingSettings.trackClaude)
+            Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
+            Toggle("Xcode", isOn: $trackingSettings.trackXcode)
 
             Divider()
 

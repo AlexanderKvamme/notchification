@@ -12,6 +12,7 @@ final class ProcessMonitor: ObservableObject {
 
     private let claudeDetector = ClaudeDetector()
     private let androidStudioDetector = AndroidStudioDetector()
+    private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -19,9 +20,14 @@ final class ProcessMonitor: ObservableObject {
     }
 
     func startMonitoring() {
-        claudeDetector.startMonitoring()
-        androidStudioDetector.startMonitoring()
-        // Future: xcodeDetector.startMonitoring()
+        // Start only enabled detectors
+        if trackingSettings.trackClaude {
+            claudeDetector.startMonitoring()
+        }
+        if trackingSettings.trackAndroidStudio {
+            androidStudioDetector.startMonitoring()
+        }
+        // Future: if trackingSettings.trackXcode { xcodeDetector.startMonitoring() }
     }
 
     func stopMonitoring() {
@@ -30,6 +36,7 @@ final class ProcessMonitor: ObservableObject {
     }
 
     private func setupBindings() {
+        // Listen to detector state changes
         claudeDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -43,20 +50,47 @@ final class ProcessMonitor: ObservableObject {
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        // Listen to tracking settings changes
+        trackingSettings.$trackClaude
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.claudeDetector.startMonitoring()
+                } else {
+                    self.claudeDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        trackingSettings.$trackAndroidStudio
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.androidStudioDetector.startMonitoring()
+                } else {
+                    self.androidStudioDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
         var processes: [ProcessType] = []
 
-        if claudeDetector.isActive {
+        if trackingSettings.trackClaude && claudeDetector.isActive {
             processes.append(.claude)
         }
 
-        if androidStudioDetector.isActive {
+        if trackingSettings.trackAndroidStudio && androidStudioDetector.isActive {
             processes.append(.androidStudio)
         }
 
-        // Future: Check xcode detector
+        // Future: Check xcode detector with trackingSettings.trackXcode
 
         activeProcesses = processes
     }
