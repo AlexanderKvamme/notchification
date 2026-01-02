@@ -8,11 +8,11 @@
         <item>
             <title>Version 1.0.1</title>
             <pubDate>Thu, 02 Jan 2025 14:18:00 +0000</pubDate>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <description><![CDATA[
-                <h2>What's New in 1.0.1</h2>
+                <h2>What's New</h2>
                 <ul>
                     <li>Added Check for Updates feature</li>
                     <li>Added Send Feedback button</li>
