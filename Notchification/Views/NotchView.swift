@@ -14,8 +14,11 @@ struct NotchView: View {
     // Animation state
     @State private var isExpanded: Bool = false
     @State private var previousProcesses: Set<ProcessType> = []
-    @State private var confettiTrigger: Int = 0
-    @State private var confettiColor: Color = .orange
+
+    // Separate confetti triggers for each process type
+    @State private var claudeConfettiTrigger: Int = 0
+    @State private var xcodeConfettiTrigger: Int = 0
+    @State private var androidConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -48,9 +51,14 @@ struct NotchView: View {
                     anchor: .top
                 )
                 .overlay(alignment: .top) {
-                    // Confetti cannon - overlay so it doesn't affect layout
-                    ConfettiEmitter(trigger: $confettiTrigger, color: confettiColor)
-                        .allowsHitTesting(false)
+                    // Three separate confetti cannons - one per process type
+                    // Each has a fixed color, avoiding caching issues
+                    ZStack {
+                        ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
+                        ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
+                        ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
+                    }
+                    .allowsHitTesting(false)
                 }
 
             // Content: Multiple processes stacked vertically
@@ -95,11 +103,17 @@ struct NotchView: View {
             let newSet = Set(newValue)
             let removed = oldSet.subtracting(newSet)
 
-            if let removedProcess = removed.first {
-                // Trigger confetti immediately - no delay needed
-                confettiColor = removedProcess.color
-                confettiTrigger += 1
-                print("🎉 Confetti triggered for \(removedProcess) with color: \(removedProcess.color)")
+            // Trigger the appropriate confetti for each removed process
+            for removedProcess in removed {
+                switch removedProcess {
+                case .claude:
+                    claudeConfettiTrigger += 1
+                case .xcode:
+                    xcodeConfettiTrigger += 1
+                case .androidStudio:
+                    androidConfettiTrigger += 1
+                }
+                print("🎉 Confetti triggered for \(removedProcess)")
             }
 
             previousProcesses = newSet
@@ -138,7 +152,7 @@ struct ProcessLogo: View {
 struct AndroidStudioLogo: View {
     var body: some View {
         AndroidStudioLogoShape()
-            .fill(Color(red: 0.24, green: 0.86, blue: 0.52))  // #3DDC84 Android Green
+            .fill(ProcessType.androidStudio.color)
     }
 }
 
@@ -214,7 +228,7 @@ struct AndroidStudioLogoShape: Shape {
 struct XcodeLogo: View {
     var body: some View {
         XcodeLogoShape()
-            .fill(Color(red: 0.08, green: 0.49, blue: 0.98))  // #147EFB Xcode Blue
+            .fill(ProcessType.xcode.color)
     }
 }
 
@@ -419,7 +433,7 @@ struct AnimatedProgressBar: View {
 struct ClaudeLogo: View {
     var body: some View {
         ClaudeLogoShape()
-            .fill(Color(red: 0.85, green: 0.47, blue: 0.34))  // #D97757
+            .fill(ProcessType.claude.color)
     }
 }
 
