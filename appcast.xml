@@ -6,10 +6,10 @@
         <description>Notchification updates</description>
         <language>en</language>
         <item>
-            <title>Version 1.0.9</title>
-            <pubDate>Thu, 02 Jan 2025 22:00:00 +0000</pubDate>
-            <sparkle:version>9</sparkle:version>
-            <sparkle:shortVersionString>1.0.9</sparkle:shortVersionString>
+            <title>Version 1.0.10</title>
+            <pubDate>Thu, 02 Jan 2025 23:00:00 +0000</pubDate>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>1.0.10</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <description><![CDATA[
                 <h2>What's New</h2>
@@ -18,9 +18,9 @@
                 </ul>
             ]]></description>
             <enclosure
-                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.9/Notchification-1.0.9.zip"
-                sparkle:edSignature="peCubmjI4r5xtZjKp2Kf/82C7JhLES3vm2+f1jUd0HEwylntYOO+0D/ZuoqbL4Wf1h9pvKRtsPofpT3mWCl1Dg=="
-                length="1239860"
+                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.10/Notchification-1.0.10.zip"
+                sparkle:edSignature="pvDPmjzdq1LyG1xTdbjMvzNw0OBN5RDBWW99d/lr/BJSQSO0gt0AZp5fAMnIO8hIEm2sqJNybhn2yx+Rqt/9Bg=="
+                length="1239834"
                 type="application/octet-stream"/>
         </item>
     </channel>

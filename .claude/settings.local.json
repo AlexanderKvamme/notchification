@@ -53,7 +53,8 @@
       "Bash(zip:*)",
       "Bash(log stream:*)",
       "Bash(/Applications/Notchification.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc/Contents/MacOS/Installer)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebFetch(domain:extrabar.app)"
     ]
   }
 }
