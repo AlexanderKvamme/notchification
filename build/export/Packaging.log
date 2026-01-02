@@ -1,0 +1,103 @@
+2026-01-02 00:07:17 +0000 [MT] Initial pipeline context: <IDEDistributionProcessingPipelineContext: 0x15b885570; archive(resolved)="<IDEArchive: 0x6000025a7020>", distributionTask(resolved)="2", distributionDestination(resolved)="1", distributionMethod(resolved)="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team(resolved)="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	Chain (12, self inclusive):
+	<IDEDistributionProcessingPipelineContext: 0x15b885570; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionProcessingPipelineContext: 0x15b8852e0; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15b8850d0; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15bd454a0; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15b94fc80; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15a75b980; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15bd45000; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15bd0ce30; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15b93e590; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="<IDEProvisioningBasicTeam: 0x600000f6f020; teamID='52VSB9N5CT', teamName='(null)'>">
+	<IDEDistributionContext: 0x15b93df80; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="(null)">
+	<IDEDistributionContext: 0x15a63b380; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="<IDEDistributionMethodDeveloperID: 0x600000c32b10>", team="(null)">
+	<IDEDistributionContext: 0x15a616610; archive = "<IDEArchive: 0x6000025a7020>", distributionMethod="(null)", team="(null)">
+</IDEDistributionProcessingPipelineContext: 0x15b885570>
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionCreateDestRootStep
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionCopyItemStep
+2026-01-02 00:07:17 +0000 [MT] Running /usr/bin/ditto '-V' '/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app' '/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app'
+2026-01-02 00:07:17 +0000  >>> Copying /Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app 
+2026-01-02 00:07:17 +0000  copying file ./Contents/_CodeSignature/CodeResources ... 
+2026-01-02 00:07:17 +0000  2898 bytes for ./Contents/_CodeSignature/CodeResources
+2026-01-02 00:07:17 +0000  copying file ./Contents/MacOS/Notchification ... 
+2026-01-02 00:07:17 +0000  312016 bytes for ./Contents/MacOS/Notchification
+2026-01-02 00:07:17 +0000  copying file ./Contents/Resources/AppIcon.icns ... 
+2026-01-02 00:07:17 +0000  30369 bytes for ./Contents/Resources/AppIcon.icns
+copying file ./Contents/Resources/Assets.car ... 
+2026-01-02 00:07:17 +0000  217704 bytes for ./Contents/Resources/Assets.car
+2026-01-02 00:07:17 +0000  copying file ./Contents/Resources/Info.plist ... 
+2026-01-02 00:07:17 +0000  221 bytes for ./Contents/Resources/Info.plist
+2026-01-02 00:07:17 +0000  copying file ./Contents/Info.plist ... 
+2026-01-02 00:07:17 +0000  1587 bytes for ./Contents/Info.plist
+2026-01-02 00:07:17 +0000  copying file ./Contents/PkgInfo ... 
+2026-01-02 00:07:17 +0000  8 bytes for ./Contents/PkgInfo
+2026-01-02 00:07:17 +0000 [MT] /usr/bin/ditto exited with 0
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionEmbedProfileStep
+2026-01-02 00:07:17 +0000 [MT] Skipping profile for item: <IDEDistributionItem: 0x600002a92340; bundleID='com.hoi.Notchification', path='<DVTFilePath:0x6000025a7090:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x600002db3750; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x600003b40fc0; name='Developer ID Application: Alexander Kvamme (52VSB9N5CT)', hash='B558148818D0F27FF807F0F414962A0459E6059E', serialNumber='191A244BCF45D813', certificateKinds='(
+    "1.2.840.113635.100.6.1.13"
+), issueDate='2026-01-01 23:49:33 +0000''>', entitlements='{
+    "com.apple.security.app-sandbox" = 0;
+}', teamID='52VSB9N5CT', identifier='com.hoi.Notchification', executablePath='<DVTFilePath:0x600002a94960:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app/Contents/MacOS/Notchification'>', hardenedRuntime='1'>'>
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionInfoPlistStep
+2026-01-02 00:07:17 +0000 [MT] Skipping step: IDEDistributionInfoPlistStep because it said so
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionAppThinningPlistStep
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionSymbolsStep
+2026-01-02 00:07:17 +0000 [MT] Skipping step: IDEDistributionSymbolsStep because it said so
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionAppThinningStep
+2026-01-02 00:07:17 +0000 [MT] Skipping step: IDEDistributionAppThinningStep because it said so
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionArchThinningStep
+2026-01-02 00:07:17 +0000 [MT] Item /Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app doesn't have the entitlement com.apple.developer.web-browser-engine.host enabled, returning ["arm64e"]
+2026-01-02 00:07:17 +0000 [MT] Archs to thin for item /Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app are ["arm64e"]
+2026-01-02 00:07:17 +0000 [MT] Running /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo '/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app/Contents/MacOS/Notchification' '-verify_arch' 'arm64e'
+2026-01-02 00:07:17 +0000 [MT] /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo exited with 1
+2026-01-02 00:07:17 +0000 [MT] Skipping architecture thinning for item "Notchification" because arch "arm64e" wasn't found
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionODRStep
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionStripXattrsStep
+2026-01-02 00:07:17 +0000 [MT] Skipping stripping extended attributes because the codesign step will strip them.
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionCodesignStep
+2026-01-02 00:07:17 +0000 [MT] Entitlements for <IDEDistributionItem: 0x600002a92340; bundleID='com.hoi.Notchification', path='<DVTFilePath:0x6000025a7090:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x600002db3750; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x600003b48540; name='Developer ID Application: Alexander Kvamme (52VSB9N5CT)', hash='B558148818D0F27FF807F0F414962A0459E6059E', serialNumber='191A244BCF45D813', certificateKinds='(
+    "1.2.840.113635.100.6.1.13"
+), issueDate='2026-01-01 23:49:33 +0000''>', entitlements='{
+    "com.apple.security.app-sandbox" = 0;
+}', teamID='52VSB9N5CT', identifier='com.hoi.Notchification', executablePath='<DVTFilePath:0x600002a94960:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app/Contents/MacOS/Notchification'>', hardenedRuntime='1'>'>: {
+    "com.apple.security.app-sandbox" = 0;
+}
+2026-01-02 00:07:17 +0000 [MT] Associated App Clip Identifiers Filter: Skipping because "com.apple.developer.associated-appclip-app-identifiers" is not present
+2026-01-02 00:07:17 +0000 [MT] Entitlements for <IDEDistributionItem: 0x600002a92340; bundleID='com.hoi.Notchification', path='<DVTFilePath:0x6000025a7090:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x600002db3750; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x600003b48780; name='Developer ID Application: Alexander Kvamme (52VSB9N5CT)', hash='B558148818D0F27FF807F0F414962A0459E6059E', serialNumber='191A244BCF45D813', certificateKinds='(
+    "1.2.840.113635.100.6.1.13"
+), issueDate='2026-01-01 23:49:33 +0000''>', entitlements='{
+    "com.apple.security.app-sandbox" = 0;
+}', teamID='52VSB9N5CT', identifier='com.hoi.Notchification', executablePath='<DVTFilePath:0x600002a94960:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app/Contents/MacOS/Notchification'>', hardenedRuntime='1'>'> are: {
+    "com.apple.security.app-sandbox" = 0;
+}
+2026-01-02 00:07:17 +0000 [MT] Writing entitlements for <IDEDistributionItem: 0x600002a92340; bundleID='com.hoi.Notchification', path='<DVTFilePath:0x6000025a7090:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x600002db3750; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x600003b48900; name='Developer ID Application: Alexander Kvamme (52VSB9N5CT)', hash='B558148818D0F27FF807F0F414962A0459E6059E', serialNumber='191A244BCF45D813', certificateKinds='(
+    "1.2.840.113635.100.6.1.13"
+), issueDate='2026-01-01 23:49:33 +0000''>', entitlements='{
+    "com.apple.security.app-sandbox" = 0;
+}', teamID='52VSB9N5CT', identifier='com.hoi.Notchification', executablePath='<DVTFilePath:0x600002a94960:'/Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification/build/Notchification.xcarchive/Products/Applications/Notchification.app/Contents/MacOS/Notchification'>', hardenedRuntime='1'>'> to: /var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/entitlements~~~7pIZSU
+2026-01-02 00:07:17 +0000 [MT] invoking codesign: <NSConcreteTask: 0x600002e4f200; launchPath='/usr/bin/codesign', arguments='(
+    "-f",
+    "-s",
+    B558148818D0F27FF807F0F414962A0459E6059E,
+    "--entitlements",
+    "/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/entitlements~~~7pIZSU",
+    "--requirements",
+    "=designated => anchor apple generic  and identifier \"$self.identifier\" and ((cert leaf[field.1.2.840.113635.100.6.1.9] exists) or ( certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists  and certificate leaf[subject.OU] = \"52VSB9N5CT\" ))",
+    "--preserve-metadata=identifier,flags,runtime",
+    "--generate-entitlement-der",
+    "--strip-disallowed-xattrs",
+    "-vvv",
+    "/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app"
+)'>
+2026-01-02 00:07:17 +0000 [MT] codesign output: /var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app: replacing existing signature
+/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app: signed app bundle with Mach-O thin (arm64) [com.hoi.Notchification]
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionZipODRItemStep
+2026-01-02 00:07:17 +0000 [MT] Skipping step: IDEDistributionZipODRItemStep because it said so
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionSkipPackagingStep
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionAppStoreInformationStep
+2026-01-02 00:07:17 +0000 [MT] Skipping step: IDEDistributionAppStoreInformationStep because it said so
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionGenerateProcessedDistributionItems
+2026-01-02 00:07:17 +0000 [MT] IDEDistributionItem init <DVTFilePath:0x6000025b2290:'/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app'>
+2026-01-02 00:07:17 +0000 [MT] [OPTIONAL] Didn't find embedded provisioning profile for <DVTFilePath:0x6000025b2290:'/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app'>: Error Domain=NSCocoaErrorDomain Code=4 "No file at <DVTFilePath:0x6000025c43f0:'/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app/Contents/embedded.provisionprofile'>" UserInfo={NSLocalizedDescription=No file at <DVTFilePath:0x6000025c43f0:'/var/folders/3r/yy8ptqs15975_w8pn61gngzc0000gn/T/XcodeDistPipeline.~~~3kzgSq/Root/Applications/Notchification.app/Contents/embedded.provisionprofile'>}
+2026-01-02 00:07:17 +0000 [MT] Processing step: IDEDistributionCreateManifestStep
+2026-01-02 00:07:17 +0000 [MT] Skipping step: IDEDistributionCreateManifestStep because it said so

@@ -26,7 +26,12 @@
       "Bash(git commit:*)",
       "Bash(killall:*)",
       "Bash(kill:*)",
-      "Bash(codesign:*)"
+      "Bash(codesign:*)",
+      "Bash(security find-identity:*)",
+      "Bash(ditto:*)",
+      "Bash(xcrun notarytool submit:*)",
+      "Bash(xcrun notarytool log:*)",
+      "Bash(xcrun stapler:*)"
     ]
   }
 }

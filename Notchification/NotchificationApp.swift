@@ -79,19 +79,22 @@ enum MockProcessType: String, CaseIterable {
 /// Main app state that coordinates monitoring and UI
 final class AppState: ObservableObject {
     @Published var isMonitoring: Bool = true
+
+    #if DEBUG
     @Published var isMocking: Bool = false
     @Published var mockOnLaunchType: MockProcessType {
         didSet {
             UserDefaults.standard.set(mockOnLaunchType.rawValue, forKey: "mockOnLaunchType")
         }
     }
+    #endif
 
     private let processMonitor = ProcessMonitor()
     private let windowController = NotchWindowController()
     private var cancellables = Set<AnyCancellable>()
-    private var mockTimer: Timer?
 
     init() {
+        #if DEBUG
         // Load settings
         let savedMockType = UserDefaults.standard.string(forKey: "mockOnLaunchType") ?? "None"
         self.mockOnLaunchType = MockProcessType(rawValue: savedMockType) ?? .none
@@ -104,18 +107,26 @@ final class AppState: ObservableObject {
         } else {
             startMonitoring()
         }
+        #else
+        setupBindings()
+        startMonitoring()
+        #endif
     }
 
     private func setupBindings() {
         processMonitor.$activeProcesses
             .receive(on: DispatchQueue.main)
             .sink { [weak self] processes in
-                guard let self = self, !self.isMocking else { return }
+                guard let self = self else { return }
+                #if DEBUG
+                guard !self.isMocking else { return }
+                #endif
                 self.windowController.update(with: processes)
             }
             .store(in: &cancellables)
     }
 
+    #if DEBUG
     private func runLaunchMock() {
         guard let processType = mockOnLaunchType.processType else {
             startMonitoring()
@@ -132,6 +143,7 @@ final class AppState: ObservableObject {
             self?.startMonitoring()
         }
     }
+    #endif
 
     func startMonitoring() {
         isMonitoring = true
@@ -148,40 +160,8 @@ final class AppState: ObservableObject {
         if isMonitoring {
             stopMonitoring()
         } else {
-            if isMocking { stopMockLoop() }
             startMonitoring()
         }
-    }
-
-    // MARK: - Mock Mode
-
-    func toggleMockMode() {
-        if isMocking {
-            stopMockLoop()
-        } else {
-            if isMonitoring { stopMonitoring() }
-            startMockLoop()
-        }
-    }
-
-    private func startMockLoop() {
-        isMocking = true
-        mockTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            self?.toggleMockState()
-        }
-        toggleMockState() // Start immediately
-    }
-
-    private func toggleMockState() {
-        let isShowing = windowController.isShowing
-        windowController.update(with: isShowing ? [] : [.claude])
-    }
-
-    private func stopMockLoop() {
-        mockTimer?.invalidate()
-        mockTimer = nil
-        isMocking = false
-        windowController.update(with: [])
     }
 }
 
@@ -198,11 +178,6 @@ struct MenuBarView: View {
                 set: { _ in appState.toggleMonitoring() }
             ))
 
-            Toggle("Mock Mode", isOn: Binding(
-                get: { appState.isMocking },
-                set: { _ in appState.toggleMockMode() }
-            ))
-
             Divider()
 
             Text("Track Apps").font(.caption).foregroundColor(.secondary)
@@ -210,6 +185,7 @@ struct MenuBarView: View {
             Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
             Toggle("Xcode", isOn: $trackingSettings.trackXcode)
 
+            #if DEBUG
             Divider()
 
             Text("Mock on Launch").font(.caption).foregroundColor(.secondary)
@@ -227,6 +203,7 @@ struct MenuBarView: View {
             Toggle("Claude", isOn: $debugSettings.debugClaude)
             Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
             Toggle("Xcode", isOn: $debugSettings.debugXcode)
+            #endif
 
             Divider()
 
