@@ -45,7 +45,12 @@
       "Bash(gh release create:*)",
       "Bash(gh release:*)",
       "Bash(git -C /Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification status appcast.xml)",
-      "Bash(tar:*)"
+      "Bash(tar:*)",
+      "Bash(git rm:*)",
+      "WebFetch(domain:steipete.me)",
+      "WebFetch(domain:sparkle-project.org)",
+      "WebFetch(domain:christiantietze.de)",
+      "Bash(zip:*)"
     ]
   }
 }

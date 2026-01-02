@@ -5,14 +5,16 @@
 
 import SwiftUI
 import Combine
+import Sparkle
 
 @main
 struct NotchificationApp: App {
     @StateObject private var appState = AppState()
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
     var body: some Scene {
         MenuBarExtra("Notchification", systemImage: "bell.badge") {
-            MenuBarView(appState: appState)
+            MenuBarView(appState: appState, updater: updaterController.updater)
         }
     }
 }
@@ -214,6 +216,7 @@ final class AppState: ObservableObject {
 /// Menu bar dropdown view
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
+    let updater: SPUUpdater
     @ObservedObject var debugSettings = DebugSettings.shared
     @ObservedObject var trackingSettings = TrackingSettings.shared
 
@@ -267,9 +270,7 @@ struct MenuBarView: View {
             }
 
             Button("Check for Updates...") {
-                if let url = URL(string: "https://github.com/AlexanderKvamme/notchification/releases") {
-                    NSWorkspace.shared.open(url)
-                }
+                updater.checkForUpdates()
             }
 
             Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
