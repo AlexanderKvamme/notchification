@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		DD2C84002F06D50000AF8080 /* ConfettiSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = DD2C83FF2F06D50000AF8080 /* ConfettiSwiftUI */; };
+		DDF6643B2F07FAA400060EE2 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = DDF6643A2F07FAA400060EE2 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DD2C84002F06D50000AF8080 /* ConfettiSwiftUI in Frameworks */,
+				DDF6643B2F07FAA400060EE2 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = Notchification;
 			packageProductDependencies = (
 				DD2C83FF2F06D50000AF8080 /* ConfettiSwiftUI */,
+				DDF6643A2F07FAA400060EE2 /* Sparkle */,
 			);
 			productName = Notchification;
 			productReference = DD2C83C02F06D48D00AF8080 /* Notchification.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				DD2C83FE2F06D50000AF8080 /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */,
+				DDF664392F07FAA400060EE2 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DD2C83C12F06D48D00AF8080 /* Products */;
@@ -260,12 +264,13 @@
 				CODE_SIGN_ENTITLEMENTS = Notchification/Notchification.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"Notchification/Preview Content\"";
 				DEVELOPMENT_TEAM = 52VSB9N5CT;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Notchification/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Notchification;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -275,7 +280,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hoi.Notchification;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -289,14 +294,16 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Notchification/Notchification.entitlements;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"Notchification/Preview Content\"";
 				DEVELOPMENT_TEAM = 52VSB9N5CT;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Notchification/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Notchification;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -306,7 +313,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hoi.Notchification;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -346,6 +353,14 @@
 				minimumVersion = 1.1.0;
 			};
 		};
+		DDF664392F07FAA400060EE2 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -353,6 +368,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DD2C83FE2F06D50000AF8080 /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */;
 			productName = ConfettiSwiftUI;
+		};
+		DDF6643A2F07FAA400060EE2 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DDF664392F07FAA400060EE2 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
