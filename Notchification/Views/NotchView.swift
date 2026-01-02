@@ -16,7 +16,6 @@ struct NotchView: View {
     @State private var previousProcesses: Set<ProcessType> = []
     @State private var confettiTrigger: Int = 0
     @State private var confettiColor: Color = .orange
-    @State private var confettiId: UUID = UUID()
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -42,6 +41,7 @@ struct NotchView: View {
             NotchShape()
                 .fill(Color.black)
                 .frame(width: notchWidth, height: expandedHeight)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedHeight)
                 .scaleEffect(
                     x: isExpanded ? 1 : 0.3,
                     y: isExpanded ? 1 : 0,
@@ -50,7 +50,6 @@ struct NotchView: View {
                 .overlay(alignment: .top) {
                     // Confetti cannon - overlay so it doesn't affect layout
                     ConfettiEmitter(trigger: $confettiTrigger, color: confettiColor)
-                        .id(confettiId)
                         .allowsHitTesting(false)
                 }
 
@@ -69,6 +68,7 @@ struct NotchView: View {
                             )
                             .frame(height: progressBarHeight)
                         }
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
                     }
                 }
                 .padding(.horizontal, horizontalPadding)
@@ -76,35 +76,30 @@ struct NotchView: View {
                 .offset(y: topPadding)
                 .opacity(isExpanded ? 1 : 0)
                 .scaleEffect(isExpanded ? 1 : 0.5)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
             }
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .top)
-        .animation(isExpanded
-            ? .spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)  // Bouncy open
-            : .easeOut(duration: 0.3),  // Smooth close
-            value: isExpanded
-        )
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
+        .drawingGroup()  // GPU acceleration for smoother animations
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
-            isExpanded = !isEmpty
+            let animation: Animation = isEmpty
+                ? .easeOut(duration: 0.3)  // Smooth close
+                : .spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)  // Bouncy open
+            withAnimation(animation) {
+                isExpanded = !isEmpty
+            }
         }
         .onChange(of: notchState.activeProcesses) { oldValue, newValue in
-            // Check if a process was removed
+            // Check if a process was removed (completed)
             let oldSet = Set(oldValue)
             let newSet = Set(newValue)
             let removed = oldSet.subtracting(newSet)
 
             if let removedProcess = removed.first {
-                // Set confetti color and new ID, then trigger after delay to ensure view updates
+                // Trigger confetti immediately - no delay needed
                 confettiColor = removedProcess.color
-                confettiId = UUID()
-
-                // Debug log
+                confettiTrigger += 1
                 print("🎉 Confetti triggered for \(removedProcess) with color: \(removedProcess.color)")
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    confettiTrigger += 1
-                }
             }
 
             previousProcesses = newSet
@@ -112,7 +107,8 @@ struct NotchView: View {
         .onAppear {
             previousProcesses = Set(notchState.activeProcesses)
             if !notchState.activeProcesses.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Use withAnimation for explicit control
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)) {
                     isExpanded = true
                 }
             }
@@ -406,7 +402,11 @@ struct AnimatedProgressBar: View {
     }
 
     private func stopAnimation() {
-        withAnimation(.easeOut(duration: 0.3)) {
+        // Reset instantly - parent handles the fade/scale animation
+        // Using Transaction to avoid conflicting with parent's animation
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             baseWidth = 0
             waveWidth = 0
             waveOpacity = 1.0
@@ -617,7 +617,7 @@ struct ConfettiEmitter: View {
             .frame(width: 300, height: 50)
             .confettiCannon(
                 counter: $trigger,
-                num: 100,
+                num: 40,  // Reduced from 100 for smoother performance
                 colors: [color],
                 confettiSize: 12,
                 rainHeight: 200,
