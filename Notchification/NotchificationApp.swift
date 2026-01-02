@@ -51,11 +51,19 @@ final class TrackingSettings: ObservableObject {
     @Published var trackXcode: Bool {
         didSet { UserDefaults.standard.set(trackXcode, forKey: "trackXcode") }
     }
+    @Published var confettiEnabled: Bool {
+        didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
+    }
+    @Published var soundEnabled: Bool {
+        didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
+    }
 
     private init() {
         self.trackClaude = UserDefaults.standard.object(forKey: "trackClaude") as? Bool ?? true
         self.trackAndroidStudio = UserDefaults.standard.object(forKey: "trackAndroidStudio") as? Bool ?? true
         self.trackXcode = UserDefaults.standard.object(forKey: "trackXcode") as? Bool ?? true
+        self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
+        self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
 }
 
@@ -222,6 +230,11 @@ struct MenuBarView: View {
             Toggle("Claude", isOn: $trackingSettings.trackClaude)
             Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
             Toggle("Xcode", isOn: $trackingSettings.trackXcode)
+
+            Divider()
+
+            Toggle("Confetti", isOn: $trackingSettings.confettiEnabled)
+            Toggle("Sound", isOn: $trackingSettings.soundEnabled)
 
             #if DEBUG
             Divider()

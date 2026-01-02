@@ -5,6 +5,10 @@
 
 import SwiftUI
 import ConfettiSwiftUI
+import AppKit
+
+// Shared sound instance for completion sound
+private let completionSound = NSSound(named: "Glass")
 
 struct NotchView: View {
     @ObservedObject var notchState: NotchState
@@ -83,7 +87,11 @@ struct NotchView: View {
                 .frame(width: notchWidth)
                 .offset(y: topPadding)
                 .opacity(isExpanded ? 1 : 0)
-                .scaleEffect(isExpanded ? 1 : 0.5)
+                .scaleEffect(
+                    x: isExpanded ? 1 : 0.3,  // Match notch's x-scale
+                    y: isExpanded ? 1 : 0,    // Match notch's y-scale
+                    anchor: .top
+                )
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
             }
         }
@@ -103,17 +111,27 @@ struct NotchView: View {
             let newSet = Set(newValue)
             let removed = oldSet.subtracting(newSet)
 
-            // Trigger the appropriate confetti for each removed process
+            // Trigger effects for each removed process
             for removedProcess in removed {
-                switch removedProcess {
-                case .claude:
-                    claudeConfettiTrigger += 1
-                case .xcode:
-                    xcodeConfettiTrigger += 1
-                case .androidStudio:
-                    androidConfettiTrigger += 1
+                // Confetti (if enabled)
+                if TrackingSettings.shared.confettiEnabled {
+                    switch removedProcess {
+                    case .claude:
+                        claudeConfettiTrigger += 1
+                    case .xcode:
+                        xcodeConfettiTrigger += 1
+                    case .androidStudio:
+                        androidConfettiTrigger += 1
+                    }
+                    print("🎉 Confetti triggered for \(removedProcess)")
                 }
-                print("🎉 Confetti triggered for \(removedProcess)")
+
+                // Sound (if enabled)
+                if TrackingSettings.shared.soundEnabled {
+                    // Stop if already playing, then play fresh
+                    completionSound?.stop()
+                    completionSound?.play()
+                }
             }
 
             previousProcesses = newSet
