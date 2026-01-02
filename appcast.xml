@@ -1,27 +1,14 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Notchification</title>
-        <link>https://github.com/AlexanderKvamme/notchification</link>
-        <description>Notchification updates</description>
-        <language>en</language>
         <item>
-            <title>Version 1.0.10</title>
-            <pubDate>Thu, 02 Jan 2025 23:00:00 +0000</pubDate>
-            <sparkle:version>10</sparkle:version>
-            <sparkle:shortVersionString>1.0.10</sparkle:shortVersionString>
+            <title>1.0.11</title>
+            <pubDate>Fri, 02 Jan 2026 20:37:03 +0100</pubDate>
+            <sparkle:version>11</sparkle:version>
+            <sparkle:shortVersionString>1.0.11</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <h2>What's New</h2>
-                <ul>
-                    <li>Fixed auto-updates for non-sandboxed app</li>
-                </ul>
-            ]]></description>
-            <enclosure
-                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.10/Notchification-1.0.10.zip"
-                sparkle:edSignature="pvDPmjzdq1LyG1xTdbjMvzNw0OBN5RDBWW99d/lr/BJSQSO0gt0AZp5fAMnIO8hIEm2sqJNybhn2yx+Rqt/9Bg=="
-                length="1239834"
-                type="application/octet-stream"/>
+            <enclosure url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.11/Notchification-1.0.11.zip" length="1427851" type="application/octet-stream" sparkle:edSignature="RIJsn6dt0EgKlbJeBuDSrx6sxGoC+w+HHXGP9evsR6WHF1WRrMfDkxY2RyklURfF+R+mHba87rwRoCAcSS8HCA=="/>
         </item>
     </channel>
 </rss>
