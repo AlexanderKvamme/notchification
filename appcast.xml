@@ -3,12 +3,12 @@
     <channel>
         <title>Notchification</title>
         <item>
-            <title>1.0.12</title>
-            <pubDate>Fri, 02 Jan 2026 21:07:49 +0100</pubDate>
-            <sparkle:version>12</sparkle:version>
-            <sparkle:shortVersionString>1.0.12</sparkle:shortVersionString>
+            <title>1.0.13</title>
+            <pubDate>Sat, 03 Jan 2026 00:52:42 +0100</pubDate>
+            <sparkle:version>13</sparkle:version>
+            <sparkle:shortVersionString>1.0.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.12/Notchification-1.0.12.zip" length="1427854" type="application/octet-stream" sparkle:edSignature="MC2bXqYVeEdZAwwHaLvAcS3bGgV/hKnRzVWmOSkNaZIhDOTFX0/ByEEMfMoriRPmEfu5CrEJJtQNIaFL+UIbAA=="/>
+            <enclosure url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.13/Notchification-1.0.13.zip" length="1307487" type="application/octet-stream" sparkle:edSignature="wP/WHLZegp9dB88kxo9eIouNT1VKN+BZPZ/TMc3vBrFVv2hmnr3VvgUwG9sRD42qs6XyIGmj92pDh59opTx6Ag=="/>
         </item>
     </channel>
 </rss>
