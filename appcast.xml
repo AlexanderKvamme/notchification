@@ -6,27 +6,21 @@
         <description>Notchification updates</description>
         <language>en</language>
         <item>
-            <title>Version 1.0.3</title>
-            <pubDate>Thu, 02 Jan 2025 15:00:00 +0000</pubDate>
-            <sparkle:version>3</sparkle:version>
-            <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
+            <title>Version 1.0.4</title>
+            <pubDate>Thu, 02 Jan 2025 15:10:00 +0000</pubDate>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <description><![CDATA[
                 <h2>What's New</h2>
                 <ul>
-                    <li>Properly signed and notarized for macOS</li>
-                    <li>Auto-updates now work correctly</li>
-                    <li>Added Check for Updates feature</li>
-                    <li>Added Send Feedback button</li>
-                    <li>Added Confetti and Sound toggles</li>
-                    <li>Improved animation smoothness</li>
-                    <li>Shows version number in menu</li>
+                    <li>Test release for update verification</li>
                 </ul>
             ]]></description>
             <enclosure
-                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.3/Notchification-1.0.3.zip"
-                sparkle:edSignature="39JzZBrYiHqGG2pepwtFnheYytLTlMUlz5YiylwTk7mmcB4vHdU4/k2o/maee0Ke/yywktMwvFYyVuHshWyIDw=="
-                length="1459881"
+                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.4/Notchification-1.0.4.zip"
+                sparkle:edSignature="daBDWct9kSzQ98G2iQegOil5AtsmDFtzyMmJPk0fjuVrNv7bKCC9yvv2nqNZ3vV07oKU/jbSB+hqStx4451jBQ=="
+                length="1459865"
                 type="application/octet-stream"/>
         </item>
     </channel>
