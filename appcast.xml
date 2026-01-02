@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>Notchification</title>
+        <link>https://github.com/AlexanderKvamme/notchification</link>
+        <description>Notchification updates</description>
+        <language>en</language>
+        <item>
+            <title>Version 1.0.1</title>
+            <pubDate>Thu, 02 Jan 2025 14:18:00 +0000</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>What's New in 1.0.1</h2>
+                <ul>
+                    <li>Added Check for Updates feature</li>
+                    <li>Added Send Feedback button</li>
+                    <li>Added Confetti toggle</li>
+                    <li>Added Sound toggle</li>
+                    <li>Improved animation smoothness</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.1/Notchification-1.0.1.zip"
+                sparkle:edSignature="xxsulmBKi6Xw1QBVC+pYAGwZY/jvGwX5AJq1ztiGfV8W9ZnEQ7YGqRGxIxiRvz36c68WGGYui3heDmuFFldGAg=="
+                length="1413729"
+                type="application/octet-stream"/>
+        </item>
+    </channel>
+</rss>
