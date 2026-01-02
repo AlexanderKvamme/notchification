@@ -31,7 +31,21 @@
       "Bash(ditto:*)",
       "Bash(xcrun notarytool submit:*)",
       "Bash(xcrun notarytool log:*)",
-      "Bash(xcrun stapler:*)"
+      "Bash(xcrun stapler:*)",
+      "Bash(/tmp/bin/generate_keys:*)",
+      "Bash(plutil:*)",
+      "Bash(/tmp/bin/sign_update:*)",
+      "Bash(curl:*)",
+      "Bash(git push)",
+      "Bash(unzip:*)",
+      "Bash(spctl -a -vv:*)",
+      "Bash(xattr:*)",
+      "Bash(cd:*)",
+      "Bash(xcrun notarytool store-credentials:*)",
+      "Bash(gh release create:*)",
+      "Bash(gh release:*)",
+      "Bash(git -C /Users/alexanderkvamme/Documents/workspaces/code/swift/Notchification status appcast.xml)",
+      "Bash(tar:*)"
     ]
   }
 }

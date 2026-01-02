@@ -266,6 +266,16 @@ struct MenuBarView: View {
                 }
             }
 
+            Button("Check for Updates...") {
+                if let url = URL(string: "https://github.com/AlexanderKvamme/notchification/releases") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+
+            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
