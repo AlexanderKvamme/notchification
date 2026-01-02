@@ -65,6 +65,7 @@ enum MockProcessType: String, CaseIterable {
     case claude = "Claude"
     case android = "Android"
     case xcode = "Xcode"
+    case all = "All"
 
     var processType: ProcessType? {
         switch self {
@@ -72,7 +73,12 @@ enum MockProcessType: String, CaseIterable {
         case .claude: return .claude
         case .android: return .androidStudio
         case .xcode: return .xcode
+        case .all: return nil // Handled specially
         }
+    }
+
+    var allProcessTypes: [ProcessType] {
+        [.claude, .androidStudio, .xcode]
     }
 }
 
@@ -128,6 +134,12 @@ final class AppState: ObservableObject {
 
     #if DEBUG
     private func runLaunchMock() {
+        // Handle "All" mock type specially
+        if mockOnLaunchType == .all {
+            runAllMock()
+            return
+        }
+
         guard let processType = mockOnLaunchType.processType else {
             startMonitoring()
             return
@@ -138,6 +150,32 @@ final class AppState: ObservableObject {
 
         // Hide after 5 seconds and start monitoring
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            self?.windowController.update(with: [])
+            self?.isMocking = false
+            self?.startMonitoring()
+        }
+    }
+
+    private func runAllMock() {
+        isMocking = true
+        let allTypes = mockOnLaunchType.allProcessTypes
+
+        // Start with all three processes
+        windowController.update(with: allTypes)
+
+        // Remove processes one by one with 1-second delays
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            // Remove first process (claude)
+            self?.windowController.update(with: [.androidStudio, .xcode])
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            // Remove second process (android)
+            self?.windowController.update(with: [.xcode])
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+            // Remove last process (xcode)
             self?.windowController.update(with: [])
             self?.isMocking = false
             self?.startMonitoring()
@@ -206,6 +244,14 @@ struct MenuBarView: View {
             #endif
 
             Divider()
+
+            Button("Send Feedback") {
+                let subject = "Notchification Feedback"
+                let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject
+                if let url = URL(string: "mailto:alexanderkvamme@gmail.com?subject=\(encodedSubject)") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
 
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
