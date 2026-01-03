@@ -1,1 +1,8 @@
 *.zip
+
+# User-specific files
+.claude/settings.local.json
+xcuserdata/
+*.xcuserdata/
+DerivedData/
+build/
