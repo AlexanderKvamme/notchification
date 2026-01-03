@@ -3,12 +3,21 @@
     <channel>
         <title>Notchification</title>
         <item>
-            <title>1.0.13</title>
-            <pubDate>Sat, 03 Jan 2026 00:52:42 +0100</pubDate>
-            <sparkle:version>13</sparkle:version>
-            <sparkle:shortVersionString>1.0.13</sparkle:shortVersionString>
+            <title>1.0.14</title>
+            <link>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.14</link>
+            <sparkle:releaseNotesLink>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.14</sparkle:releaseNotesLink>
+            <pubDate>Fri, 03 Jan 2026 12:00:00 +0100</pubDate>
+            <sparkle:version>14</sparkle:version>
+            <sparkle:shortVersionString>1.0.14</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.13/Notchification-1.0.13.zip" length="1307487" type="application/octet-stream" sparkle:edSignature="wP/WHLZegp9dB88kxo9eIouNT1VKN+BZPZ/TMc3vBrFVv2hmnr3VvgUwG9sRD42qs6XyIGmj92pDh59opTx6Ag=="/>
+            <description><![CDATA[
+                <h2>What's New in 1.0.14</h2>
+                <ul>
+                    <li>Simplified update system - updates now redirect to download page</li>
+                    <li>Bug fixes and improvements</li>
+                </ul>
+                <p><strong>To update:</strong> Download the latest version from the link and replace the app in your Applications folder.</p>
+            ]]></description>
         </item>
     </channel>
 </rss>

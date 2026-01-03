@@ -8,7 +8,5 @@
 	<true/>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/AlexanderKvamme/notchification/main/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>8XuqYstj6PqwwjoW55tSAblEmJUNiXGdPhHN7szpJRI=</string>
 </dict>
 </plist>
