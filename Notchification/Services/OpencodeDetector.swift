@@ -234,9 +234,10 @@ final class OpencodeDetector: ObservableObject {
                 .suffix(10)
 
             let lineArray = Array(lines)
+            guard lineArray.count >= 2 else { continue }
 
             // Check for consecutive lines pattern
-            for i in 0..<lineArray.count - 1 {
+            for i in 0..<(lineArray.count - 1) {
                 if lineArray[i].contains("Generating...") && lineArray[i + 1].contains("press esc to exit cancel") {
                     return true
                 }
