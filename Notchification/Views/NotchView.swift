@@ -23,6 +23,8 @@ struct NotchView: View {
     @State private var claudeConfettiTrigger: Int = 0
     @State private var xcodeConfettiTrigger: Int = 0
     @State private var androidConfettiTrigger: Int = 0
+    @State private var finderConfettiTrigger: Int = 0
+    @State private var opencodeConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -55,12 +57,14 @@ struct NotchView: View {
                     anchor: .top
                 )
                 .overlay(alignment: .top) {
-                    // Three separate confetti cannons - one per process type
+                    // Separate confetti cannons - one per process type
                     // Each has a fixed color, avoiding caching issues
                     ZStack {
                         ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
                         ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
                         ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
+                        ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
+                        ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
                     }
                     .allowsHitTesting(false)
                 }
@@ -122,6 +126,10 @@ struct NotchView: View {
                         xcodeConfettiTrigger += 1
                     case .androidStudio:
                         androidConfettiTrigger += 1
+                    case .finder:
+                        finderConfettiTrigger += 1
+                    case .opencode:
+                        opencodeConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -161,6 +169,10 @@ struct ProcessLogo: View {
             AndroidStudioLogo()
         case .xcode:
             XcodeLogo()
+        case .finder:
+            FinderLogo()
+        case .opencode:
+            OpencodeLogo()
         }
     }
 }
@@ -341,6 +353,30 @@ struct XcodeLogoShape: Shape {
 
     private func p(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) -> CGPoint {
         CGPoint(x: x * s, y: y * s)
+    }
+}
+
+// MARK: - Finder Logo
+
+struct FinderLogo: View {
+    var body: some View {
+        Image("findericon")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.finder.color)
+    }
+}
+
+// MARK: - Opencode Logo
+
+struct OpencodeLogo: View {
+    var body: some View {
+        Image("opencodeicon")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.opencode.color)
     }
 }
 

@@ -2,6 +2,7 @@
 //  AndroidStudioDetector.swift
 //  Notchification
 //
+//  Color: #2BA160 (Android green)
 //  Detects Android Studio builds using gradle --status command
 //  which shows BUSY when a build is running
 //

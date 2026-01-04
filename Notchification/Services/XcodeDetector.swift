@@ -2,6 +2,7 @@
 //  XcodeDetector.swift
 //  Notchification
 //
+//  Color: #147EFB (Xcode blue)
 //  Detects Xcode builds by monitoring XCBBuildService process
 //
 
@@ -17,8 +18,8 @@ final class XcodeDetector: ObservableObject {
 
     private var timer: Timer?
 
-    // CPU threshold - XCBBuildService uses significant CPU when building
-    private let cpuThreshold: Double = 5.0
+    // CPU threshold - read from settings
+    private var cpuThreshold: Double { ThresholdSettings.shared.xcodeThreshold }
 
     // Consecutive readings required
     private let requiredToShow: Int = 1

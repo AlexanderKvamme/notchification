@@ -2,6 +2,8 @@
 //  ClaudeDetector.swift
 //  Notchification
 //
+//  Color: #D97757 (Claude orange)
+//
 
 import Foundation
 import Combine
@@ -15,10 +17,9 @@ final class ClaudeDetector: ObservableObject {
     private let pollingInterval: TimeInterval = 0.3
     private let queue = DispatchQueue(label: "com.notchification.claudedetector", qos: .utility)
 
-    // CPU thresholds
-    private let cpuLowMax: Double = 10.0      // 0-10 = LOW
-    private let cpuMedMax: Double = 20.0      // 10-20 = MEDIUM
-    // 20+ = HIGH
+    // CPU thresholds - read from settings
+    private var cpuLowMax: Double { ThresholdSettings.shared.claudeLowThreshold }
+    private var cpuMedMax: Double { ThresholdSettings.shared.claudeHighThreshold }
 
     // Consecutive readings required
     private let requiredHighToShow: Int = 2   // 2 consecutive highs → show

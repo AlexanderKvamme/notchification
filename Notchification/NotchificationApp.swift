@@ -32,11 +32,19 @@ final class DebugSettings: ObservableObject {
     @Published var debugXcode: Bool {
         didSet { UserDefaults.standard.set(debugXcode, forKey: "debugXcode") }
     }
+    @Published var debugFinder: Bool {
+        didSet { UserDefaults.standard.set(debugFinder, forKey: "debugFinder") }
+    }
+    @Published var debugOpencode: Bool {
+        didSet { UserDefaults.standard.set(debugOpencode, forKey: "debugOpencode") }
+    }
 
     private init() {
         self.debugClaude = UserDefaults.standard.object(forKey: "debugClaude") as? Bool ?? false
         self.debugAndroid = UserDefaults.standard.object(forKey: "debugAndroid") as? Bool ?? true
         self.debugXcode = UserDefaults.standard.object(forKey: "debugXcode") as? Bool ?? true
+        self.debugFinder = UserDefaults.standard.object(forKey: "debugFinder") as? Bool ?? true
+        self.debugOpencode = UserDefaults.standard.object(forKey: "debugOpencode") as? Bool ?? false
     }
 }
 
@@ -53,6 +61,12 @@ final class TrackingSettings: ObservableObject {
     @Published var trackXcode: Bool {
         didSet { UserDefaults.standard.set(trackXcode, forKey: "trackXcode") }
     }
+    @Published var trackFinder: Bool {
+        didSet { UserDefaults.standard.set(trackFinder, forKey: "trackFinder") }
+    }
+    @Published var trackOpencode: Bool {
+        didSet { UserDefaults.standard.set(trackOpencode, forKey: "trackOpencode") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -64,8 +78,59 @@ final class TrackingSettings: ObservableObject {
         self.trackClaude = UserDefaults.standard.object(forKey: "trackClaude") as? Bool ?? true
         self.trackAndroidStudio = UserDefaults.standard.object(forKey: "trackAndroidStudio") as? Bool ?? true
         self.trackXcode = UserDefaults.standard.object(forKey: "trackXcode") as? Bool ?? true
+        self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? true
+        self.trackOpencode = UserDefaults.standard.object(forKey: "trackOpencode") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
+    }
+}
+
+/// CPU threshold settings - customizable per detector
+final class ThresholdSettings: ObservableObject {
+    static let shared = ThresholdSettings()
+
+    // Claude thresholds (default: LOW 0-10, MED 10-20, HIGH 20+)
+    @Published var claudeLowThreshold: Double {
+        didSet { UserDefaults.standard.set(claudeLowThreshold, forKey: "claudeLowThreshold") }
+    }
+    @Published var claudeHighThreshold: Double {
+        didSet { UserDefaults.standard.set(claudeHighThreshold, forKey: "claudeHighThreshold") }
+    }
+
+    // Opencode thresholds (default: LOW 0-1, MED 1-3, HIGH 3+)
+    @Published var opencodeLowThreshold: Double {
+        didSet { UserDefaults.standard.set(opencodeLowThreshold, forKey: "opencodeLowThreshold") }
+    }
+    @Published var opencodeHighThreshold: Double {
+        didSet { UserDefaults.standard.set(opencodeHighThreshold, forKey: "opencodeHighThreshold") }
+    }
+
+    // Xcode threshold (default: 5%)
+    @Published var xcodeThreshold: Double {
+        didSet { UserDefaults.standard.set(xcodeThreshold, forKey: "xcodeThreshold") }
+    }
+
+    // Default values
+    static let defaultClaudeLow: Double = 10.0
+    static let defaultClaudeHigh: Double = 20.0
+    static let defaultOpencodeLow: Double = 0.5
+    static let defaultOpencodeHigh: Double = 2.0
+    static let defaultXcode: Double = 5.0
+
+    private init() {
+        self.claudeLowThreshold = UserDefaults.standard.object(forKey: "claudeLowThreshold") as? Double ?? Self.defaultClaudeLow
+        self.claudeHighThreshold = UserDefaults.standard.object(forKey: "claudeHighThreshold") as? Double ?? Self.defaultClaudeHigh
+        self.opencodeLowThreshold = UserDefaults.standard.object(forKey: "opencodeLowThreshold") as? Double ?? Self.defaultOpencodeLow
+        self.opencodeHighThreshold = UserDefaults.standard.object(forKey: "opencodeHighThreshold") as? Double ?? Self.defaultOpencodeHigh
+        self.xcodeThreshold = UserDefaults.standard.object(forKey: "xcodeThreshold") as? Double ?? Self.defaultXcode
+    }
+
+    func resetToDefaults() {
+        claudeLowThreshold = Self.defaultClaudeLow
+        claudeHighThreshold = Self.defaultClaudeHigh
+        opencodeLowThreshold = Self.defaultOpencodeLow
+        opencodeHighThreshold = Self.defaultOpencodeHigh
+        xcodeThreshold = Self.defaultXcode
     }
 }
 
@@ -75,6 +140,8 @@ enum MockProcessType: String, CaseIterable {
     case claude = "Claude"
     case android = "Android"
     case xcode = "Xcode"
+    case finder = "Finder"
+    case opencode = "Opencode"
     case all = "All"
 
     var processType: ProcessType? {
@@ -83,12 +150,14 @@ enum MockProcessType: String, CaseIterable {
         case .claude: return .claude
         case .android: return .androidStudio
         case .xcode: return .xcode
+        case .finder: return .finder
+        case .opencode: return .opencode
         case .all: return nil // Handled specially
         }
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode]
+        [.claude, .androidStudio, .xcode, .finder, .opencode]
     }
 }
 
@@ -233,6 +302,8 @@ struct MenuBarView: View {
             Toggle("Claude", isOn: $trackingSettings.trackClaude)
             Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
             Toggle("Xcode", isOn: $trackingSettings.trackXcode)
+            Toggle("Finder", isOn: $trackingSettings.trackFinder)
+            Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
 
             Divider()
 
@@ -257,9 +328,15 @@ struct MenuBarView: View {
             Toggle("Claude", isOn: $debugSettings.debugClaude)
             Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
             Toggle("Xcode", isOn: $debugSettings.debugXcode)
+            Toggle("Finder", isOn: $debugSettings.debugFinder)
+            Toggle("Opencode", isOn: $debugSettings.debugOpencode)
             #endif
 
             Divider()
+
+            Button("Settings...") {
+                SettingsWindowController.shared.showSettings()
+            }
 
             Button("Send Feedback") {
                 let subject = "Notchification Feedback"

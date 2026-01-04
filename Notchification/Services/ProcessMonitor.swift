@@ -13,6 +13,8 @@ final class ProcessMonitor: ObservableObject {
     private let claudeDetector = ClaudeDetector()
     private let androidStudioDetector = AndroidStudioDetector()
     private let xcodeDetector = XcodeDetector()
+    private let finderDetector = FinderDetector()
+    private let opencodeDetector = OpencodeDetector()
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -31,12 +33,20 @@ final class ProcessMonitor: ObservableObject {
         if trackingSettings.trackXcode {
             xcodeDetector.startMonitoring()
         }
+        if trackingSettings.trackFinder {
+            finderDetector.startMonitoring()
+        }
+        if trackingSettings.trackOpencode {
+            opencodeDetector.startMonitoring()
+        }
     }
 
     func stopMonitoring() {
         claudeDetector.stopMonitoring()
         androidStudioDetector.stopMonitoring()
         xcodeDetector.stopMonitoring()
+        finderDetector.stopMonitoring()
+        opencodeDetector.stopMonitoring()
     }
 
     private func setupBindings() {
@@ -56,6 +66,20 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         xcodeDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        finderDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        opencodeDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateActiveProcesses()
@@ -101,6 +125,32 @@ final class ProcessMonitor: ObservableObject {
                 self.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackFinder
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.finderDetector.startMonitoring()
+                } else {
+                    self.finderDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        trackingSettings.$trackOpencode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.opencodeDetector.startMonitoring()
+                } else {
+                    self.opencodeDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -116,6 +166,14 @@ final class ProcessMonitor: ObservableObject {
 
         if trackingSettings.trackXcode && xcodeDetector.isActive {
             processes.append(.xcode)
+        }
+
+        if trackingSettings.trackFinder && finderDetector.isActive {
+            processes.append(.finder)
+        }
+
+        if trackingSettings.trackOpencode && opencodeDetector.isActive {
+            processes.append(.opencode)
         }
 
         activeProcesses = processes
