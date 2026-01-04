@@ -103,8 +103,7 @@ final class ClaudeDetector: ObservableObject {
         return false
     }
 
-    /// Use AppleScript to check iTerm2 terminal content for Claude activity
-    /// Only reads the last ~500 chars (bottom of terminal) to avoid matching old history
+    /// Use AppleScript to get iTerm2 terminal content
     private func isClaudeActiveInITerm2() -> Bool {
         let script = """
         tell application "System Events"
@@ -116,15 +115,7 @@ final class ClaudeDetector: ObservableObject {
             repeat with w in windows
                 repeat with t in tabs of w
                     repeat with s in sessions of t
-                        set sessionContent to contents of s
-                        set contentLength to length of sessionContent
-                        -- Only check the last 1500 chars (roughly 15-20 lines)
-                        if contentLength > 1500 then
-                            set recentContent to text (contentLength - 1500) thru contentLength of sessionContent
-                        else
-                            set recentContent to sessionContent
-                        end if
-                        set allContent to allContent & "---SESSION---" & recentContent
+                        set allContent to allContent & "---SESSION---" & contents of s
                     end repeat
                 end repeat
             end repeat
@@ -156,8 +147,7 @@ final class ClaudeDetector: ObservableObject {
         return hasClaudePattern(in: output)
     }
 
-    /// Use AppleScript to check Terminal.app content for Claude activity
-    /// Only reads the last ~500 chars (bottom of terminal) to avoid matching old history
+    /// Use AppleScript to get Terminal.app content
     private func isClaudeActiveInTerminal() -> Bool {
         let script = """
         tell application "System Events"
@@ -168,15 +158,7 @@ final class ClaudeDetector: ObservableObject {
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
-                    set tabContent to history of t
-                    set contentLength to length of tabContent
-                    -- Only check the last 1500 chars (roughly 15-20 lines)
-                    if contentLength > 1500 then
-                        set recentContent to text (contentLength - 1500) thru contentLength of tabContent
-                    else
-                        set recentContent to tabContent
-                    end if
-                    set allContent to allContent & "---TAB---" & recentContent
+                    set allContent to allContent & "---TAB---" & history of t
                 end repeat
             end repeat
             return allContent
@@ -207,30 +189,30 @@ final class ClaudeDetector: ObservableObject {
         return hasClaudePattern(in: output)
     }
 
-    /// Check if output contains Claude Code working pattern
-    /// Claude shows status like: "✳ Adding ProcessType cases… (esc to interrupt · ctrl+t to show todos · 3m 28s)"
-    /// The key indicators are the status characters combined with "esc to interrupt"
+    /// Check if "esc to interrupt" appears in the last 10 non-empty lines of ANY session
     private func hasClaudePattern(in output: String) -> Bool {
-        // Look for Claude's actual status line format, not just "esc to interrupt" in code
-        // The live status line has: (esc to interrupt · something · time)
-        // Use the middle dot separator which is unique to the status line
-        let statusLinePattern = "esc to interrupt ·"
-        let found = output.contains(statusLinePattern)
+        // Split by session/tab separator and check each one
+        let sessions = output.components(separatedBy: "---SESSION---") +
+                       output.components(separatedBy: "---TAB---")
 
-        if DebugSettings.shared.debugClaude {
-            if found {
-                // Find and print the line containing the pattern
-                let lines = output.components(separatedBy: .newlines)
-                for line in lines {
-                    if line.contains(statusLinePattern) {
-                        print("🔶 Claude FOUND: \(line.prefix(120))")
-                        break
+        for session in sessions {
+            // Get last 10 non-empty lines of this session
+            let lines = session.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .suffix(10)
+
+            for line in lines {
+                if line.contains("esc to interrupt") {
+                    if DebugSettings.shared.debugClaude {
+                        print("🔶 Claude FOUND: \(line.prefix(100))")
                     }
+                    return true
                 }
             }
         }
 
-        return found
+        return false
     }
 
     deinit {

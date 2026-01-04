@@ -95,7 +95,7 @@ final class CodexDetector: ObservableObject {
         return false
     }
 
-    /// Use AppleScript to check iTerm2 terminal content for Codex activity
+    /// Use AppleScript to get iTerm2 terminal content
     private func isCodexActiveInITerm2() -> Bool {
         let script = """
         tell application "System Events"
@@ -107,14 +107,7 @@ final class CodexDetector: ObservableObject {
             repeat with w in windows
                 repeat with t in tabs of w
                     repeat with s in sessions of t
-                        set sessionContent to contents of s
-                        set contentLength to length of sessionContent
-                        if contentLength > 3000 then
-                            set recentContent to text (contentLength - 3000) thru contentLength of sessionContent
-                        else
-                            set recentContent to sessionContent
-                        end if
-                        set allContent to allContent & "---SESSION---" & recentContent
+                        set allContent to allContent & "---SESSION---" & contents of s
                     end repeat
                 end repeat
             end repeat
@@ -146,7 +139,7 @@ final class CodexDetector: ObservableObject {
         return hasCodexPattern(in: output)
     }
 
-    /// Use AppleScript to check Terminal.app content for Codex activity
+    /// Use AppleScript to get Terminal.app content
     private func isCodexActiveInTerminal() -> Bool {
         let script = """
         tell application "System Events"
@@ -157,14 +150,7 @@ final class CodexDetector: ObservableObject {
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
-                    set tabContent to history of t
-                    set contentLength to length of tabContent
-                    if contentLength > 3000 then
-                        set recentContent to text (contentLength - 3000) thru contentLength of tabContent
-                    else
-                        set recentContent to tabContent
-                    end if
-                    set allContent to allContent & "---TAB---" & recentContent
+                    set allContent to allContent & "---TAB---" & history of t
                 end repeat
             end repeat
             return allContent
@@ -195,12 +181,28 @@ final class CodexDetector: ObservableObject {
         return hasCodexPattern(in: output)
     }
 
-    /// Check if output contains Codex "Working" pattern
-    /// Looks for "Working" and "esc to interrupt" appearing together
+    /// Check if "Working" + "esc to interrupt" appears in the last 10 non-empty lines of ANY session
     private func hasCodexPattern(in output: String) -> Bool {
-        // Check for "Working" and "esc to interrupt" in the output
-        // They appear on the same line: "Working (0s • esc to interrupt)"
-        return output.contains("Working") && output.contains("esc to interrupt")
+        // Split by session/tab separator and check each one
+        let sessions = output.components(separatedBy: "---SESSION---") +
+                       output.components(separatedBy: "---TAB---")
+
+        for session in sessions {
+            // Get last 10 non-empty lines of this session
+            let lines = session.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .suffix(10)
+
+            // Check if any line has both "Working" and "esc to interrupt"
+            for line in lines {
+                if line.contains("Working") && line.contains("esc to interrupt") {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 
     deinit {

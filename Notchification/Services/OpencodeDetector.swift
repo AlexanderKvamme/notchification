@@ -175,9 +175,8 @@ final class OpencodeDetector: ObservableObject {
         return false
     }
 
-    /// Use AppleScript to check iTerm2 terminal content for opencode activity
+    /// Use AppleScript to get iTerm2 terminal content
     private func isOpencodeActiveInITerm2() -> Bool {
-        // Script to get all session content - last ~3000 chars (~30 lines)
         let script = """
         tell application "System Events"
             if not (exists process "iTerm2") then return "NOT_RUNNING"
@@ -188,14 +187,7 @@ final class OpencodeDetector: ObservableObject {
             repeat with w in windows
                 repeat with t in tabs of w
                     repeat with s in sessions of t
-                        set sessionContent to contents of s
-                        set contentLength to length of sessionContent
-                        if contentLength > 3000 then
-                            set recentContent to text (contentLength - 3000) thru contentLength of sessionContent
-                        else
-                            set recentContent to sessionContent
-                        end if
-                        set allContent to allContent & "---SESSION---" & recentContent
+                        set allContent to allContent & "---SESSION---" & contents of s
                     end repeat
                 end repeat
             end repeat
@@ -228,22 +220,33 @@ final class OpencodeDetector: ObservableObject {
         return hasGeneratingPattern(in: output)
     }
 
-    /// Check if output contains "Generating..." followed by "press esc to exit cancel" on consecutive lines
+    /// Check if "Generating..." + "press esc to exit cancel" appears in the last 10 lines of ANY session
     private func hasGeneratingPattern(in output: String) -> Bool {
-        let lines = output.components(separatedBy: .newlines)
-        for i in 0..<lines.count - 1 {
-            let currentLine = lines[i]
-            let nextLine = lines[i + 1]
-            if currentLine.contains("Generating...") && nextLine.contains("press esc to exit cancel") {
-                return true
+        // Split by session/tab separator and check each one
+        let sessions = output.components(separatedBy: "---SESSION---") +
+                       output.components(separatedBy: "---TAB---")
+
+        for session in sessions {
+            // Get last 10 non-empty lines of this session
+            let lines = session.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .suffix(10)
+
+            let lineArray = Array(lines)
+
+            // Check for consecutive lines pattern
+            for i in 0..<lineArray.count - 1 {
+                if lineArray[i].contains("Generating...") && lineArray[i + 1].contains("press esc to exit cancel") {
+                    return true
+                }
             }
         }
         return false
     }
 
-    /// Use AppleScript to check Terminal.app content for opencode activity
+    /// Use AppleScript to get Terminal.app content
     private func isOpencodeActiveInTerminal() -> Bool {
-        // Terminal.app uses "history" for full content, "contents" for visible only
         let script = """
         tell application "System Events"
             if not (exists process "Terminal") then return "NOT_RUNNING"
@@ -253,14 +256,7 @@ final class OpencodeDetector: ObservableObject {
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
-                    set tabContent to history of t
-                    set contentLength to length of tabContent
-                    if contentLength > 3000 then
-                        set recentContent to text (contentLength - 3000) thru contentLength of tabContent
-                    else
-                        set recentContent to tabContent
-                    end if
-                    set allContent to allContent & "---TAB---" & recentContent
+                    set allContent to allContent & "---TAB---" & history of t
                 end repeat
             end repeat
             return allContent
