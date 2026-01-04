@@ -15,8 +15,24 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
     }
 }
 
+/// App delegate to handle single-instance enforcement
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Check for other running instances after launch
+        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+        let otherInstances = runningApps.filter { $0 != NSRunningApplication.current }
+
+        if !otherInstances.isEmpty {
+            // Another instance is running - activate it and quit this one
+            otherInstances.first?.activate(options: .activateIgnoringOtherApps)
+            NSApp.terminate(nil)
+        }
+    }
+}
+
 @main
 struct NotchificationApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
     private let updaterDelegate = UpdaterDelegate()
     private var updaterController: SPUStandardUpdaterController
@@ -96,6 +112,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackOneDrive: Bool {
         didSet { UserDefaults.standard.set(trackOneDrive, forKey: "trackOneDrive") }
     }
+    @Published var trackICloud: Bool {
+        didSet { UserDefaults.standard.set(trackICloud, forKey: "trackICloud") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -113,6 +132,7 @@ final class TrackingSettings: ObservableObject {
         self.trackDropbox = UserDefaults.standard.object(forKey: "trackDropbox") as? Bool ?? true
         self.trackGoogleDrive = UserDefaults.standard.object(forKey: "trackGoogleDrive") as? Bool ?? true
         self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? true
+        self.trackICloud = UserDefaults.standard.object(forKey: "trackICloud") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -179,6 +199,7 @@ enum MockProcessType: String, CaseIterable {
     case dropbox = "Dropbox"
     case googleDrive = "Google Drive"
     case oneDrive = "OneDrive"
+    case icloud = "iCloud"
     case all = "All"
 
     var processType: ProcessType? {
@@ -193,12 +214,13 @@ enum MockProcessType: String, CaseIterable {
         case .dropbox: return .dropbox
         case .googleDrive: return .googleDrive
         case .oneDrive: return .oneDrive
+        case .icloud: return .icloud
         case .all: return nil // Handled specially
         }
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive]
+        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud]
     }
 }
 
@@ -361,6 +383,7 @@ struct MenuBarView: View {
             Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
             Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
             Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
+            Toggle("iCloud", isOn: $trackingSettings.trackICloud)
 
             Divider()
 

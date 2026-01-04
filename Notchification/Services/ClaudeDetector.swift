@@ -104,7 +104,7 @@ final class ClaudeDetector: ObservableObject {
     }
 
     /// Use AppleScript to check iTerm2 terminal content for Claude activity
-    /// Only reads the last ~200 chars (bottom of terminal) to avoid matching old history
+    /// Only reads the last ~500 chars (bottom of terminal) to avoid matching old history
     private func isClaudeActiveInITerm2() -> Bool {
         let script = """
         tell application "System Events"
@@ -118,9 +118,9 @@ final class ClaudeDetector: ObservableObject {
                     repeat with s in sessions of t
                         set sessionContent to contents of s
                         set contentLength to length of sessionContent
-                        -- Only check the last 200 chars (roughly 2-3 lines)
-                        if contentLength > 200 then
-                            set recentContent to text (contentLength - 200) thru contentLength of sessionContent
+                        -- Only check the last 1500 chars (roughly 15-20 lines)
+                        if contentLength > 1500 then
+                            set recentContent to text (contentLength - 1500) thru contentLength of sessionContent
                         else
                             set recentContent to sessionContent
                         end if
@@ -157,7 +157,7 @@ final class ClaudeDetector: ObservableObject {
     }
 
     /// Use AppleScript to check Terminal.app content for Claude activity
-    /// Only reads the last ~200 chars (bottom of terminal) to avoid matching old history
+    /// Only reads the last ~500 chars (bottom of terminal) to avoid matching old history
     private func isClaudeActiveInTerminal() -> Bool {
         let script = """
         tell application "System Events"
@@ -170,9 +170,9 @@ final class ClaudeDetector: ObservableObject {
                 repeat with t in tabs of w
                     set tabContent to history of t
                     set contentLength to length of tabContent
-                    -- Only check the last 200 chars (roughly 2-3 lines)
-                    if contentLength > 200 then
-                        set recentContent to text (contentLength - 200) thru contentLength of tabContent
+                    -- Only check the last 1500 chars (roughly 15-20 lines)
+                    if contentLength > 1500 then
+                        set recentContent to text (contentLength - 1500) thru contentLength of tabContent
                     else
                         set recentContent to tabContent
                     end if
@@ -211,9 +211,26 @@ final class ClaudeDetector: ObservableObject {
     /// Claude shows status like: "✳ Adding ProcessType cases… (esc to interrupt · ctrl+t to show todos · 3m 28s)"
     /// The key indicators are the status characters combined with "esc to interrupt"
     private func hasClaudePattern(in output: String) -> Bool {
-        // Must have "esc to interrupt" - this means Claude is actively working
-        // This alone is sufficient - it only appears when Claude is processing
-        return output.contains("esc to interrupt")
+        // Look for Claude's actual status line format, not just "esc to interrupt" in code
+        // The live status line has: (esc to interrupt · something · time)
+        // Use the middle dot separator which is unique to the status line
+        let statusLinePattern = "esc to interrupt ·"
+        let found = output.contains(statusLinePattern)
+
+        if DebugSettings.shared.debugClaude {
+            if found {
+                // Find and print the line containing the pattern
+                let lines = output.components(separatedBy: .newlines)
+                for line in lines {
+                    if line.contains(statusLinePattern) {
+                        print("🔶 Claude FOUND: \(line.prefix(120))")
+                        break
+                    }
+                }
+            }
+        }
+
+        return found
     }
 
     deinit {

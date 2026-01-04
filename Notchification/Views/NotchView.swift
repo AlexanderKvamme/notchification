@@ -30,6 +30,7 @@ struct NotchView: View {
     @State private var dropboxConfettiTrigger: Int = 0
     @State private var googleDriveConfettiTrigger: Int = 0
     @State private var oneDriveConfettiTrigger: Int = 0
+    @State private var icloudConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -75,6 +76,7 @@ struct NotchView: View {
                         ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
                         ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
                         ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
+                        ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
                     }
                     .allowsHitTesting(false)
                 }
@@ -157,6 +159,8 @@ struct NotchView: View {
                         googleDriveConfettiTrigger += 1
                     case .oneDrive:
                         oneDriveConfettiTrigger += 1
+                    case .icloud:
+                        icloudConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -208,6 +212,8 @@ struct ProcessLogo: View {
             GoogleDriveLogo()
         case .oneDrive:
             OneDriveLogo()
+        case .icloud:
+            iCloudLogo()
         }
     }
 }
@@ -458,6 +464,18 @@ struct OneDriveLogo: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .foregroundColor(ProcessType.oneDrive.color)
+    }
+}
+
+// MARK: - iCloud Logo
+
+struct iCloudLogo: View {
+    var body: some View {
+        Image("icloudlogo")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.icloud.color)
     }
 }
 

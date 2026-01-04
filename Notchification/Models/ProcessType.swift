@@ -15,6 +15,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case dropbox = "dropbox"
     case googleDrive = "googledrive"
     case oneDrive = "onedrive"
+    case icloud = "icloud"
 
     var id: String { rawValue }
 
@@ -29,6 +30,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .dropbox: return "Dropbox"
         case .googleDrive: return "Google Drive"
         case .oneDrive: return "OneDrive"
+        case .icloud: return "iCloud"
         }
     }
 
@@ -43,6 +45,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .dropbox: return Color(red: 0.0, green: 0.38, blue: 1.0) // #0061FF Dropbox blue
         case .googleDrive: return Color(red: 0.26, green: 0.52, blue: 0.96) // #4285F4 Google blue
         case .oneDrive: return Color(red: 0.0, green: 0.47, blue: 0.83) // #0078D4 Microsoft blue
+        case .icloud: return Color(red: 0.2, green: 0.6, blue: 1.0) // iCloud blue
         }
     }
 
@@ -57,6 +60,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .dropbox: return Color(red: 0.4, green: 0.6, blue: 1.0) // Lighter Dropbox blue
         case .googleDrive: return Color(red: 0.5, green: 0.7, blue: 1.0) // Lighter Google blue
         case .oneDrive: return Color(red: 0.4, green: 0.65, blue: 0.95) // Lighter Microsoft blue
+        case .icloud: return Color(red: 0.5, green: 0.8, blue: 1.0) // Lighter iCloud blue
         }
     }
 
@@ -71,6 +75,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .dropbox: return .solid
         case .googleDrive: return .solid
         case .oneDrive: return .solid
+        case .icloud: return .solid
         }
     }
 }
