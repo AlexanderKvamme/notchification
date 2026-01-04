@@ -27,6 +27,9 @@ final class ClaudeDetector: ObservableObject {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Track if a check is in progress
+    private var checkInProgress = false
+
     init() {
         logger.info("🔶 ClaudeDetector init")
     }
@@ -52,6 +55,10 @@ final class ClaudeDetector: ObservableObject {
     }
 
     private func checkStatus() {
+        // Skip if a check is already in progress
+        guard !checkInProgress else { return }
+        checkInProgress = true
+
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
 
@@ -59,6 +66,8 @@ final class ClaudeDetector: ObservableObject {
             let debug = DebugSettings.shared.debugClaude
 
             DispatchQueue.main.async {
+                self.checkInProgress = false
+
                 if isWorking {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0

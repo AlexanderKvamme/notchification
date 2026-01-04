@@ -507,8 +507,10 @@ struct InstallerLogo: View {
 
 struct AppStoreLogo: View {
     var body: some View {
-        FrigginAppStoreIconShape()
-            .fill(ProcessType.appStore.color)
+        Image("appstoreicon")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.appStore.color)
     }
 }
 
