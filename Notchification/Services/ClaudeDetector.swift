@@ -14,10 +14,10 @@ private let logger = Logger(subsystem: "com.hoi.Notchification", category: "Clau
 
 /// Detects if Claude Code is actively working
 /// Uses AppleScript to read terminal content and look for status indicators
-final class ClaudeDetector: ObservableObject {
+final class ClaudeDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .claude
 
     // Consecutive readings required
     private let requiredToShow: Int = 1
@@ -27,51 +27,33 @@ final class ClaudeDetector: ObservableObject {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
-    // Track if a check is in progress
-    private var checkInProgress = false
+    // Serial queue ensures checks don't overlap (no need for checkInProgress flag)
+    private let checkQueue = DispatchQueue(label: "com.notchification.claude-check", qos: .utility)
 
     init() {
         logger.info("🔶 ClaudeDetector init")
     }
 
-    func startMonitoring() {
-        logger.info("🔶 ClaudeDetector startMonitoring")
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
         isActive = false
     }
 
-    private func checkStatus() {
-        // Skip if a check is already in progress
-        guard !checkInProgress else { return }
-        checkInProgress = true
-
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+    func poll() {
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let isWorking = self.isClaudeWorking()
             let debug = DebugSettings.shared.debugClaude
 
             DispatchQueue.main.async {
-                self.checkInProgress = false
-
                 if isWorking {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0
 
+                    // NOTE: Keep debug logs - helps diagnose detection issues
                     if debug {
                         logger.debug("🔶 Claude active: \(self.consecutiveActiveReadings)/\(self.requiredToShow)")
                     }
@@ -84,6 +66,7 @@ final class ClaudeDetector: ObservableObject {
                     self.consecutiveInactiveReadings += 1
                     self.consecutiveActiveReadings = 0
 
+                    // NOTE: Keep debug logs - helps diagnose detection issues
                     if debug {
                         logger.debug("🔶 Claude inactive: \(self.consecutiveInactiveReadings)/\(self.requiredToHide)")
                     }
@@ -114,17 +97,17 @@ final class ClaudeDetector: ObservableObject {
 
     /// Use AppleScript to get iTerm2 terminal content
     private func isClaudeActiveInITerm2() -> Bool {
+        // Use 'text' (visible screen) instead of 'contents' (full scrollback).
+        // 'contents' can take 2-3 seconds on large scrollbacks, while 'text' is instant.
+        // Since we only need the last 10 lines to detect "esc to interrupt", visible screen is sufficient.
         let script = """
-        tell application "System Events"
-            if not (exists process "iTerm2") then return "NOT_RUNNING"
-        end tell
-
         tell application "iTerm2"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
                     repeat with s in sessions of t
-                        set allContent to allContent & "---SESSION---" & contents of s
+                        set allContent to allContent & "---SESSION---" & text of s
                     end repeat
                 end repeat
             end repeat
@@ -140,10 +123,20 @@ final class ClaudeDetector: ObservableObject {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds (text property is fast, but osascript can hang)
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
@@ -158,12 +151,10 @@ final class ClaudeDetector: ObservableObject {
 
     /// Use AppleScript to get Terminal.app content
     private func isClaudeActiveInTerminal() -> Bool {
+        // Skip System Events check - it causes timeouts
         let script = """
-        tell application "System Events"
-            if not (exists process "Terminal") then return "NOT_RUNNING"
-        end tell
-
         tell application "Terminal"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
@@ -182,10 +173,20 @@ final class ClaudeDetector: ObservableObject {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds (text property is fast, but osascript can hang)
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
@@ -213,6 +214,7 @@ final class ClaudeDetector: ObservableObject {
 
             for line in lines {
                 if line.contains("esc to interrupt") {
+                    // NOTE: Keep this debug output - helps diagnose detection issues
                     if DebugSettings.shared.debugClaude {
                         print("🔶 Claude FOUND: \(line.prefix(100))")
                     }
@@ -222,9 +224,5 @@ final class ClaudeDetector: ObservableObject {
         }
 
         return false
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

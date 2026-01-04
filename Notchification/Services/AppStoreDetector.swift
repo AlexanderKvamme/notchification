@@ -10,10 +10,10 @@ import Foundation
 import Combine
 
 /// Detects App Store downloads by checking for progress button (e.g. "75% loaded")
-final class AppStoreDetector: ObservableObject {
+final class AppStoreDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .appStore
 
     // Consecutive readings required
     private let requiredToShow: Int = 1
@@ -23,31 +23,25 @@ final class AppStoreDetector: ObservableObject {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Track if a check is in progress (async AppleScript)
+    private var checkInProgress = false
+
     init() {}
 
-    func startMonitoring() {
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
+        checkInProgress = false
         isActive = false
     }
 
-    private func checkStatus() {
-        print("[AppStoreDetector] timer tick")
+    func poll() {
+        guard !checkInProgress else { return }
+        checkInProgress = true
+
         checkDownloadStatus { [weak self] downloadActive in
             guard let self = self else { return }
+            self.checkInProgress = false
 
             if downloadActive {
                 self.consecutiveActiveReadings += 1
@@ -106,13 +100,12 @@ final class AppStoreDetector: ObservableObject {
         // Timeout: kill after 2 seconds
         let timeoutWork = DispatchWorkItem { [weak task] in
             if task?.isRunning == true {
-                print("[AppStoreDetector] killing hung process")
                 task?.terminate()
             }
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
 
-        task.terminationHandler = { [weak self] _ in
+        task.terminationHandler = { _ in
             timeoutWork.cancel()
 
             let data = pipe.fileHandleForReading.availableData
@@ -121,10 +114,8 @@ final class AppStoreDetector: ObservableObject {
             let parts = result.split(separator: "|", omittingEmptySubsequences: false)
             let groups = parts.count >= 1 ? Int(parts[0]) ?? 0 : 0
             let buttons = parts.count >= 2 ? Int(parts[1]) ?? 0 : 0
-            let titles = parts.count > 2 ? String(parts[2]) : ""
 
             let isDownloading = groups > buttons
-            print("[AppStoreDetector] groups=\(groups) buttons=\(buttons) titles=[\(titles)] downloading=\(isDownloading)")
 
             DispatchQueue.main.async {
                 completion(isDownloading)
@@ -134,13 +125,8 @@ final class AppStoreDetector: ObservableObject {
         do {
             try task.run()
         } catch {
-            print("[AppStoreDetector] Error: \(error)")
             timeoutWork.cancel()
             completion(false)
         }
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

@@ -11,10 +11,10 @@ import Combine
 import AppKit
 
 /// Detects if Installer.app is running (pkg installations)
-final class InstallerDetector: ObservableObject {
+final class InstallerDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .installer
     private let bundleIdentifier = "com.apple.installer"
 
     // Consecutive readings required
@@ -27,41 +27,34 @@ final class InstallerDetector: ObservableObject {
 
     init() {}
 
-    func startMonitoring() {
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
         isActive = false
     }
 
-    private func checkStatus() {
-        let isRunning = isInstallerRunning()
+    func poll() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
 
-        if isRunning {
-            consecutiveActiveReadings += 1
-            consecutiveInactiveReadings = 0
+            let isRunning = self.isInstallerRunning()
 
-            if consecutiveActiveReadings >= requiredToShow && !isActive {
-                isActive = true
-            }
-        } else {
-            consecutiveInactiveReadings += 1
-            consecutiveActiveReadings = 0
+            DispatchQueue.main.async {
+                if isRunning {
+                    self.consecutiveActiveReadings += 1
+                    self.consecutiveInactiveReadings = 0
 
-            if consecutiveInactiveReadings >= requiredToHide && isActive {
-                isActive = false
+                    if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
+                        self.isActive = true
+                    }
+                } else {
+                    self.consecutiveInactiveReadings += 1
+                    self.consecutiveActiveReadings = 0
+
+                    if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
+                        self.isActive = false
+                    }
+                }
             }
         }
     }
@@ -71,14 +64,11 @@ final class InstallerDetector: ObservableObject {
         let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
         guard !runningApps.isEmpty else { return false }
 
-        // Check if there's a progress indicator visible (actual installation in progress)
         return hasProgressBar()
     }
 
     /// Check if Installer.app has a busy or progress indicator visible (installation in progress)
     private func hasProgressBar() -> Bool {
-        // Use osascript via Process to avoid NSAppleScript permission issues
-        // Check for busy indicator (Preparing phase) or progress indicator (Writing files phase)
         let script = """
         tell application "System Events"
             tell process "Installer"
@@ -114,9 +104,5 @@ final class InstallerDetector: ObservableObject {
         } catch {
             return false
         }
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

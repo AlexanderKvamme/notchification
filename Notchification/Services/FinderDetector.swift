@@ -14,13 +14,13 @@ import os.log
 private let logger = Logger(subsystem: "com.hoi.Notchification", category: "FinderDetector")
 
 /// Detects if Finder is actively copying or moving files by looking for progress windows
-final class FinderDetector: ObservableObject {
+final class FinderDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .finder
 
     // Consecutive readings required
-    private let requiredToShow: Int = 1  // Trigger immediately
+    private let requiredToShow: Int = 1
     private let requiredToHide: Int = 3
 
     // Counters
@@ -29,33 +29,20 @@ final class FinderDetector: ObservableObject {
 
     // Cooldown to prevent rapid re-triggering
     private var lastDeactivationTime: Date?
-    private let reactivationCooldown: TimeInterval = 3.0  // Must wait 3 seconds before re-activating
+    private let reactivationCooldown: TimeInterval = 3.0
 
     init() {
         logger.info("📁 FinderDetector init")
     }
 
-    func startMonitoring() {
-        logger.info("📁 FinderDetector startMonitoring")
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
+        lastDeactivationTime = nil
         isActive = false
     }
 
-    private func checkStatus() {
+    func poll() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
 
@@ -67,7 +54,6 @@ final class FinderDetector: ObservableObject {
                     self.consecutiveInactiveReadings = 0
 
                     if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
-                        // Check cooldown - don't reactivate too quickly after deactivation
                         if let lastDeactivation = self.lastDeactivationTime,
                            Date().timeIntervalSince(lastDeactivation) < self.reactivationCooldown {
                             logger.debug("📁 Ignoring activation - still in cooldown period")
@@ -92,7 +78,6 @@ final class FinderDetector: ObservableObject {
 
     /// Check if Finder has a progress window open using Accessibility API
     private func finderHasProgressWindow() -> Bool {
-        // Get Finder app
         guard let finderApp = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first else {
             return false
         }
@@ -100,7 +85,6 @@ final class FinderDetector: ObservableObject {
         let finderPID = finderApp.processIdentifier
         let appElement = AXUIElementCreateApplication(finderPID)
 
-        // Get all windows
         var windowsValue: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
 
@@ -108,20 +92,16 @@ final class FinderDetector: ObservableObject {
             return false
         }
 
-        // First pass: check if there's a dialog window (confirmation prompt)
-        // If so, skip detection - the copy is paused waiting for user input
         for window in windows {
             if isDialogWindow(window) {
                 return false
             }
         }
 
-        // Second pass: check for progress windows
         for window in windows {
             var titleValue: CFTypeRef?
             if AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue) == .success,
                let title = titleValue as? String, !title.isEmpty {
-                // Finder progress windows have short titles like "Copy", "Move", etc.
                 let progressKeywords = ["Copy", "Move", "Delete", "Preparing", "Emptying", "Trash"]
                 for keyword in progressKeywords {
                     if title.contains(keyword) {
@@ -136,7 +116,6 @@ final class FinderDetector: ObservableObject {
 
     /// Check if window is a dialog (confirmation, alert, etc.)
     private func isDialogWindow(_ window: AXUIElement) -> Bool {
-        // Check subrole for dialog types
         var subroleValue: CFTypeRef?
         if AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subroleValue) == .success,
            let subrole = subroleValue as? String {
@@ -145,18 +124,16 @@ final class FinderDetector: ObservableObject {
             }
         }
 
-        // Check if window has typical dialog buttons (Replace, Keep Both, Stop, Skip)
         return windowHasDialogButtons(window)
     }
 
     /// Check if window contains dialog-specific buttons
     private func windowHasDialogButtons(_ element: AXUIElement, depth: Int = 0) -> Bool {
-        guard depth < 5 else { return false }  // Limit recursion
+        guard depth < 5 else { return false }
 
         var roleValue: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue) == .success,
            let role = roleValue as? String, role == "AXButton" {
-            // Check button title
             var titleValue: CFTypeRef?
             if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleValue) == .success,
                let title = titleValue as? String {
@@ -167,7 +144,6 @@ final class FinderDetector: ObservableObject {
             }
         }
 
-        // Check children
         var childrenValue: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenValue) == .success,
            let children = childrenValue as? [AXUIElement] {
@@ -179,9 +155,5 @@ final class FinderDetector: ObservableObject {
         }
 
         return false
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

@@ -10,12 +10,10 @@ import Foundation
 import Combine
 
 /// Detects if OneDrive is actively syncing by reading its menu bar status
-final class OneDriveDetector: ObservableObject {
+final class OneDriveDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: DispatchSourceTimer?
-    private let pollingInterval: TimeInterval = 1.0
-    private let queue = DispatchQueue(label: "com.notchification.onedrivedetector", qos: .utility)
+    let processType: ProcessType = .oneDrive
 
     private let requiredToShow: Int = 2
     private let requiredToHide: Int = 2
@@ -28,49 +26,44 @@ final class OneDriveDetector: ObservableObject {
 
     init() {}
 
-    func startMonitoring() {
+    func reset() {
         consecutiveSyncingReadings = 0
         consecutiveIdleReadings = 0
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: pollingInterval)
-        timer.setEventHandler { [weak self] in
-            self?.checkStatus()
-        }
-        timer.resume()
-        self.timer = timer
+        isActive = false
     }
 
-    func stopMonitoring() {
-        timer?.cancel()
-        timer = nil
-        DispatchQueue.main.async {
-            self.isActive = false
-        }
-    }
+    func poll() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
 
-    private func checkStatus() {
-        guard isOneDriveRunning() else {
-            consecutiveSyncingReadings = 0
-            consecutiveIdleReadings += 1
-            if consecutiveIdleReadings >= requiredToHide {
-                updateStatus(isActive: false)
+            guard self.isOneDriveRunning() else {
+                DispatchQueue.main.async {
+                    self.consecutiveSyncingReadings = 0
+                    self.consecutiveIdleReadings += 1
+                    if self.consecutiveIdleReadings >= self.requiredToHide && self.isActive {
+                        self.isActive = false
+                    }
+                }
+                return
             }
-            return
-        }
 
-        let status = getMenuBarStatus()
+            let status = self.getMenuBarStatus()
+            let isSyncing = self.isSyncing(status: status)
 
-        if isSyncing(status: status) {
-            consecutiveSyncingReadings += 1
-            consecutiveIdleReadings = 0
-            if consecutiveSyncingReadings >= requiredToShow {
-                updateStatus(isActive: true)
-            }
-        } else {
-            consecutiveIdleReadings += 1
-            consecutiveSyncingReadings = 0
-            if consecutiveIdleReadings >= requiredToHide {
-                updateStatus(isActive: false)
+            DispatchQueue.main.async {
+                if isSyncing {
+                    self.consecutiveSyncingReadings += 1
+                    self.consecutiveIdleReadings = 0
+                    if self.consecutiveSyncingReadings >= self.requiredToShow && !self.isActive {
+                        self.isActive = true
+                    }
+                } else {
+                    self.consecutiveIdleReadings += 1
+                    self.consecutiveSyncingReadings = 0
+                    if self.consecutiveIdleReadings >= self.requiredToHide && self.isActive {
+                        self.isActive = false
+                    }
+                }
             }
         }
     }
@@ -106,7 +99,6 @@ final class OneDriveDetector: ObservableObject {
     }
 
     /// Get OneDrive menu bar status via AppleScript
-    /// The sync status is typically in the 'help' property
     private func getMenuBarStatus() -> String {
         let script = """
         tell application "System Events"
@@ -141,17 +133,5 @@ final class OneDriveDetector: ObservableObject {
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    }
-
-    private func updateStatus(isActive: Bool) {
-        if self.isActive != isActive {
-            DispatchQueue.main.async {
-                self.isActive = isActive
-            }
-        }
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

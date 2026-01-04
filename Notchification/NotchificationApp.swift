@@ -256,6 +256,21 @@ final class AppState: ObservableObject {
 
     init() {
         #if DEBUG
+        // IMPORTANT: Debug logs use os.Logger, not print()!
+        // To see debug output, open Console.app or run:
+        //   log stream --predicate 'subsystem == "com.hoi.Notchification"' --level debug
+        print("""
+
+        ╔═══════════════════════════════════════════════════════════════════════════════╗
+        ║  IMPORTANT: Debug logs are in Console.app, NOT Xcode console!                ║
+        ║                                                                               ║
+        ║  Run this in Terminal to see live debug logs:                                 ║
+        ║                                                                               ║
+        ║  log stream --predicate 'subsystem == "com.hoi.Notchification"' --level debug ║
+        ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+        """)
+
         // Load settings
         let savedMockType = UserDefaults.standard.string(forKey: "mockOnLaunchType") ?? "None"
         self.mockOnLaunchType = MockProcessType(rawValue: savedMockType) ?? .none

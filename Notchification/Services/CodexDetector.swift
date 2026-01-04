@@ -15,10 +15,10 @@ private let logger = Logger(subsystem: "com.hoi.Notchification", category: "Code
 
 /// Detects if Codex CLI is actively working
 /// Uses AppleScript to read terminal content
-final class CodexDetector: ObservableObject {
+final class CodexDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .codex
 
     // Consecutive readings required
     private let requiredToShow: Int = 1
@@ -32,27 +32,13 @@ final class CodexDetector: ObservableObject {
         logger.info("🤖 CodexDetector init")
     }
 
-    func startMonitoring() {
-        logger.info("🤖 CodexDetector startMonitoring")
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
         isActive = false
     }
 
-    private func checkStatus() {
+    func poll() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
 
@@ -82,12 +68,10 @@ final class CodexDetector: ObservableObject {
 
     /// Check if Codex is working by looking in terminal apps
     private func isCodexWorking() -> Bool {
-        // Check iTerm2
         if isCodexActiveInITerm2() {
             return true
         }
 
-        // Check Terminal.app
         if isCodexActiveInTerminal() {
             return true
         }
@@ -183,18 +167,15 @@ final class CodexDetector: ObservableObject {
 
     /// Check if "Working" + "esc to interrupt" appears in the last 10 non-empty lines of ANY session
     private func hasCodexPattern(in output: String) -> Bool {
-        // Split by session/tab separator and check each one
         let sessions = output.components(separatedBy: "---SESSION---") +
                        output.components(separatedBy: "---TAB---")
 
         for session in sessions {
-            // Get last 10 non-empty lines of this session
             let lines = session.components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
                 .suffix(10)
 
-            // Check if any line has both "Working" and "esc to interrupt"
             for line in lines {
                 if line.contains("Working") && line.contains("esc to interrupt") {
                     return true
@@ -203,9 +184,5 @@ final class CodexDetector: ObservableObject {
         }
 
         return false
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

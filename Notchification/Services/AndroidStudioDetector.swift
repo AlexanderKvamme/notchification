@@ -11,10 +11,10 @@ import Foundation
 import Combine
 
 /// Detects if Android Studio is actively building
-final class AndroidStudioDetector: ObservableObject {
+final class AndroidStudioDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .androidStudio
     private var gradlePath: String?
 
     // Consecutive readings required
@@ -31,7 +31,6 @@ final class AndroidStudioDetector: ObservableObject {
 
     /// Find the gradle executable path
     private func findGradlePath() {
-        // Check common locations
         let possiblePaths = [
             "/opt/homebrew/bin/gradle",
             "/usr/local/bin/gradle",
@@ -66,29 +65,13 @@ final class AndroidStudioDetector: ObservableObject {
         }
     }
 
-    func startMonitoring() {
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        // Create timer and add to .common mode so it fires even when menu is open
-        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        // Fire immediately
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
         isActive = false
     }
 
-    private func checkStatus() {
-        // Run on background to not block UI
+    func poll() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
 
@@ -129,14 +112,11 @@ final class AndroidStudioDetector: ObservableObject {
         let errPipe = Pipe()
         let task = Process()
 
-        // Use bash to run gradle with proper environment
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
         task.arguments = ["-c", "\(gradle) --status 2>&1"]
 
-        // Set JAVA_HOME if needed
         var env = ProcessInfo.processInfo.environment
         if env["JAVA_HOME"] == nil {
-            // Try common Android Studio JBR location
             let jbrPath = NSString(string: "~/Applications/Android Studio.app/Contents/jbr/Contents/Home").expandingTildeInPath
             if FileManager.default.fileExists(atPath: jbrPath) {
                 env["JAVA_HOME"] = jbrPath
@@ -161,12 +141,10 @@ final class AndroidStudioDetector: ObservableObject {
 
         let combined = output + errOutput
 
-        // Only log if debug enabled and not just boilerplate messages
         if DebugSettings.shared.debugAndroid && !combined.isEmpty && !combined.contains("Only Daemons for the current Gradle version") {
             print("🤖 gradle output: \(combined.prefix(200))")
         }
 
-        // Check if any daemon is BUSY
         if combined.contains("BUSY") {
             return (true, "daemon BUSY")
         }
@@ -176,9 +154,5 @@ final class AndroidStudioDetector: ObservableObject {
         }
 
         return (false, combined.isEmpty ? "no output" : "no daemon status")
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

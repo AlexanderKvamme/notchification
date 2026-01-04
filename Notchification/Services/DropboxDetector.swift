@@ -10,12 +10,10 @@ import Foundation
 import Combine
 
 /// Detects if Dropbox is actively syncing by reading its menu bar status
-final class DropboxDetector: ObservableObject {
+final class DropboxDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: DispatchSourceTimer?
-    private let pollingInterval: TimeInterval = 1.0  // Slower polling for menu bar
-    private let queue = DispatchQueue(label: "com.notchification.dropboxdetector", qos: .utility)
+    let processType: ProcessType = .dropbox
 
     // Consecutive readings required for state changes
     private let requiredToShow: Int = 2
@@ -26,53 +24,47 @@ final class DropboxDetector: ObservableObject {
 
     // Status patterns indicating sync activity
     private let syncingPatterns = ["Syncing", "Uploading", "Downloading", "Indexing"]
-    private let idlePatterns = ["Up to date", "Paused", "Offline"]
 
     init() {}
 
-    func startMonitoring() {
+    func reset() {
         consecutiveSyncingReadings = 0
         consecutiveIdleReadings = 0
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: pollingInterval)
-        timer.setEventHandler { [weak self] in
-            self?.checkDropboxStatus()
-        }
-        timer.resume()
-        self.timer = timer
+        isActive = false
     }
 
-    func stopMonitoring() {
-        timer?.cancel()
-        timer = nil
-        DispatchQueue.main.async {
-            self.isActive = false
-        }
-    }
+    func poll() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
 
-    private func checkDropboxStatus() {
-        guard isDropboxRunning() else {
-            consecutiveSyncingReadings = 0
-            consecutiveIdleReadings += 1
-            if consecutiveIdleReadings >= requiredToHide {
-                updateStatus(isActive: false)
+            guard self.isDropboxRunning() else {
+                DispatchQueue.main.async {
+                    self.consecutiveSyncingReadings = 0
+                    self.consecutiveIdleReadings += 1
+                    if self.consecutiveIdleReadings >= self.requiredToHide && self.isActive {
+                        self.isActive = false
+                    }
+                }
+                return
             }
-            return
-        }
 
-        let status = getMenuBarStatus()
+            let status = self.getMenuBarStatus()
+            let isSyncing = self.isSyncing(status: status)
 
-        if isSyncing(status: status) {
-            consecutiveSyncingReadings += 1
-            consecutiveIdleReadings = 0
-            if consecutiveSyncingReadings >= requiredToShow {
-                updateStatus(isActive: true)
-            }
-        } else {
-            consecutiveIdleReadings += 1
-            consecutiveSyncingReadings = 0
-            if consecutiveIdleReadings >= requiredToHide {
-                updateStatus(isActive: false)
+            DispatchQueue.main.async {
+                if isSyncing {
+                    self.consecutiveSyncingReadings += 1
+                    self.consecutiveIdleReadings = 0
+                    if self.consecutiveSyncingReadings >= self.requiredToShow && !self.isActive {
+                        self.isActive = true
+                    }
+                } else {
+                    self.consecutiveIdleReadings += 1
+                    self.consecutiveSyncingReadings = 0
+                    if self.consecutiveIdleReadings >= self.requiredToHide && self.isActive {
+                        self.isActive = false
+                    }
+                }
             }
         }
     }
@@ -108,7 +100,6 @@ final class DropboxDetector: ObservableObject {
     }
 
     /// Get Dropbox menu bar status via AppleScript
-    /// The sync status is in the 'help' property, not 'description'
     private func getMenuBarStatus() -> String {
         let script = """
         tell application "System Events"
@@ -143,17 +134,5 @@ final class DropboxDetector: ObservableObject {
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    }
-
-    private func updateStatus(isActive: Bool) {
-        if self.isActive != isActive {
-            DispatchQueue.main.async {
-                self.isActive = isActive
-            }
-        }
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }
