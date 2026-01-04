@@ -16,6 +16,9 @@ final class ProcessMonitor: ObservableObject {
     private let finderDetector = FinderDetector()
     private let opencodeDetector = OpencodeDetector()
     private let codexDetector = CodexDetector()
+    private let dropboxDetector = DropboxDetector()
+    private let googleDriveDetector = GoogleDriveDetector()
+    private let oneDriveDetector = OneDriveDetector()
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -43,6 +46,15 @@ final class ProcessMonitor: ObservableObject {
         if trackingSettings.trackCodex {
             codexDetector.startMonitoring()
         }
+        if trackingSettings.trackDropbox {
+            dropboxDetector.startMonitoring()
+        }
+        if trackingSettings.trackGoogleDrive {
+            googleDriveDetector.startMonitoring()
+        }
+        if trackingSettings.trackOneDrive {
+            oneDriveDetector.startMonitoring()
+        }
     }
 
     func stopMonitoring() {
@@ -52,6 +64,9 @@ final class ProcessMonitor: ObservableObject {
         finderDetector.stopMonitoring()
         opencodeDetector.stopMonitoring()
         codexDetector.stopMonitoring()
+        dropboxDetector.stopMonitoring()
+        googleDriveDetector.stopMonitoring()
+        oneDriveDetector.stopMonitoring()
     }
 
     private func setupBindings() {
@@ -92,6 +107,27 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         codexDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        dropboxDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        googleDriveDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        oneDriveDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateActiveProcesses()
@@ -176,6 +212,45 @@ final class ProcessMonitor: ObservableObject {
                 self.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackDropbox
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.dropboxDetector.startMonitoring()
+                } else {
+                    self.dropboxDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        trackingSettings.$trackGoogleDrive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.googleDriveDetector.startMonitoring()
+                } else {
+                    self.googleDriveDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        trackingSettings.$trackOneDrive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.oneDriveDetector.startMonitoring()
+                } else {
+                    self.oneDriveDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -203,6 +278,18 @@ final class ProcessMonitor: ObservableObject {
 
         if trackingSettings.trackCodex && codexDetector.isActive {
             processes.append(.codex)
+        }
+
+        if trackingSettings.trackDropbox && dropboxDetector.isActive {
+            processes.append(.dropbox)
+        }
+
+        if trackingSettings.trackGoogleDrive && googleDriveDetector.isActive {
+            processes.append(.googleDrive)
+        }
+
+        if trackingSettings.trackOneDrive && oneDriveDetector.isActive {
+            processes.append(.oneDrive)
         }
 
         activeProcesses = processes

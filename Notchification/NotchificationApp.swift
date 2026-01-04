@@ -87,6 +87,15 @@ final class TrackingSettings: ObservableObject {
     @Published var trackCodex: Bool {
         didSet { UserDefaults.standard.set(trackCodex, forKey: "trackCodex") }
     }
+    @Published var trackDropbox: Bool {
+        didSet { UserDefaults.standard.set(trackDropbox, forKey: "trackDropbox") }
+    }
+    @Published var trackGoogleDrive: Bool {
+        didSet { UserDefaults.standard.set(trackGoogleDrive, forKey: "trackGoogleDrive") }
+    }
+    @Published var trackOneDrive: Bool {
+        didSet { UserDefaults.standard.set(trackOneDrive, forKey: "trackOneDrive") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -101,6 +110,9 @@ final class TrackingSettings: ObservableObject {
         self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? true
         self.trackOpencode = UserDefaults.standard.object(forKey: "trackOpencode") as? Bool ?? true
         self.trackCodex = UserDefaults.standard.object(forKey: "trackCodex") as? Bool ?? true
+        self.trackDropbox = UserDefaults.standard.object(forKey: "trackDropbox") as? Bool ?? true
+        self.trackGoogleDrive = UserDefaults.standard.object(forKey: "trackGoogleDrive") as? Bool ?? true
+        self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -164,6 +176,9 @@ enum MockProcessType: String, CaseIterable {
     case finder = "Finder"
     case opencode = "Opencode"
     case codex = "Codex"
+    case dropbox = "Dropbox"
+    case googleDrive = "Google Drive"
+    case oneDrive = "OneDrive"
     case all = "All"
 
     var processType: ProcessType? {
@@ -175,12 +190,15 @@ enum MockProcessType: String, CaseIterable {
         case .finder: return .finder
         case .opencode: return .opencode
         case .codex: return .codex
+        case .dropbox: return .dropbox
+        case .googleDrive: return .googleDrive
+        case .oneDrive: return .oneDrive
         case .all: return nil // Handled specially
         }
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex]
+        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive]
     }
 }
 
@@ -340,6 +358,9 @@ struct MenuBarView: View {
             Toggle("Finder", isOn: $trackingSettings.trackFinder)
             Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
             Toggle("Codex", isOn: $trackingSettings.trackCodex)
+            Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
+            Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
+            Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
 
             Divider()
 

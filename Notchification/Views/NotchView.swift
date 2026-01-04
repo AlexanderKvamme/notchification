@@ -27,6 +27,9 @@ struct NotchView: View {
     @State private var finderConfettiTrigger: Int = 0
     @State private var opencodeConfettiTrigger: Int = 0
     @State private var codexConfettiTrigger: Int = 0
+    @State private var dropboxConfettiTrigger: Int = 0
+    @State private var googleDriveConfettiTrigger: Int = 0
+    @State private var oneDriveConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -69,6 +72,9 @@ struct NotchView: View {
                         ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
                         ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
                         ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
+                        ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
+                        ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
+                        ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
                     }
                     .allowsHitTesting(false)
                 }
@@ -145,6 +151,12 @@ struct NotchView: View {
                         opencodeConfettiTrigger += 1
                     case .codex:
                         codexConfettiTrigger += 1
+                    case .dropbox:
+                        dropboxConfettiTrigger += 1
+                    case .googleDrive:
+                        googleDriveConfettiTrigger += 1
+                    case .oneDrive:
+                        oneDriveConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -190,6 +202,12 @@ struct ProcessLogo: View {
             OpencodeLogo()
         case .codex:
             CodexLogo()
+        case .dropbox:
+            DropboxLogo()
+        case .googleDrive:
+            GoogleDriveLogo()
+        case .oneDrive:
+            OneDriveLogo()
         }
     }
 }
@@ -406,6 +424,40 @@ struct CodexLogo: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .foregroundColor(ProcessType.codex.color)
+    }
+}
+
+// MARK: - Dropbox Logo
+
+struct DropboxLogo: View {
+    var body: some View {
+        Image("dropboxicon")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.dropbox.color)
+    }
+}
+
+// MARK: - Google Drive Logo
+
+struct GoogleDriveLogo: View {
+    var body: some View {
+        Image(systemName: "externaldrive.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.googleDrive.color)
+    }
+}
+
+// MARK: - OneDrive Logo
+
+struct OneDriveLogo: View {
+    var body: some View {
+        Image(systemName: "cloud.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.oneDrive.color)
     }
 }
 
