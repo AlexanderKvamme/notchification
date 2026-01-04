@@ -54,6 +54,9 @@ final class OpencodeDetector: ObservableObject {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
 
+        // Request Automation permissions for terminal apps (triggers system prompt if needed)
+        requestTerminalPermissions()
+
         let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.checkStatus()
         }
@@ -61,6 +64,30 @@ final class OpencodeDetector: ObservableObject {
         self.timer = timer
 
         checkStatus()
+    }
+
+    /// Request Automation permissions for iTerm2 and Terminal.app
+    /// This triggers the system permission prompt if not already granted
+    private func requestTerminalPermissions() {
+        DispatchQueue.global(qos: .utility).async {
+            // Try iTerm2
+            let itermScript = "tell application \"iTerm2\" to return name"
+            let itermTask = Process()
+            itermTask.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            itermTask.arguments = ["-e", itermScript]
+            itermTask.standardOutput = FileHandle.nullDevice
+            itermTask.standardError = FileHandle.nullDevice
+            try? itermTask.run()
+
+            // Try Terminal
+            let terminalScript = "tell application \"Terminal\" to return name"
+            let terminalTask = Process()
+            terminalTask.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            terminalTask.arguments = ["-e", terminalScript]
+            terminalTask.standardOutput = FileHandle.nullDevice
+            terminalTask.standardError = FileHandle.nullDevice
+            try? terminalTask.run()
+        }
     }
 
     func stopMonitoring() {
@@ -108,28 +135,170 @@ final class OpencodeDetector: ObservableObject {
 
     /// Check if Opencode is working by looking for status text via Accessibility API
     private func isOpencodeWorking() -> (Bool, String) {
-        guard let opencodeApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first else {
-            return (false, "App not running")
-        }
+        // First check the GUI app
+        if let opencodeApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first {
+            let appElement = AXUIElementCreateApplication(opencodeApp.processIdentifier)
 
-        let appElement = AXUIElementCreateApplication(opencodeApp.processIdentifier)
+            var windowsValue: CFTypeRef?
+            let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
 
-        // Get all windows
-        var windowsValue: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
-
-        guard result == .success, let windows = windowsValue as? [AXUIElement] else {
-            return (false, "No windows")
-        }
-
-        // Search each window for status text
-        for window in windows {
-            if let statusText = findStatusText(in: window) {
-                return (true, statusText)
+            if result == .success, let windows = windowsValue as? [AXUIElement] {
+                for window in windows {
+                    if let statusText = findStatusText(in: window) {
+                        return (true, "GUI: \(statusText)")
+                    }
+                }
             }
         }
 
+        // Check for CLI in terminal - look for tabs titled "opencode" AND opencode process running
+        if isOpencodeCLIActive() {
+            return (true, "CLI: opencode tab active")
+        }
+
         return (false, "No activity")
+    }
+
+    /// Check if Opencode CLI is active in a terminal using AppleScript
+    private func isOpencodeCLIActive() -> Bool {
+        // Check iTerm2
+        if isOpencodeActiveInITerm2() {
+            return true
+        }
+
+        // Check Terminal.app
+        if isOpencodeActiveInTerminal() {
+            return true
+        }
+
+        return false
+    }
+
+    /// Use AppleScript to check iTerm2 terminal content for opencode activity
+    private func isOpencodeActiveInITerm2() -> Bool {
+        // Script to get all session content - last ~3000 chars (~30 lines)
+        let script = """
+        tell application "System Events"
+            if not (exists process "iTerm2") then return "NOT_RUNNING"
+        end tell
+
+        tell application "iTerm2"
+            set allContent to ""
+            repeat with w in windows
+                repeat with t in tabs of w
+                    repeat with s in sessions of t
+                        set sessionContent to contents of s
+                        set contentLength to length of sessionContent
+                        if contentLength > 3000 then
+                            set recentContent to text (contentLength - 3000) thru contentLength of sessionContent
+                        else
+                            set recentContent to sessionContent
+                        end if
+                        set allContent to allContent & "---SESSION---" & recentContent
+                    end repeat
+                end repeat
+            end repeat
+            return allContent
+        end tell
+        """
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        task.arguments = ["-e", script]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            return false
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              output != "NOT_RUNNING" else {
+            return false
+        }
+
+        // Check for "Generating..." followed by "press esc to exit cancel" on consecutive lines
+        return hasGeneratingPattern(in: output)
+    }
+
+    /// Check if output contains "Generating..." followed by "press esc to exit cancel" on consecutive lines
+    private func hasGeneratingPattern(in output: String) -> Bool {
+        let lines = output.components(separatedBy: .newlines)
+        for i in 0..<lines.count - 1 {
+            let currentLine = lines[i]
+            let nextLine = lines[i + 1]
+            if currentLine.contains("Generating...") && nextLine.contains("press esc to exit cancel") {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Use AppleScript to check Terminal.app content for opencode activity
+    private func isOpencodeActiveInTerminal() -> Bool {
+        // Terminal.app uses "history" for full content, "contents" for visible only
+        let script = """
+        tell application "System Events"
+            if not (exists process "Terminal") then return "NOT_RUNNING"
+        end tell
+
+        tell application "Terminal"
+            set allContent to ""
+            repeat with w in windows
+                repeat with t in tabs of w
+                    set tabContent to history of t
+                    set contentLength to length of tabContent
+                    if contentLength > 3000 then
+                        set recentContent to text (contentLength - 3000) thru contentLength of tabContent
+                    else
+                        set recentContent to tabContent
+                    end if
+                    set allContent to allContent & "---TAB---" & recentContent
+                end repeat
+            end repeat
+            return allContent
+        end tell
+        """
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        task.arguments = ["-e", script]
+
+        let pipe = Pipe()
+        let errorPipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = errorPipe
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            return false
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
+        // Debug: check for errors
+        if let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
+            let debug = DebugSettings.shared.debugOpencode
+            if debug {
+                logger.debug("🟢 Terminal AppleScript error: \(errorOutput)")
+            }
+        }
+
+        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              output != "NOT_RUNNING" else {
+            return false
+        }
+
+        return hasGeneratingPattern(in: output)
     }
 
     /// Check if text matches active status pattern (keyword + timer like "Making edits · 25s")
