@@ -66,10 +66,54 @@ final class InstallerDetector: ObservableObject {
         }
     }
 
-    /// Check if Installer.app is running
+    /// Check if Installer.app is running with an active installation (progress bar visible)
     private func isInstallerRunning() -> Bool {
         let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
-        return !runningApps.isEmpty
+        guard !runningApps.isEmpty else { return false }
+
+        // Check if there's a progress indicator visible (actual installation in progress)
+        return hasProgressBar()
+    }
+
+    /// Check if Installer.app has a busy or progress indicator visible (installation in progress)
+    private func hasProgressBar() -> Bool {
+        // Use osascript via Process to avoid NSAppleScript permission issues
+        // Check for busy indicator (Preparing phase) or progress indicator (Writing files phase)
+        let script = """
+        tell application "System Events"
+            tell process "Installer"
+                try
+                    set busyExists to exists (busy indicator 1 of group 1 of group 1 of window 1)
+                    if busyExists then return "BUSY"
+                end try
+                try
+                    set progressExists to exists (progress indicator 1 of group 1 of group 1 of window 1)
+                    if progressExists then return "PROGRESS"
+                end try
+                return "NONE"
+            end tell
+        end tell
+        """
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            return output == "BUSY" || output == "PROGRESS"
+        } catch {
+            return false
+        }
     }
 
     deinit {
