@@ -32,6 +32,7 @@ struct NotchView: View {
     @State private var oneDriveConfettiTrigger: Int = 0
     @State private var icloudConfettiTrigger: Int = 0
     @State private var installerConfettiTrigger: Int = 0
+    @State private var appStoreConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -79,6 +80,7 @@ struct NotchView: View {
                         ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
                         ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
                         ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
+                        ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
                     }
                     .allowsHitTesting(false)
                 }
@@ -165,6 +167,8 @@ struct NotchView: View {
                         icloudConfettiTrigger += 1
                     case .installer:
                         installerConfettiTrigger += 1
+                    case .appStore:
+                        appStoreConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -220,6 +224,8 @@ struct ProcessLogo: View {
             iCloudLogo()
         case .installer:
             InstallerLogo()
+        case .appStore:
+            AppStoreLogo()
         }
     }
 }
@@ -494,6 +500,69 @@ struct InstallerLogo: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .foregroundColor(ProcessType.installer.color)
+    }
+}
+
+// MARK: - App Store Logo
+
+struct AppStoreLogo: View {
+    var body: some View {
+        FrigginAppStoreIconShape()
+            .fill(ProcessType.appStore.color)
+    }
+}
+
+struct FrigginAppStoreIconShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 24.0
+        var path = Path()
+
+        // The "A" document shape (without the hammer)
+        path.move(to: p(16.1, 3.8, s))
+        path.addLine(to: p(0, 6.3, s))
+        path.addLine(to: p(2.6, 23, s))
+        path.addLine(to: p(11.2, 21.6, s))
+        path.addCurve(to: p(13.8, 13.8, s), control1: p(11.1, 20.9, s), control2: p(13.4, 15.1, s))
+        path.addLine(to: p(9.4, 14.5, s))
+        path.addLine(to: p(10, 12.7, s))
+        path.addLine(to: p(13.1, 12.2, s))
+        path.addLine(to: p(13.9, 13.2, s))
+        path.addCurve(to: p(14.1, 12.5, s), control1: p(14.1, 12.7, s), control2: p(14.1, 12.5, s))
+        path.addLine(to: p(9.8, 7.2, s))
+        path.addCurve(to: p(9.9, 6.3, s), control1: p(9.6, 6.9, s), control2: p(9.6, 6.5, s))
+        path.addLine(to: p(10.1, 6.1, s))
+        path.addCurve(to: p(11, 6.2, s), control1: p(10.4, 5.9, s), control2: p(10.8, 5.9, s))
+        path.addLine(to: p(14.8, 10.6, s))
+        path.addCurve(to: p(16.3, 5.4, s), control1: p(15.6, 8.2, s), control2: p(16.3, 6.1, s))
+        path.addCurve(to: p(16.1, 3.8, s), control1: p(16.4, 5.2, s), control2: p(16.4, 4.5, s))
+        path.closeSubpath()
+
+        // Small detail inside
+        path.move(to: p(4.1, 13.7, s))
+        path.addLine(to: p(6.8, 13.2, s))
+        path.addLine(to: p(6.1, 15, s))
+        path.addLine(to: p(4.3, 15.3, s))
+        path.closeSubpath()
+
+        // Another detail
+        path.move(to: p(9.9, 8.6, s))
+        path.addLine(to: p(10.2, 8.7, s))
+        path.addCurve(to: p(10.6, 9.6, s), control1: p(10.6, 8.8, s), control2: p(10.7, 9.1, s))
+        path.addLine(to: p(7.6, 17.6, s))
+        path.addLine(to: p(5.8, 20, s))
+        path.addLine(to: p(6, 17, s))
+        path.addLine(to: p(9, 9, s))
+        path.addCurve(to: p(9.9, 8.6, s), control1: p(9.1, 8.6, s), control2: p(9.5, 8.4, s))
+        path.closeSubpath()
+
+        let bounds = path.boundingRect
+        let xOffset = (rect.width - bounds.width) / 2 - bounds.minX
+        let yOffset = (rect.height - bounds.height) / 2 - bounds.minY
+        return path.offsetBy(dx: xOffset, dy: yOffset)
+    }
+
+    private func p(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) -> CGPoint {
+        CGPoint(x: x * s, y: y * s)
     }
 }
 

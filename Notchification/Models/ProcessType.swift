@@ -17,6 +17,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case oneDrive = "onedrive"
     case icloud = "icloud"
     case installer = "installer"
+    case appStore = "appstore"
 
     var id: String { rawValue }
 
@@ -33,6 +34,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .oneDrive: return "OneDrive"
         case .icloud: return "iCloud"
         case .installer: return "Installer"
+        case .appStore: return "App Store"
         }
     }
 
@@ -49,6 +51,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .oneDrive: return Color(red: 0.0, green: 0.47, blue: 0.83) // #0078D4 Microsoft blue
         case .icloud: return Color(red: 0.2, green: 0.6, blue: 1.0) // iCloud blue
         case .installer: return Color(red: 0.6, green: 0.4, blue: 0.8) // Purple for system installer
+        case .appStore: return Color(red: 0.0, green: 0.48, blue: 1.0) // #007AFF App Store blue
         }
     }
 
@@ -65,6 +68,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .oneDrive: return Color(red: 0.4, green: 0.65, blue: 0.95) // Lighter Microsoft blue
         case .icloud: return Color(red: 0.5, green: 0.8, blue: 1.0) // Lighter iCloud blue
         case .installer: return Color(red: 0.75, green: 0.55, blue: 0.9) // Lighter purple
+        case .appStore: return Color(red: 0.4, green: 0.7, blue: 1.0) // Lighter App Store blue
         }
     }
 
@@ -81,6 +85,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .oneDrive: return .solid
         case .icloud: return .solid
         case .installer: return .solid
+        case .appStore: return .solid
         }
     }
 }

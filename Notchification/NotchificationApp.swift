@@ -118,6 +118,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackInstaller: Bool {
         didSet { UserDefaults.standard.set(trackInstaller, forKey: "trackInstaller") }
     }
+    @Published var trackAppStore: Bool {
+        didSet { UserDefaults.standard.set(trackAppStore, forKey: "trackAppStore") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -137,6 +140,7 @@ final class TrackingSettings: ObservableObject {
         self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? true
         self.trackICloud = UserDefaults.standard.object(forKey: "trackICloud") as? Bool ?? true
         self.trackInstaller = UserDefaults.standard.object(forKey: "trackInstaller") as? Bool ?? true
+        self.trackAppStore = UserDefaults.standard.object(forKey: "trackAppStore") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -205,6 +209,7 @@ enum MockProcessType: String, CaseIterable {
     case oneDrive = "OneDrive"
     case icloud = "iCloud"
     case installer = "Installer"
+    case appStore = "App Store"
     case all = "All"
 
     var processType: ProcessType? {
@@ -221,12 +226,13 @@ enum MockProcessType: String, CaseIterable {
         case .oneDrive: return .oneDrive
         case .icloud: return .icloud
         case .installer: return .installer
+        case .appStore: return .appStore
         case .all: return nil // Handled specially
         }
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer]
+        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
     }
 }
 
@@ -391,6 +397,7 @@ struct MenuBarView: View {
             Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
             Toggle("iCloud", isOn: $trackingSettings.trackICloud)
             Toggle("Installer", isOn: $trackingSettings.trackInstaller)
+            Toggle("App Store", isOn: $trackingSettings.trackAppStore)
 
             Divider()
 
