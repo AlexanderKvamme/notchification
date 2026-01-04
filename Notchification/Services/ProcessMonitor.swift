@@ -20,6 +20,7 @@ final class ProcessMonitor: ObservableObject {
     private let googleDriveDetector = GoogleDriveDetector()
     private let oneDriveDetector = OneDriveDetector()
     private let icloudDetector = iCloudDetector()
+    private let installerDetector = InstallerDetector()
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -59,6 +60,9 @@ final class ProcessMonitor: ObservableObject {
         if trackingSettings.trackICloud {
             icloudDetector.startMonitoring()
         }
+        if trackingSettings.trackInstaller {
+            installerDetector.startMonitoring()
+        }
     }
 
     func stopMonitoring() {
@@ -72,6 +76,7 @@ final class ProcessMonitor: ObservableObject {
         googleDriveDetector.stopMonitoring()
         oneDriveDetector.stopMonitoring()
         icloudDetector.stopMonitoring()
+        installerDetector.stopMonitoring()
     }
 
     private func setupBindings() {
@@ -140,6 +145,13 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         icloudDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        installerDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateActiveProcesses()
@@ -276,6 +288,19 @@ final class ProcessMonitor: ObservableObject {
                 self.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackInstaller
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.installerDetector.startMonitoring()
+                } else {
+                    self.installerDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -319,6 +344,10 @@ final class ProcessMonitor: ObservableObject {
 
         if trackingSettings.trackICloud && icloudDetector.isActive {
             processes.append(.icloud)
+        }
+
+        if trackingSettings.trackInstaller && installerDetector.isActive {
+            processes.append(.installer)
         }
 
         activeProcesses = processes

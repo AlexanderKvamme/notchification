@@ -31,6 +31,7 @@ struct NotchView: View {
     @State private var googleDriveConfettiTrigger: Int = 0
     @State private var oneDriveConfettiTrigger: Int = 0
     @State private var icloudConfettiTrigger: Int = 0
+    @State private var installerConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -77,6 +78,7 @@ struct NotchView: View {
                         ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
                         ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
                         ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
+                        ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
                     }
                     .allowsHitTesting(false)
                 }
@@ -161,6 +163,8 @@ struct NotchView: View {
                         oneDriveConfettiTrigger += 1
                     case .icloud:
                         icloudConfettiTrigger += 1
+                    case .installer:
+                        installerConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -214,6 +218,8 @@ struct ProcessLogo: View {
             OneDriveLogo()
         case .icloud:
             iCloudLogo()
+        case .installer:
+            InstallerLogo()
         }
     }
 }
@@ -476,6 +482,18 @@ struct iCloudLogo: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .foregroundColor(ProcessType.icloud.color)
+    }
+}
+
+// MARK: - Installer Logo
+
+struct InstallerLogo: View {
+    var body: some View {
+        // Package/box icon using SF Symbol
+        Image(systemName: "shippingbox.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.installer.color)
     }
 }
 

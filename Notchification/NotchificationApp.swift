@@ -115,6 +115,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackICloud: Bool {
         didSet { UserDefaults.standard.set(trackICloud, forKey: "trackICloud") }
     }
+    @Published var trackInstaller: Bool {
+        didSet { UserDefaults.standard.set(trackInstaller, forKey: "trackInstaller") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -133,6 +136,7 @@ final class TrackingSettings: ObservableObject {
         self.trackGoogleDrive = UserDefaults.standard.object(forKey: "trackGoogleDrive") as? Bool ?? true
         self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? true
         self.trackICloud = UserDefaults.standard.object(forKey: "trackICloud") as? Bool ?? true
+        self.trackInstaller = UserDefaults.standard.object(forKey: "trackInstaller") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -200,6 +204,7 @@ enum MockProcessType: String, CaseIterable {
     case googleDrive = "Google Drive"
     case oneDrive = "OneDrive"
     case icloud = "iCloud"
+    case installer = "Installer"
     case all = "All"
 
     var processType: ProcessType? {
@@ -215,12 +220,13 @@ enum MockProcessType: String, CaseIterable {
         case .googleDrive: return .googleDrive
         case .oneDrive: return .oneDrive
         case .icloud: return .icloud
+        case .installer: return .installer
         case .all: return nil // Handled specially
         }
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud]
+        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer]
     }
 }
 
@@ -384,6 +390,7 @@ struct MenuBarView: View {
             Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
             Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
             Toggle("iCloud", isOn: $trackingSettings.trackICloud)
+            Toggle("Installer", isOn: $trackingSettings.trackInstaller)
 
             Divider()
 
