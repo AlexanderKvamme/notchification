@@ -38,6 +38,9 @@ final class DebugSettings: ObservableObject {
     @Published var debugOpencode: Bool {
         didSet { UserDefaults.standard.set(debugOpencode, forKey: "debugOpencode") }
     }
+    @Published var debugCodex: Bool {
+        didSet { UserDefaults.standard.set(debugCodex, forKey: "debugCodex") }
+    }
 
     private init() {
         self.debugClaude = UserDefaults.standard.object(forKey: "debugClaude") as? Bool ?? false
@@ -45,6 +48,7 @@ final class DebugSettings: ObservableObject {
         self.debugXcode = UserDefaults.standard.object(forKey: "debugXcode") as? Bool ?? true
         self.debugFinder = UserDefaults.standard.object(forKey: "debugFinder") as? Bool ?? true
         self.debugOpencode = UserDefaults.standard.object(forKey: "debugOpencode") as? Bool ?? false
+        self.debugCodex = UserDefaults.standard.object(forKey: "debugCodex") as? Bool ?? false
     }
 }
 
@@ -67,6 +71,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackOpencode: Bool {
         didSet { UserDefaults.standard.set(trackOpencode, forKey: "trackOpencode") }
     }
+    @Published var trackCodex: Bool {
+        didSet { UserDefaults.standard.set(trackCodex, forKey: "trackCodex") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -80,6 +87,7 @@ final class TrackingSettings: ObservableObject {
         self.trackXcode = UserDefaults.standard.object(forKey: "trackXcode") as? Bool ?? true
         self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? true
         self.trackOpencode = UserDefaults.standard.object(forKey: "trackOpencode") as? Bool ?? true
+        self.trackCodex = UserDefaults.standard.object(forKey: "trackCodex") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -142,6 +150,7 @@ enum MockProcessType: String, CaseIterable {
     case xcode = "Xcode"
     case finder = "Finder"
     case opencode = "Opencode"
+    case codex = "Codex"
     case all = "All"
 
     var processType: ProcessType? {
@@ -152,12 +161,13 @@ enum MockProcessType: String, CaseIterable {
         case .xcode: return .xcode
         case .finder: return .finder
         case .opencode: return .opencode
+        case .codex: return .codex
         case .all: return nil // Handled specially
         }
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode]
+        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex]
     }
 }
 
@@ -304,6 +314,7 @@ struct MenuBarView: View {
             Toggle("Xcode", isOn: $trackingSettings.trackXcode)
             Toggle("Finder", isOn: $trackingSettings.trackFinder)
             Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
+            Toggle("Codex", isOn: $trackingSettings.trackCodex)
 
             Divider()
 
@@ -330,6 +341,7 @@ struct MenuBarView: View {
             Toggle("Xcode", isOn: $debugSettings.debugXcode)
             Toggle("Finder", isOn: $debugSettings.debugFinder)
             Toggle("Opencode", isOn: $debugSettings.debugOpencode)
+            Toggle("Codex", isOn: $debugSettings.debugCodex)
             #endif
 
             Divider()

@@ -15,6 +15,7 @@ final class ProcessMonitor: ObservableObject {
     private let xcodeDetector = XcodeDetector()
     private let finderDetector = FinderDetector()
     private let opencodeDetector = OpencodeDetector()
+    private let codexDetector = CodexDetector()
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -39,6 +40,9 @@ final class ProcessMonitor: ObservableObject {
         if trackingSettings.trackOpencode {
             opencodeDetector.startMonitoring()
         }
+        if trackingSettings.trackCodex {
+            codexDetector.startMonitoring()
+        }
     }
 
     func stopMonitoring() {
@@ -47,6 +51,7 @@ final class ProcessMonitor: ObservableObject {
         xcodeDetector.stopMonitoring()
         finderDetector.stopMonitoring()
         opencodeDetector.stopMonitoring()
+        codexDetector.stopMonitoring()
     }
 
     private func setupBindings() {
@@ -80,6 +85,13 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         opencodeDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        codexDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateActiveProcesses()
@@ -151,6 +163,19 @@ final class ProcessMonitor: ObservableObject {
                 self.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackCodex
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self = self else { return }
+                if enabled {
+                    self.codexDetector.startMonitoring()
+                } else {
+                    self.codexDetector.stopMonitoring()
+                }
+                self.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -174,6 +199,10 @@ final class ProcessMonitor: ObservableObject {
 
         if trackingSettings.trackOpencode && opencodeDetector.isActive {
             processes.append(.opencode)
+        }
+
+        if trackingSettings.trackCodex && codexDetector.isActive {
+            processes.append(.codex)
         }
 
         activeProcesses = processes

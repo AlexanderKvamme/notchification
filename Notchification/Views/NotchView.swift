@@ -25,6 +25,7 @@ struct NotchView: View {
     @State private var androidConfettiTrigger: Int = 0
     @State private var finderConfettiTrigger: Int = 0
     @State private var opencodeConfettiTrigger: Int = 0
+    @State private var codexConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -65,6 +66,7 @@ struct NotchView: View {
                         ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
                         ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
                         ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
+                        ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
                     }
                     .allowsHitTesting(false)
                 }
@@ -130,6 +132,8 @@ struct NotchView: View {
                         finderConfettiTrigger += 1
                     case .opencode:
                         opencodeConfettiTrigger += 1
+                    case .codex:
+                        codexConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -173,6 +177,8 @@ struct ProcessLogo: View {
             FinderLogo()
         case .opencode:
             OpencodeLogo()
+        case .codex:
+            CodexLogo()
         }
     }
 }
@@ -377,6 +383,18 @@ struct OpencodeLogo: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .foregroundColor(ProcessType.opencode.color)
+    }
+}
+
+// MARK: - Codex Logo
+
+struct CodexLogo: View {
+    var body: some View {
+        Image("codexicon")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.codex.color)
     }
 }
 

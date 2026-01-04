@@ -11,6 +11,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case androidStudio = "android"
     case finder = "finder"
     case opencode = "opencode"
+    case codex = "codex"
 
     var id: String { rawValue }
 
@@ -21,6 +22,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .androidStudio: return "Android Studio"
         case .finder: return "Finder"
         case .opencode: return "Opencode"
+        case .codex: return "Codex"
         }
     }
 
@@ -31,6 +33,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .androidStudio: return Color(red: 0.17, green: 0.63, blue: 0.38) // Darker Android green
         case .finder: return Color(red: 0.902, green: 0.910, blue: 0.937) // #e6e8ef Finder gray
         case .opencode: return Color(red: 0.847, green: 0.847, blue: 0.847) // #D8D8D8 Opencode gray
+        case .codex: return Color(red: 0.976, green: 0.976, blue: 0.976) // #F9F9F9 OpenAI light gray
         }
     }
 
@@ -41,6 +44,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .androidStudio: return Color(red: 0.30, green: 0.85, blue: 0.55) // Brighter green
         case .finder: return .white // White wave on gray base
         case .opencode: return .white // White wave on gray base
+        case .codex: return .white // White wave on light gray base
         }
     }
 
@@ -51,6 +55,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .androidStudio: return .dots
         case .finder: return .diagonalStripes
         case .opencode: return .solid
+        case .codex: return .solid
         }
     }
 }
