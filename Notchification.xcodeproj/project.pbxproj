@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		DD2C84002F06D50000AF8080 /* ConfettiSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = DD2C83FF2F06D50000AF8080 /* ConfettiSwiftUI */; };
 		DDF6643B2F07FAA400060EE2 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = DDF6643A2F07FAA400060EE2 /* Sparkle */; };
+		DDLEMON012F10000000000001 /* LemonSqueezyLicense in Frameworks */ = {isa = PBXBuildFile; productRef = DDLEMON022F10000000000002 /* LemonSqueezyLicense */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 			files = (
 				DD2C84002F06D50000AF8080 /* ConfettiSwiftUI in Frameworks */,
 				DDF6643B2F07FAA400060EE2 /* Sparkle in Frameworks */,
+				DDLEMON012F10000000000001 /* LemonSqueezyLicense in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +76,7 @@
 			packageProductDependencies = (
 				DD2C83FF2F06D50000AF8080 /* ConfettiSwiftUI */,
 				DDF6643A2F07FAA400060EE2 /* Sparkle */,
+				DDLEMON022F10000000000002 /* LemonSqueezyLicense */,
 			);
 			productName = Notchification;
 			productReference = DD2C83C02F06D48D00AF8080 /* Notchification.app */;
@@ -106,6 +109,7 @@
 			packageReferences = (
 				DD2C83FE2F06D50000AF8080 /* XCRemoteSwiftPackageReference "ConfettiSwiftUI" */,
 				DDF664392F07FAA400060EE2 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				DDLEMON032F10000000000003 /* XCRemoteSwiftPackageReference "swift-lemon-squeezy-license" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DD2C83C12F06D48D00AF8080 /* Products */;
@@ -361,6 +365,14 @@
 				minimumVersion = 2.8.1;
 			};
 		};
+		DDLEMON032F10000000000003 /* XCRemoteSwiftPackageReference "swift-lemon-squeezy-license" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kevinhermawan/swift-lemon-squeezy-license.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -373,6 +385,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DDF664392F07FAA400060EE2 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		DDLEMON022F10000000000002 /* LemonSqueezyLicense */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DDLEMON032F10000000000003 /* XCRemoteSwiftPackageReference "swift-lemon-squeezy-license" */;
+			productName = LemonSqueezyLicense;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

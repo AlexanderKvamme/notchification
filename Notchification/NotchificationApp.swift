@@ -7,10 +7,23 @@ import SwiftUI
 import Combine
 import Sparkle
 
+/// Sparkle delegate that gates updates to licensed users only
+final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
+    func updater(_ updater: SPUUpdater, shouldProceedWithUpdate item: SUAppcastItem, updateCheck: SPUUpdateCheck) -> Bool {
+        // Only allow updates for licensed users
+        return LicenseManager.shared.state == .licensed
+    }
+}
+
 @main
 struct NotchificationApp: App {
     @StateObject private var appState = AppState()
-    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    private let updaterDelegate = UpdaterDelegate()
+    private var updaterController: SPUStandardUpdaterController
+
+    init() {
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: updaterDelegate, userDriverDelegate: nil)
+    }
 
     var body: some Scene {
         MenuBarExtra("Notchification", systemImage: "bell.badge") {
@@ -186,6 +199,7 @@ final class AppState: ObservableObject {
 
     private let processMonitor = ProcessMonitor()
     private let windowController = NotchWindowController()
+    private let licenseManager = LicenseManager.shared
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -200,12 +214,17 @@ final class AppState: ObservableObject {
         if mockOnLaunchType != .none {
             runLaunchMock()
         } else {
-            startMonitoring()
+            startMonitoringIfLicensed()
         }
         #else
         setupBindings()
-        startMonitoring()
+        startMonitoringIfLicensed()
         #endif
+    }
+
+    private func startMonitoringIfLicensed() {
+        // Always start monitoring - we show a nag message if expired
+        startMonitoring()
     }
 
     private func setupBindings() {
@@ -298,9 +317,15 @@ struct MenuBarView: View {
     let updater: SPUUpdater
     @ObservedObject var debugSettings = DebugSettings.shared
     @ObservedObject var trackingSettings = TrackingSettings.shared
+    @ObservedObject var licenseManager = LicenseManager.shared
 
     var body: some View {
         VStack {
+            // License status
+            licenseStatusView
+
+            Divider()
+
             Toggle("Monitoring", isOn: Binding(
                 get: { appState.isMonitoring },
                 set: { _ in appState.toggleMonitoring() }
@@ -342,9 +367,23 @@ struct MenuBarView: View {
             Toggle("Finder", isOn: $debugSettings.debugFinder)
             Toggle("Opencode", isOn: $debugSettings.debugOpencode)
             Toggle("Codex", isOn: $debugSettings.debugCodex)
+
+            Divider()
+
+            Text("License Debug").font(.caption).foregroundColor(.secondary)
+            Button("Reset Trial") {
+                licenseManager.resetTrial()
+            }
+            Button("Expire Trial") {
+                licenseManager.expireTrial()
+            }
             #endif
 
             Divider()
+
+            Button("License...") {
+                LicenseWindowController.shared.showLicenseWindow()
+            }
 
             Button("Settings...") {
                 SettingsWindowController.shared.showSettings()
@@ -370,6 +409,32 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+        }
+    }
+
+    @ViewBuilder
+    private var licenseStatusView: some View {
+        switch licenseManager.state {
+        case .licensed:
+            HStack {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundColor(.green)
+                Text("Licensed")
+                    .font(.caption)
+            }
+
+        case .trial(let daysRemaining):
+            HStack {
+                Image(systemName: "clock")
+                    .foregroundColor(.orange)
+                Text("Trial: \(daysRemaining) days left")
+                    .font(.caption)
+            }
+
+        case .expired:
+            Label("Trial expired", systemImage: "xmark.circle.fill")
+                .font(.caption)
+                .foregroundColor(.red)
         }
     }
 }

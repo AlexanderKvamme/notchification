@@ -1,5 +1,5 @@
 {
-  "originHash" : "fe8ad476151964abcd391dfde3916608ac9d4415d7065932d861312562b7c615",
+  "originHash" : "62089d114f4209313d5d53d306051dd14829acf3de223afeeaba7296ad6c8c91",
   "pins" : [
     {
       "identity" : "confettiswiftui",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "5581748cef2bae787496fe6d61139aebe0a451f6",
         "version" : "2.8.1"
+      }
+    },
+    {
+      "identity" : "swift-lemon-squeezy-license",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kevinhermawan/swift-lemon-squeezy-license.git",
+      "state" : {
+        "revision" : "fbdecdcbf5056a1d3c786441a2ad5af3e2e633d5",
+        "version" : "1.0.1"
       }
     }
   ],

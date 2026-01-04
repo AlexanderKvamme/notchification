@@ -12,6 +12,7 @@ private let completionSound = NSSound(named: "Glass")
 
 struct NotchView: View {
     @ObservedObject var notchState: NotchState
+    @ObservedObject var licenseManager = LicenseManager.shared
     var screenWidth: CGFloat = 1440
     var screenHeight: CGFloat = 900
 
@@ -42,7 +43,8 @@ struct NotchView: View {
     private var expandedHeight: CGFloat {
         let processCount = max(1, notchState.activeProcesses.count)
         let contentHeight = CGFloat(processCount) * logoSize + CGFloat(processCount - 1) * rowSpacing
-        return topPadding + contentHeight + 16  // 16 bottom padding
+        let trialTextHeight: CGFloat = licenseManager.state == .expired ? 20 : 0
+        return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
     var body: some View {
@@ -87,6 +89,15 @@ struct NotchView: View {
                             .frame(height: progressBarHeight)
                         }
                         .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    }
+
+                    // Trial expired message
+                    if licenseManager.state == .expired {
+                        Text("Thanks for trying! Please upgrade")
+                            .font(.system(size: 10))
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 4)
                     }
                 }
                 .padding(.horizontal, horizontalPadding)
