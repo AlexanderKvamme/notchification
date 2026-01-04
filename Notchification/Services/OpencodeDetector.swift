@@ -27,6 +27,7 @@ final class OpencodeDetector: ObservableObject {
         "Running commands",
         "Running command",
         "Planning next steps",
+        "Considering next steps",
         "Gathering thoughts",
         "Gathering context",
         "Generating",
