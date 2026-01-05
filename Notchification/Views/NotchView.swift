@@ -139,13 +139,15 @@ struct NotchView: View {
                     // Highlight layer - sweeps same direction as base (right to left)
                     // Single process: lighter waveColor that fades out on top of base
                     // Multiple processes: cycles through actual process colors, animating on top
-                    MinimalNotchShape(cornerRadius: 13)
-                        .trim(from: 1 - waveProgress, to: 1)
-                        .stroke(
-                            currentHighlightColor,
-                            style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
-                        )
-                        .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+                    if !notchState.activeProcesses.isEmpty {
+                        MinimalNotchShape(cornerRadius: 13)
+                            .trim(from: 1 - waveProgress, to: 1)
+                            .stroke(
+                                currentHighlightColor,
+                                style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
+                            )
+                            .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+                    }
 
                     // Black mask at top - covers stroke overflow (rendered ON TOP of strokes)
                     // Width accounts for stroke (half on each side)
