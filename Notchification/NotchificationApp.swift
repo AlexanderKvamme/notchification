@@ -529,6 +529,25 @@ final class AppState: ObservableObject {
             startMonitoring()
         }
     }
+
+    /// Run a quick mock for a specific process (triggered by command-click)
+    func runQuickMock(process: ProcessType = .finder) {
+        // Don't run if already mocking
+        #if DEBUG
+        guard !isMocking else { return }
+        isMocking = true
+        #endif
+
+        windowController.update(with: [process])
+
+        // Hide after 5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            self?.windowController.update(with: [])
+            #if DEBUG
+            self?.isMocking = false
+            #endif
+        }
+    }
 }
 
 /// Menu bar dropdown view
@@ -553,24 +572,30 @@ struct MenuBarView: View {
 
             Divider()
 
-            Text("Track Apps").font(.caption).foregroundColor(.secondary)
-            Toggle("Claude", isOn: $trackingSettings.trackClaude)
-            Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
-            Toggle("Xcode", isOn: $trackingSettings.trackXcode)
-            Toggle("Finder", isOn: $trackingSettings.trackFinder)
-            Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
-            Toggle("Codex", isOn: $trackingSettings.trackCodex)
-            Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
-            Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
-            Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
-            Toggle("iCloud", isOn: $trackingSettings.trackICloud)
-            Toggle("Installer", isOn: $trackingSettings.trackInstaller)
-            Toggle("App Store", isOn: $trackingSettings.trackAppStore)
+            Text("Track Apps (⌘-click to demo)").font(.caption).foregroundColor(.secondary)
+            trackAppToggle("Claude", isOn: $trackingSettings.trackClaude, process: .claude)
+            trackAppToggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio, process: .androidStudio)
+            trackAppToggle("Xcode", isOn: $trackingSettings.trackXcode, process: .xcode)
+            trackAppToggle("Finder", isOn: $trackingSettings.trackFinder, process: .finder)
+            trackAppToggle("Opencode", isOn: $trackingSettings.trackOpencode, process: .opencode)
+            trackAppToggle("Codex", isOn: $trackingSettings.trackCodex, process: .codex)
+            trackAppToggle("Dropbox", isOn: $trackingSettings.trackDropbox, process: .dropbox)
+            trackAppToggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive, process: .googleDrive)
+            trackAppToggle("OneDrive", isOn: $trackingSettings.trackOneDrive, process: .oneDrive)
+            trackAppToggle("iCloud", isOn: $trackingSettings.trackICloud, process: .icloud)
+            trackAppToggle("Installer", isOn: $trackingSettings.trackInstaller, process: .installer)
+            trackAppToggle("App Store", isOn: $trackingSettings.trackAppStore, process: .appStore)
 
             Divider()
 
             Toggle("Confetti", isOn: $trackingSettings.confettiEnabled)
             Toggle("Sound", isOn: $trackingSettings.soundEnabled)
+
+            Divider()
+
+            Button("Run Demo") {
+                appState.runQuickMock()
+            }
 
             #if DEBUG
             Divider()
@@ -636,6 +661,26 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+        }
+    }
+
+    /// Toggle that also triggers a demo when command-clicked
+    @ViewBuilder
+    private func trackAppToggle(_ title: String, isOn: Binding<Bool>, process: ProcessType) -> some View {
+        Button(action: {
+            if NSEvent.modifierFlags.contains(.command) {
+                // Command-click: run demo for this process
+                appState.runQuickMock(process: process)
+            } else {
+                // Normal click: toggle tracking
+                isOn.wrappedValue.toggle()
+            }
+        }) {
+            HStack {
+                Image(systemName: isOn.wrappedValue ? "checkmark" : "")
+                    .frame(width: 14)
+                Text(title)
+            }
         }
     }
 
