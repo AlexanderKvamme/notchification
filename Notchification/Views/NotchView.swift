@@ -24,6 +24,7 @@ struct NotchView: View {
     @State private var waveProgress: CGFloat = 0  // For wave pulse animation (0 to 1 = fills the stroke)
     @State private var waveOpacity: CGFloat = 1.0  // Wave fades out as it sweeps
     @State private var currentWaveIndex: Int = 0  // Which process wave is currently animating
+    @State private var previousWaveIndex: Int = -1  // Previous color (shown as background while next animates)
     @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
 
     // Separate confetti triggers for each process type
@@ -56,6 +57,9 @@ struct NotchView: View {
     private let rowSpacing: CGFloat = 8
     private let topPadding: CGFloat = 38  // Space below physical notch cutout (~34px)
 
+    // Minimal mode stroke width
+    private let minimalStrokeWidth: CGFloat = 10
+
     // Dynamic height based on number of processes
     private var expandedHeight: CGFloat {
         let processCount = max(1, notchState.activeProcesses.count)
@@ -69,36 +73,82 @@ struct NotchView: View {
         notchState.activeProcesses.first?.color ?? .white
     }
 
-    /// Current wave color based on which process wave is animating
-    private var currentWaveColor: Color {
+    /// Current highlight color based on which process is animating
+    /// - Single process: uses the lighter waveColor (like the regular progress bar)
+    /// - Multiple processes: cycles through each process's actual color
+    private var currentHighlightColor: Color {
         let processes = notchState.activeProcesses
         guard !processes.isEmpty else { return .white }
         let index = currentWaveIndex % processes.count
-        return processes[index].waveColor
+
+        // For multiple processes, use actual colors to cycle between them
+        // For single process, use the lighter wave color like the regular progress bar
+        if processes.count > 1 {
+            return processes[index].color
+        } else {
+            return processes[index].waveColor
+        }
+    }
+
+    /// Whether to show the base stroke layer (only for single process)
+    private var showBaseStroke: Bool {
+        notchState.activeProcesses.count == 1
+    }
+
+    /// Previous highlight color (background layer for multiple processes)
+    private var previousHighlightColor: Color {
+        let processes = notchState.activeProcesses
+        guard !processes.isEmpty, previousWaveIndex >= 0 else { return .clear }
+        let index = previousWaveIndex % processes.count
+        return processes[index].color
     }
 
     var body: some View {
         ZStack(alignment: .top) {
             if styleSettings.minimalStyle {
-                // MINIMAL MODE: Base stroke + wave pulses
+                // MINIMAL MODE: Base stroke + highlight pulses
                 // Uses real notch dimensions from NSScreen APIs
-                ZStack {
-                    // Base stroke layer - draws in from right to left
-                    MinimalNotchShape(cornerRadius: 13)
-                        .trim(from: 1 - strokeProgress, to: 1)
-                        .stroke(
-                            baseStrokeColor,
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                        )
+                ZStack(alignment: .top) {
+                    // Black background fill - matches notch shape for screenshots
+                    MinimalNotchShape(cornerRadius: 8)
+                        .fill(Color.black)
 
-                    // Highlight layer - sweeps same direction as base (right to left) while fading out
+                    // Base stroke layer - only shown for single process
+                    // For multiple processes, we just cycle through colors directly
+                    if showBaseStroke {
+                        MinimalNotchShape(cornerRadius: 13)
+                            .trim(from: 1 - strokeProgress, to: 1)
+                            .stroke(
+                                baseStrokeColor,
+                                style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
+                            )
+                    }
+
+                    // Background layer for multiple processes - shows previous completed color
+                    if !showBaseStroke && previousWaveIndex >= 0 {
+                        MinimalNotchShape(cornerRadius: 13)
+                            .stroke(
+                                previousHighlightColor,
+                                style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
+                            )
+                    }
+
+                    // Highlight layer - sweeps same direction as base (right to left)
+                    // Single process: lighter waveColor that fades out on top of base
+                    // Multiple processes: cycles through actual process colors, animating on top
                     MinimalNotchShape(cornerRadius: 13)
                         .trim(from: 1 - waveProgress, to: 1)
                         .stroke(
-                            currentWaveColor,
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                            currentHighlightColor,
+                            style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
                         )
-                        .opacity(strokeProgress >= 1 ? waveOpacity : 0)  // Only show after base is drawn, fades as it sweeps
+                        .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+
+                    // Black mask at top - covers stroke overflow (rendered ON TOP of strokes)
+                    // Width accounts for stroke (half on each side)
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(width: notchInfo.width - minimalStrokeWidth, height: minimalStrokeWidth)
                 }
                 .frame(width: notchInfo.width, height: notchInfo.height)
                 .opacity(isExpanded ? 1 : 0)
@@ -205,6 +255,7 @@ struct NotchView: View {
                     isPendingDismiss = false
                     isExpanded = true
                     currentWaveIndex = 0
+                    previousWaveIndex = -1
                     waveProgress = 0
                     waveOpacity = 1.0
                     withAnimation(.easeInOut(duration: 0.5)) {
@@ -297,18 +348,23 @@ struct NotchView: View {
         }
     }
 
-    /// Starts the wave pulse animation that cycles through active process colors
-    /// Wave sweeps from start to end while fading out (like AnimatedProgressBar)
+    /// Starts the highlight animation that cycles through active process colors
+    /// - Single process: highlight sweeps and fades out (like AnimatedProgressBar)
+    /// - Multiple processes: each color sweeps around fully, then next color starts
     private func startWaveAnimation() {
         guard isExpanded && styleSettings.minimalStyle else { return }
         guard !notchState.activeProcesses.isEmpty else { return }
 
+        let isSingleProcess = notchState.activeProcesses.count == 1
+
         // If pending dismiss, complete the current wave and then hide
         if isPendingDismiss {
-            // Animate wave to completion (full stroke) while fading
+            // Animate wave to completion (full stroke)
             withAnimation(.easeInOut(duration: 1.0)) {
                 waveProgress = 1.0
-                waveOpacity = 0.0
+                if isSingleProcess {
+                    waveOpacity = 0.0
+                }
             }
             // After wave completes, fade out the whole thing and reset
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -321,6 +377,7 @@ struct NotchView: View {
                     waveProgress = 0
                     waveOpacity = 1.0
                     currentWaveIndex = 0
+                    previousWaveIndex = -1
                     isPendingDismiss = false
                 }
             }
@@ -328,24 +385,48 @@ struct NotchView: View {
         }
 
         // Reset wave for new animation cycle (instant reset)
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            waveProgress = 0
-            waveOpacity = 1.0
+        // For multiple processes, waveProgress is reset in the dispatch callback
+        if isSingleProcess {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                waveProgress = 0
+                waveOpacity = 1.0
+            }
         }
 
-        // Animate wave sweeping around the notch while fading out
+        // Animate wave sweeping around the notch
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            withAnimation(.easeInOut(duration: 3.0)) {
-                waveProgress = 1.0
-                waveOpacity = 0.0
-            }
-
-            // Move to next process color and restart after a pause
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                currentWaveIndex += 1
-                startWaveAnimation()
+            if isSingleProcess {
+                // Single process: sweep and fade out
+                withAnimation(.easeInOut(duration: 3.0)) {
+                    waveProgress = 1.0
+                    waveOpacity = 0.0
+                }
+                // Restart after a pause
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    startWaveAnimation()
+                }
+            } else {
+                // Multiple processes: sweep fully, then switch to next color
+                withAnimation(.easeInOut(duration: 2.0)) {
+                    waveProgress = 1.0
+                }
+                // Move to next process color and restart
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // Save current as previous (for background layer)
+                    previousWaveIndex = currentWaveIndex
+                    // Move to next color
+                    currentWaveIndex += 1
+                    // Reset progress instantly (previous color stays visible as background)
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        waveProgress = 0
+                    }
+                    // Start new animation
+                    startWaveAnimation()
+                }
             }
         }
     }

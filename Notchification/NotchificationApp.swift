@@ -286,6 +286,7 @@ enum MockProcessType: String, CaseIterable {
     case installer = "Installer"
     case appStore = "App Store"
     case claudeAndFinder = "Claude + Finder"
+    case threeProcesses = "Claude + Finder + Android"
     case all = "All"
 
     var processType: ProcessType? {
@@ -304,6 +305,7 @@ enum MockProcessType: String, CaseIterable {
         case .installer: return .installer
         case .appStore: return .appStore
         case .claudeAndFinder: return nil // Handled specially
+        case .threeProcesses: return nil // Handled specially
         case .all: return nil // Handled specially
         }
     }
@@ -404,6 +406,12 @@ final class AppState: ObservableObject {
             return
         }
 
+        // Handle "Three Processes" mock type
+        if mockOnLaunchType == .threeProcesses {
+            runThreeProcessesMock()
+            return
+        }
+
         guard let processType = mockOnLaunchType.processType else {
             startMonitoring()
             return
@@ -440,6 +448,26 @@ final class AppState: ObservableObject {
             if self?.mockRepeat == true {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
                     self?.runClaudeAndFinderMock()
+                }
+            } else {
+                self?.isMocking = false
+                self?.startMonitoring()
+            }
+        }
+    }
+
+    private func runThreeProcessesMock() {
+        isMocking = true
+        windowController.update(with: [.claude, .finder, .androidStudio])
+
+        // Keep showing for 15 seconds then hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+            self?.windowController.update(with: [])
+
+            // If repeat is enabled, restart after a brief pause
+            if self?.mockRepeat == true {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    self?.runThreeProcessesMock()
                 }
             } else {
                 self?.isMocking = false
