@@ -195,6 +195,81 @@ final class ThresholdSettings: ObservableObject {
     }
 }
 
+/// Visual style settings for the notch indicator
+final class StyleSettings: ObservableObject {
+    static let shared = StyleSettings()
+
+    /// When true, shows only a 2px colored border around the notch (no icons/progress bars)
+    @Published var minimalStyle: Bool {
+        didSet { UserDefaults.standard.set(minimalStyle, forKey: "minimalStyle") }
+    }
+
+    private init() {
+        self.minimalStyle = UserDefaults.standard.object(forKey: "minimalStyle") as? Bool ?? false
+    }
+}
+
+/// Information about the physical notch on the current screen
+/// Uses NSScreen APIs available on macOS 12+ to get exact dimensions
+struct NotchInfo {
+    let width: CGFloat
+    let height: CGFloat
+    let hasNotch: Bool
+
+    /// Default fallback dimensions for Macs without a notch
+    static let defaultWidth: CGFloat = 200
+    static let defaultHeight: CGFloat = 32
+
+    /// Get notch info for the given screen (or main screen if nil)
+    static func forScreen(_ screen: NSScreen? = nil) -> NotchInfo {
+        let targetScreen = screen ?? NSScreen.main
+
+        guard let screen = targetScreen else {
+            return NotchInfo(width: defaultWidth, height: defaultHeight, hasNotch: false)
+        }
+
+        // Check for notch using safeAreaInsets (available macOS 12+)
+        if #available(macOS 12.0, *) {
+            let safeArea = screen.safeAreaInsets
+
+            // If there's a top safe area inset, there's a notch
+            guard safeArea.top > 0 else {
+                return NotchInfo(width: defaultWidth, height: defaultHeight, hasNotch: false)
+            }
+
+            // Calculate notch width from auxiliary areas
+            // auxiliaryTopLeftArea and auxiliaryTopRightArea define the unobscured
+            // regions on either side of the notch
+            if let leftArea = screen.auxiliaryTopLeftArea,
+               let rightArea = screen.auxiliaryTopRightArea {
+                // Notch width is the gap between the two auxiliary areas
+                let notchWidth = rightArea.minX - leftArea.maxX
+                let notchHeight = safeArea.top
+
+                print("📐 Notch dimensions: width=\(notchWidth), height=\(notchHeight)")
+                print("📐 Left area: \(leftArea), Right area: \(rightArea)")
+                print("📐 Safe area top: \(safeArea.top)")
+
+                return NotchInfo(
+                    width: notchWidth,
+                    height: notchHeight,
+                    hasNotch: true
+                )
+            }
+
+            // Fallback: use safe area height with default width
+            return NotchInfo(
+                width: defaultWidth,
+                height: safeArea.top,
+                hasNotch: true
+            )
+        }
+
+        // macOS 11 or earlier - no notch
+        return NotchInfo(width: defaultWidth, height: defaultHeight, hasNotch: false)
+    }
+}
+
 /// Which process type to mock on launch
 enum MockProcessType: String, CaseIterable {
     case none = "None"

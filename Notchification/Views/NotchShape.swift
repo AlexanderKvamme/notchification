@@ -1,5 +1,39 @@
 import SwiftUI
 
+/// Shape that matches the physical Mac notch - simple rounded rectangle
+/// No outward "ears", just the camera housing cutout
+struct MinimalNotchShape: Shape {
+    var cornerRadius: CGFloat = 8
+
+    func path(in rect: CGRect) -> Path {
+        let width = rect.width
+        let height = rect.height
+        let r = min(cornerRadius, min(width/2, height/2))
+
+        var path = Path()
+
+        // Simple rounded rectangle - top corners are square (flush with screen top)
+        // Only bottom corners are rounded
+        path.move(to: CGPoint(x: 0, y: 0))
+        path.addLine(to: CGPoint(x: width, y: 0))
+        path.addLine(to: CGPoint(x: width, y: height - r))
+        path.addQuadCurve(
+            to: CGPoint(x: width - r, y: height),
+            control: CGPoint(x: width, y: height)
+        )
+        path.addLine(to: CGPoint(x: r, y: height))
+        path.addQuadCurve(
+            to: CGPoint(x: 0, y: height - r),
+            control: CGPoint(x: 0, y: height)
+        )
+        path.addLine(to: CGPoint(x: 0, y: 0))
+        path.closeSubpath()
+
+        return path
+    }
+}
+
+/// Extended notch shape with outward curves ("ears") for the full UI mode
 struct NotchShape: Shape {
     var cornerRadius: CGFloat = 30
 

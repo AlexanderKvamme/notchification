@@ -13,6 +13,7 @@ private let completionSound = NSSound(named: "Glass")
 struct NotchView: View {
     @ObservedObject var notchState: NotchState
     @ObservedObject var licenseManager = LicenseManager.shared
+    @ObservedObject var styleSettings = StyleSettings.shared
     var screenWidth: CGFloat = 1440
     var screenHeight: CGFloat = 900
 
@@ -34,9 +35,14 @@ struct NotchView: View {
     @State private var installerConfettiTrigger: Int = 0
     @State private var appStoreConfettiTrigger: Int = 0
 
-    // Dimensions
+    // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
     private let notchFrameWidth: CGFloat = 380  // Extra 80 for outward curves
+
+    // Real notch dimensions from system APIs (for minimal mode)
+    private var notchInfo: NotchInfo {
+        NotchInfo.forScreen(NSScreen.main)
+    }
 
     // Content dimensions
     private let logoSize: CGFloat = 24
@@ -53,75 +59,119 @@ struct NotchView: View {
         return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
+    /// Gradient from active process colors for minimal mode
+    private var processGradient: AngularGradient {
+        let colors = notchState.activeProcesses.map { $0.color }
+        // If only one color, duplicate it to avoid gradient issues
+        let gradientColors = colors.count == 1 ? [colors[0], colors[0]] : colors
+        return AngularGradient(
+            colors: gradientColors,
+            center: .center,
+            startAngle: .degrees(0),
+            endAngle: .degrees(360)
+        )
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
-            // The notch shape - scales from top center with bounce
-            NotchShape()
-                .fill(Color.black)
-                .frame(width: notchWidth, height: expandedHeight)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedHeight)
-                .scaleEffect(
-                    x: isExpanded ? 1 : 0.3,
-                    y: isExpanded ? 1 : 0,
-                    anchor: .top
-                )
-                .overlay(alignment: .top) {
-                    // Separate confetti cannons - one per process type
-                    // Each has a fixed color, avoiding caching issues
-                    ZStack {
-                        ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
-                        ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
-                        ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
-                        ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
-                        ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
-                        ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
-                        ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
-                        ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
-                        ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
-                        ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
-                        ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
-                        ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
-                    }
-                    .allowsHitTesting(false)
-                }
-
-            // Content: Multiple processes stacked vertically
-            if !notchState.activeProcesses.isEmpty {
-                VStack(alignment: .leading, spacing: rowSpacing) {
-                    ForEach(notchState.activeProcesses) { process in
-                        HStack(alignment: .center, spacing: 10) {
-                            ProcessLogo(processType: process)
-                                .frame(width: logoSize, height: logoSize)
-
-                            AnimatedProgressBar(
-                                isActive: isExpanded,
-                                baseColor: process.color,
-                                waveColor: process.waveColor
-                            )
-                            .frame(height: progressBarHeight)
+            if styleSettings.minimalStyle {
+                // MINIMAL MODE: Simple rounded rectangle matching the physical Mac notch
+                // Uses real notch dimensions from NSScreen APIs
+                MinimalNotchShape(cornerRadius: 13)
+                    .stroke(processGradient, lineWidth: 4)
+                    .frame(width: notchInfo.width, height: notchInfo.height)
+                    .scaleEffect(
+                        x: isExpanded ? 1 : 0.3,
+                        y: isExpanded ? 1 : 0,
+                        anchor: .top
+                    )
+                    .overlay(alignment: .top) {
+                        // Confetti still works in minimal mode
+                        ZStack {
+                            ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
+                            ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
+                            ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
+                            ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
+                            ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
+                            ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
+                            ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
+                            ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
+                            ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
+                            ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
+                            ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
+                            ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
                         }
-                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        .allowsHitTesting(false)
+                    }
+            } else {
+                // NORMAL MODE: Filled shape with icons and progress bars
+                NotchShape()
+                    .fill(Color.black)
+                    .frame(width: notchWidth, height: expandedHeight)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedHeight)
+                    .scaleEffect(
+                        x: isExpanded ? 1 : 0.3,
+                        y: isExpanded ? 1 : 0,
+                        anchor: .top
+                    )
+                    .overlay(alignment: .top) {
+                        // Separate confetti cannons - one per process type
+                        // Each has a fixed color, avoiding caching issues
+                        ZStack {
+                            ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
+                            ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
+                            ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
+                            ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
+                            ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
+                            ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
+                            ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
+                            ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
+                            ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
+                            ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
+                            ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
+                            ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
+                        }
+                        .allowsHitTesting(false)
                     }
 
-                    // Trial expired message
-                    if licenseManager.state == .expired {
-                        Text("Thanks for trying! Please upgrade")
-                            .font(.system(size: 10))
-                            .foregroundColor(.red)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, 4)
+                // Content: Multiple processes stacked vertically
+                if !notchState.activeProcesses.isEmpty {
+                    VStack(alignment: .leading, spacing: rowSpacing) {
+                        ForEach(notchState.activeProcesses) { process in
+                            HStack(alignment: .center, spacing: 10) {
+                                ProcessLogo(processType: process)
+                                    .frame(width: logoSize, height: logoSize)
+
+                                AnimatedProgressBar(
+                                    isActive: isExpanded,
+                                    baseColor: process.color,
+                                    waveColor: process.waveColor
+                                )
+                                .frame(height: progressBarHeight)
+                            }
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        }
+
+                        // Trial expired message
+                        if licenseManager.state == .expired {
+                            Text("Thanks for trying! Please upgrade")
+                                .font(.system(size: 10))
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.top, 4)
+                        }
                     }
+                    .padding(.horizontal, horizontalPadding)
+                    .frame(width: notchWidth)
+                    .offset(y: topPadding)
+                    .opacity(isExpanded ? 1 : 0)
+                    .scaleEffect(
+                        x: isExpanded ? 1 : 0.3,  // Match notch's x-scale
+                        y: isExpanded ? 1 : 0,    // Match notch's y-scale
+                        anchor: .top
+                    )
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
                 }
-                .padding(.horizontal, horizontalPadding)
-                .frame(width: notchWidth)
-                .offset(y: topPadding)
-                .opacity(isExpanded ? 1 : 0)
-                .scaleEffect(
-                    x: isExpanded ? 1 : 0.3,  // Match notch's x-scale
-                    y: isExpanded ? 1 : 0,    // Match notch's y-scale
-                    anchor: .top
-                )
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
             }
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .top)
