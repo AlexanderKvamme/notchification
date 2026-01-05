@@ -324,6 +324,11 @@ final class AppState: ObservableObject {
             UserDefaults.standard.set(mockOnLaunchType.rawValue, forKey: "mockOnLaunchType")
         }
     }
+    @Published var mockRepeat: Bool {
+        didSet {
+            UserDefaults.standard.set(mockRepeat, forKey: "mockRepeat")
+        }
+    }
     #endif
 
     private let processMonitor = ProcessMonitor()
@@ -351,6 +356,7 @@ final class AppState: ObservableObject {
         // Load settings
         let savedMockType = UserDefaults.standard.string(forKey: "mockOnLaunchType") ?? "None"
         self.mockOnLaunchType = MockProcessType(rawValue: savedMockType) ?? .none
+        self.mockRepeat = UserDefaults.standard.object(forKey: "mockRepeat") as? Bool ?? false
 
         setupBindings()
 
@@ -406,11 +412,19 @@ final class AppState: ObservableObject {
         isMocking = true
         windowController.update(with: [processType])
 
-        // Hide after 5 seconds and start monitoring
+        // Hide after 5 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             self?.windowController.update(with: [])
-            self?.isMocking = false
-            self?.startMonitoring()
+
+            // If repeat is enabled, restart after a brief pause
+            if self?.mockRepeat == true {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    self?.runLaunchMock()
+                }
+            } else {
+                self?.isMocking = false
+                self?.startMonitoring()
+            }
         }
     }
 
@@ -421,8 +435,16 @@ final class AppState: ObservableObject {
         // Keep showing for 10 seconds then hide
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
             self?.windowController.update(with: [])
-            self?.isMocking = false
-            self?.startMonitoring()
+
+            // If repeat is enabled, restart after a brief pause
+            if self?.mockRepeat == true {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    self?.runClaudeAndFinderMock()
+                }
+            } else {
+                self?.isMocking = false
+                self?.startMonitoring()
+            }
         }
     }
 
@@ -447,8 +469,16 @@ final class AppState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
             // Remove last process (xcode)
             self?.windowController.update(with: [])
-            self?.isMocking = false
-            self?.startMonitoring()
+
+            // If repeat is enabled, restart after a brief pause
+            if self?.mockRepeat == true {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    self?.runAllMock()
+                }
+            } else {
+                self?.isMocking = false
+                self?.startMonitoring()
+            }
         }
     }
     #endif
@@ -525,6 +555,7 @@ struct MenuBarView: View {
             }
             .pickerStyle(.inline)
             .labelsHidden()
+            Toggle("Repeat", isOn: $appState.mockRepeat)
 
             Divider()
 

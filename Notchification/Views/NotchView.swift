@@ -20,8 +20,11 @@ struct NotchView: View {
     // Animation state
     @State private var isExpanded: Bool = false
     @State private var previousProcesses: Set<ProcessType> = []
-    @State private var strokeProgress: CGFloat = 0  // For minimal mode stroke animation
-    @State private var gradientPhase: CGFloat = 0  // For animated gradient along stroke
+    @State private var strokeProgress: CGFloat = 0  // For minimal mode stroke drawing
+    @State private var waveProgress: CGFloat = 0  // For wave pulse animation (0 to 1 = fills the stroke)
+    @State private var waveOpacity: CGFloat = 1.0  // Wave fades out as it sweeps
+    @State private var currentWaveIndex: Int = 0  // Which process wave is currently animating
+    @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
 
     // Separate confetti triggers for each process type
     @State private var claudeConfettiTrigger: Int = 0
@@ -61,45 +64,44 @@ struct NotchView: View {
         return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
-    /// Animated gradient for minimal mode stroke
-    /// Single process: base color + white shimmer
-    /// Multiple processes: rotating gradient of all colors
-    private var animatedStrokeGradient: LinearGradient {
-        let processes = notchState.activeProcesses
+    /// Base color for minimal mode - first active process color
+    private var baseStrokeColor: Color {
+        notchState.activeProcesses.first?.color ?? .white
+    }
 
-        if processes.count <= 1 {
-            // Single process: color -> white -> color (shimmer effect)
-            let baseColor = processes.first?.color ?? .white
-            return LinearGradient(
-                colors: [baseColor, baseColor.opacity(0.7), .white, baseColor.opacity(0.7), baseColor],
-                startPoint: UnitPoint(x: gradientPhase - 0.5, y: 0),
-                endPoint: UnitPoint(x: gradientPhase + 0.5, y: 1)
-            )
-        } else {
-            // Multiple processes: flowing gradient of all colors
-            var colors = processes.map { $0.color }
-            colors.append(colors.first ?? .white)  // Loop back to first color
-            return LinearGradient(
-                colors: colors,
-                startPoint: UnitPoint(x: gradientPhase - 0.5, y: 0),
-                endPoint: UnitPoint(x: gradientPhase + 0.5, y: 1)
-            )
-        }
+    /// Current wave color based on which process wave is animating
+    private var currentWaveColor: Color {
+        let processes = notchState.activeProcesses
+        guard !processes.isEmpty else { return .white }
+        let index = currentWaveIndex % processes.count
+        return processes[index].waveColor
     }
 
     var body: some View {
         ZStack(alignment: .top) {
             if styleSettings.minimalStyle {
-                // MINIMAL MODE: Animated gradient stroke around the notch
+                // MINIMAL MODE: Base stroke + wave pulses
                 // Uses real notch dimensions from NSScreen APIs
-                MinimalNotchShape(cornerRadius: 13)
-                    .trim(from: 1 - strokeProgress, to: 1)
-                    .stroke(
-                        animatedStrokeGradient,
-                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                    )
-                    .frame(width: notchInfo.width, height: notchInfo.height)
-                    .opacity(isExpanded ? 1 : 0)
+                ZStack {
+                    // Base stroke layer - draws in from right to left
+                    MinimalNotchShape(cornerRadius: 13)
+                        .trim(from: 1 - strokeProgress, to: 1)
+                        .stroke(
+                            baseStrokeColor,
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+
+                    // Highlight layer - sweeps same direction as base (right to left) while fading out
+                    MinimalNotchShape(cornerRadius: 13)
+                        .trim(from: 1 - waveProgress, to: 1)
+                        .stroke(
+                            currentWaveColor,
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+                        .opacity(strokeProgress >= 1 ? waveOpacity : 0)  // Only show after base is drawn, fades as it sweeps
+                }
+                .frame(width: notchInfo.width, height: notchInfo.height)
+                .opacity(isExpanded ? 1 : 0)
                     .overlay(alignment: .top) {
                         // Confetti still works in minimal mode
                         ZStack {
@@ -195,19 +197,22 @@ struct NotchView: View {
             if styleSettings.minimalStyle {
                 // Minimal mode: animate stroke drawing around the notch
                 if isEmpty {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        strokeProgress = 0
-                        gradientPhase = 0
-                        isExpanded = false
-                    }
+                    // Mark as pending dismiss - the wave animation will complete and then hide
+                    isPendingDismiss = true
+                    // Trigger the pop animation (wave completes full cycle then fades)
+                    startWaveAnimation()
                 } else {
+                    isPendingDismiss = false
                     isExpanded = true
+                    currentWaveIndex = 0
+                    waveProgress = 0
+                    waveOpacity = 1.0
                     withAnimation(.easeInOut(duration: 0.5)) {
                         strokeProgress = 1
                     }
-                    // Start gradient animation after stroke completes
+                    // Start wave animation after stroke completes
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        startGradientAnimation()
+                        startWaveAnimation()
                     }
                 }
             } else {
@@ -278,9 +283,9 @@ struct NotchView: View {
                     withAnimation(.easeInOut(duration: 0.5)) {
                         strokeProgress = 1
                     }
-                    // Start gradient animation after stroke completes
+                    // Start wave animation after stroke completes
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        startGradientAnimation()
+                        startWaveAnimation()
                     }
                 } else {
                     // Normal mode: bouncy scale
@@ -292,13 +297,56 @@ struct NotchView: View {
         }
     }
 
-    /// Starts the continuous gradient animation for minimal mode
-    private func startGradientAnimation() {
+    /// Starts the wave pulse animation that cycles through active process colors
+    /// Wave sweeps from start to end while fading out (like AnimatedProgressBar)
+    private func startWaveAnimation() {
         guard isExpanded && styleSettings.minimalStyle else { return }
+        guard !notchState.activeProcesses.isEmpty else { return }
 
-        // Animate gradient phase continuously
-        withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
-            gradientPhase = 2.0
+        // If pending dismiss, complete the current wave and then hide
+        if isPendingDismiss {
+            // Animate wave to completion (full stroke) while fading
+            withAnimation(.easeInOut(duration: 1.0)) {
+                waveProgress = 1.0
+                waveOpacity = 0.0
+            }
+            // After wave completes, fade out the whole thing and reset
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    isExpanded = false
+                }
+                // Reset state after hiding
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    strokeProgress = 0
+                    waveProgress = 0
+                    waveOpacity = 1.0
+                    currentWaveIndex = 0
+                    isPendingDismiss = false
+                }
+            }
+            return
+        }
+
+        // Reset wave for new animation cycle (instant reset)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            waveProgress = 0
+            waveOpacity = 1.0
+        }
+
+        // Animate wave sweeping around the notch while fading out
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.easeInOut(duration: 3.0)) {
+                waveProgress = 1.0
+                waveOpacity = 0.0
+            }
+
+            // Move to next process color and restart after a pause
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                currentWaveIndex += 1
+                startWaveAnimation()
+            }
         }
     }
 }
