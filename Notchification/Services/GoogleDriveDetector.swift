@@ -24,6 +24,9 @@ final class GoogleDriveDetector: ObservableObject, Detector {
     // Google Drive status patterns
     private let syncingPatterns = ["Syncing", "Uploading", "Downloading", "Preparing"]
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.googledrive-check", qos: .utility)
+
     init() {}
 
     func reset() {
@@ -33,7 +36,8 @@ final class GoogleDriveDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             guard self.isGoogleDriveRunning() else {
@@ -99,6 +103,7 @@ final class GoogleDriveDetector: ObservableObject, Detector {
     }
 
     /// Get Google Drive menu bar status via AppleScript
+    /// Note: System Events is required to read menu bar status
     private func getMenuBarStatus() -> String {
         let script = """
         tell application "System Events"
@@ -124,10 +129,20 @@ final class GoogleDriveDetector: ObservableObject, Detector {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return ""
         }
 

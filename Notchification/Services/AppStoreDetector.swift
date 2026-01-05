@@ -23,45 +23,46 @@ final class AppStoreDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
-    // Track if a check is in progress (async AppleScript)
-    private var checkInProgress = false
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.appstore-check", qos: .utility)
 
     init() {}
 
     func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-        checkInProgress = false
         isActive = false
     }
 
     func poll() {
-        guard !checkInProgress else { return }
-        checkInProgress = true
-
-        checkDownloadStatus { [weak self] downloadActive in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
-            self.checkInProgress = false
 
-            if downloadActive {
-                self.consecutiveActiveReadings += 1
-                self.consecutiveInactiveReadings = 0
+            let downloadActive = self.checkDownloadStatusSync()
 
-                if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
-                    self.isActive = true
-                }
-            } else {
-                self.consecutiveInactiveReadings += 1
-                self.consecutiveActiveReadings = 0
+            DispatchQueue.main.async {
+                if downloadActive {
+                    self.consecutiveActiveReadings += 1
+                    self.consecutiveInactiveReadings = 0
 
-                if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
-                    self.isActive = false
+                    if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
+                        self.isActive = true
+                    }
+                } else {
+                    self.consecutiveInactiveReadings += 1
+                    self.consecutiveActiveReadings = 0
+
+                    if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
+                        self.isActive = false
+                    }
                 }
             }
         }
     }
 
-    private func checkDownloadStatus(completion: @escaping (Bool) -> Void) {
+    /// Note: System Events is required to read App Store UI elements
+    private func checkDownloadStatusSync() -> Bool {
         let script = """
         tell application "System Events"
             if not (exists process "App Store") then return "0|0|"
@@ -97,7 +98,7 @@ final class AppStoreDetector: ObservableObject, Detector {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
-        // Timeout: kill after 2 seconds
+        // Timeout after 2 seconds
         let timeoutWork = DispatchWorkItem { [weak task] in
             if task?.isRunning == true {
                 task?.terminate()
@@ -105,28 +106,22 @@ final class AppStoreDetector: ObservableObject, Detector {
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
 
-        task.terminationHandler = { _ in
-            timeoutWork.cancel()
-
-            let data = pipe.fileHandleForReading.availableData
-            let result = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "0|0|"
-
-            let parts = result.split(separator: "|", omittingEmptySubsequences: false)
-            let groups = parts.count >= 1 ? Int(parts[0]) ?? 0 : 0
-            let buttons = parts.count >= 2 ? Int(parts[1]) ?? 0 : 0
-
-            let isDownloading = groups > buttons
-
-            DispatchQueue.main.async {
-                completion(isDownloading)
-            }
-        }
-
         do {
             try task.run()
+            task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
             timeoutWork.cancel()
-            completion(false)
+            return false
         }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let result = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "0|0|"
+
+        let parts = result.split(separator: "|", omittingEmptySubsequences: false)
+        let groups = parts.count >= 1 ? Int(parts[0]) ?? 0 : 0
+        let buttons = parts.count >= 2 ? Int(parts[1]) ?? 0 : 0
+
+        return groups > buttons
     }
 }

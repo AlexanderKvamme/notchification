@@ -29,6 +29,9 @@ final class XcodeDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.xcode-check", qos: .utility)
+
     init() {
         logger.info("🔨 XcodeDetector init")
     }
@@ -40,7 +43,8 @@ final class XcodeDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let (building, details) = self.isXcodeBuilding()

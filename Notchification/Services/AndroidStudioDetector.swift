@@ -25,6 +25,9 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.android-check", qos: .utility)
+
     init() {
         findGradlePath()
     }
@@ -72,13 +75,15 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let (building, details) = self.isGradleBusy()
             let debug = DebugSettings.shared.debugAndroid
 
             DispatchQueue.main.async {
+                // NOTE: Keep debug logs - helps diagnose detection issues
                 if debug {
                     print("🤖 Android building=\(building) | \(details)")
                 }
@@ -127,10 +132,20 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         task.standardOutput = outPipe
         task.standardError = errPipe
 
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return (false, "gradle error: \(error)")
         }
 

@@ -25,6 +25,9 @@ final class DropboxDetector: ObservableObject, Detector {
     // Status patterns indicating sync activity
     private let syncingPatterns = ["Syncing", "Uploading", "Downloading", "Indexing"]
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.dropbox-check", qos: .utility)
+
     init() {}
 
     func reset() {
@@ -34,7 +37,8 @@ final class DropboxDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             guard self.isDropboxRunning() else {
@@ -100,6 +104,7 @@ final class DropboxDetector: ObservableObject, Detector {
     }
 
     /// Get Dropbox menu bar status via AppleScript
+    /// Note: System Events is required to read menu bar status
     private func getMenuBarStatus() -> String {
         let script = """
         tell application "System Events"
@@ -125,10 +130,20 @@ final class DropboxDetector: ObservableObject, Detector {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return ""
         }
 

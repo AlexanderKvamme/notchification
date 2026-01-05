@@ -31,6 +31,9 @@ final class FinderDetector: ObservableObject, Detector {
     private var lastDeactivationTime: Date?
     private let reactivationCooldown: TimeInterval = 3.0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.finder-check", qos: .utility)
+
     init() {
         logger.info("📁 FinderDetector init")
     }
@@ -43,7 +46,8 @@ final class FinderDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let hasProgressWindow = self.finderHasProgressWindow()

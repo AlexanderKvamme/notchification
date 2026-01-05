@@ -25,6 +25,9 @@ final class InstallerDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.installer-check", qos: .utility)
+
     init() {}
 
     func reset() {
@@ -34,7 +37,8 @@ final class InstallerDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let isRunning = self.isInstallerRunning()
@@ -68,6 +72,7 @@ final class InstallerDetector: ObservableObject, Detector {
     }
 
     /// Check if Installer.app has a busy or progress indicator visible (installation in progress)
+    /// Note: System Events is required to check UI elements
     private func hasProgressBar() -> Bool {
         let script = """
         tell application "System Events"
@@ -85,23 +90,33 @@ final class InstallerDetector: ObservableObject, Detector {
         end tell
         """
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        task.arguments = ["-e", script]
 
         let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
 
         do {
-            try process.run()
-            process.waitUntilExit()
+            try task.run()
+            task.waitUntilExit()
+            timeoutWork.cancel()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
             return output == "BUSY" || output == "PROGRESS"
         } catch {
+            timeoutWork.cancel()
             return false
         }
     }

@@ -27,6 +27,9 @@ final class iCloudDetector: ObservableObject, Detector {
     private var consecutiveHighReadings: Int = 0
     private var consecutiveLowReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.icloud-check", qos: .utility)
+
     init() {}
 
     func reset() {
@@ -36,7 +39,8 @@ final class iCloudDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let pids = self.getClouddPIDs()
