@@ -15,10 +15,10 @@ private let logger = Logger(subsystem: "com.hoi.Notchification", category: "Code
 
 /// Detects if Codex CLI is actively working
 /// Uses AppleScript to read terminal content
-final class CodexDetector: ObservableObject {
+final class CodexDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .codex
 
     // Consecutive readings required
     private let requiredToShow: Int = 1
@@ -28,32 +28,22 @@ final class CodexDetector: ObservableObject {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.codex-check", qos: .utility)
+
     init() {
         logger.info("🤖 CodexDetector init")
     }
 
-    func startMonitoring() {
-        logger.info("🤖 CodexDetector startMonitoring")
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
         isActive = false
     }
 
-    private func checkStatus() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+    func poll() {
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let isWorking = self.isCodexWorking()
@@ -82,12 +72,10 @@ final class CodexDetector: ObservableObject {
 
     /// Check if Codex is working by looking in terminal apps
     private func isCodexWorking() -> Bool {
-        // Check iTerm2
         if isCodexActiveInITerm2() {
             return true
         }
 
-        // Check Terminal.app
         if isCodexActiveInTerminal() {
             return true
         }
@@ -95,26 +83,17 @@ final class CodexDetector: ObservableObject {
         return false
     }
 
-    /// Use AppleScript to check iTerm2 terminal content for Codex activity
+    /// Use AppleScript to get iTerm2 terminal content
     private func isCodexActiveInITerm2() -> Bool {
+        // Use 'text' (visible screen) instead of 'contents' (full scrollback) for speed
         let script = """
-        tell application "System Events"
-            if not (exists process "iTerm2") then return "NOT_RUNNING"
-        end tell
-
         tell application "iTerm2"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
                     repeat with s in sessions of t
-                        set sessionContent to contents of s
-                        set contentLength to length of sessionContent
-                        if contentLength > 3000 then
-                            set recentContent to text (contentLength - 3000) thru contentLength of sessionContent
-                        else
-                            set recentContent to sessionContent
-                        end if
-                        set allContent to allContent & "---SESSION---" & recentContent
+                        set allContent to allContent & "---SESSION---" & text of s
                     end repeat
                 end repeat
             end repeat
@@ -130,10 +109,20 @@ final class CodexDetector: ObservableObject {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
@@ -146,25 +135,16 @@ final class CodexDetector: ObservableObject {
         return hasCodexPattern(in: output)
     }
 
-    /// Use AppleScript to check Terminal.app content for Codex activity
+    /// Use AppleScript to get Terminal.app content
     private func isCodexActiveInTerminal() -> Bool {
+        // Note: Terminal.app uses 'history' property (no 'text' equivalent)
         let script = """
-        tell application "System Events"
-            if not (exists process "Terminal") then return "NOT_RUNNING"
-        end tell
-
         tell application "Terminal"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
-                    set tabContent to history of t
-                    set contentLength to length of tabContent
-                    if contentLength > 3000 then
-                        set recentContent to text (contentLength - 3000) thru contentLength of tabContent
-                    else
-                        set recentContent to tabContent
-                    end if
-                    set allContent to allContent & "---TAB---" & recentContent
+                    set allContent to allContent & "---TAB---" & history of t
                 end repeat
             end repeat
             return allContent
@@ -179,10 +159,20 @@ final class CodexDetector: ObservableObject {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
@@ -195,15 +185,24 @@ final class CodexDetector: ObservableObject {
         return hasCodexPattern(in: output)
     }
 
-    /// Check if output contains Codex "Working" pattern
-    /// Looks for "Working" and "esc to interrupt" appearing together
+    /// Check if "Working" + "esc to interrupt" appears in the last 10 non-empty lines of ANY session
     private func hasCodexPattern(in output: String) -> Bool {
-        // Check for "Working" and "esc to interrupt" in the output
-        // They appear on the same line: "Working (0s • esc to interrupt)"
-        return output.contains("Working") && output.contains("esc to interrupt")
-    }
+        let sessions = output.components(separatedBy: "---SESSION---") +
+                       output.components(separatedBy: "---TAB---")
 
-    deinit {
-        stopMonitoring()
+        for session in sessions {
+            let lines = session.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .suffix(10)
+
+            for line in lines {
+                if line.contains("Working") && line.contains("esc to interrupt") {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 }

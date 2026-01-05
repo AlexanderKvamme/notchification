@@ -15,10 +15,10 @@ private let logger = Logger(subsystem: "com.hoi.Notchification", category: "Open
 
 /// Detects if Opencode is actively working (running commands, making edits, etc.)
 /// Uses Accessibility API to look for status text indicators
-final class OpencodeDetector: ObservableObject {
+final class OpencodeDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .opencode
     private let bundleIdentifier = "ai.opencode.desktop"
 
     // Status keywords that indicate activity (must be followed by timer like "· 25s")
@@ -34,8 +34,7 @@ final class OpencodeDetector: ObservableObject {
         "Writing"
     ]
 
-    // Regex pattern for active status with timer (e.g., "Making edits · 25s" or "· 0.54s")
-    // Using flexible separator to handle different dot characters
+    // Regex pattern for active status with timer
     private let timerPattern = try! NSRegularExpression(pattern: "\\d+\\.?\\d*s\\s*$", options: [])
 
     // Consecutive readings required
@@ -46,59 +45,24 @@ final class OpencodeDetector: ObservableObject {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap.
+    // Without this, if a check takes longer than 1 second (the poll interval),
+    // multiple checks could run concurrently and cause stuck states.
+    private let checkQueue = DispatchQueue(label: "com.notchification.opencode-check", qos: .utility)
+
     init() {
         logger.info("🟢 OpencodeDetector init")
     }
 
-    func startMonitoring() {
-        logger.info("🟢 OpencodeDetector startMonitoring")
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        // Request Automation permissions for terminal apps (triggers system prompt if needed)
-        requestTerminalPermissions()
-
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        checkStatus()
-    }
-
-    /// Request Automation permissions for iTerm2 and Terminal.app
-    /// This triggers the system permission prompt if not already granted
-    private func requestTerminalPermissions() {
-        DispatchQueue.global(qos: .utility).async {
-            // Try iTerm2
-            let itermScript = "tell application \"iTerm2\" to return name"
-            let itermTask = Process()
-            itermTask.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            itermTask.arguments = ["-e", itermScript]
-            itermTask.standardOutput = FileHandle.nullDevice
-            itermTask.standardError = FileHandle.nullDevice
-            try? itermTask.run()
-
-            // Try Terminal
-            let terminalScript = "tell application \"Terminal\" to return name"
-            let terminalTask = Process()
-            terminalTask.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            terminalTask.arguments = ["-e", terminalScript]
-            terminalTask.standardOutput = FileHandle.nullDevice
-            terminalTask.standardError = FileHandle.nullDevice
-            try? terminalTask.run()
-        }
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
         isActive = false
     }
 
-    private func checkStatus() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+    func poll() {
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let (isWorking, statusText) = self.isOpencodeWorking()
@@ -109,8 +73,9 @@ final class OpencodeDetector: ObservableObject {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0
 
+                    // NOTE: Keep debug logs - helps diagnose detection issues
                     if debug {
-                        logger.debug("🟢 Opencode ACTIVE: \(statusText)")
+                        print("🟢 Opencode ACTIVE: \(statusText)")
                     }
 
                     if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
@@ -121,8 +86,9 @@ final class OpencodeDetector: ObservableObject {
                     self.consecutiveInactiveReadings += 1
                     self.consecutiveActiveReadings = 0
 
+                    // NOTE: Keep debug logs - helps diagnose detection issues
                     if debug {
-                        logger.debug("🟢 Opencode idle")
+                        print("🟢 Opencode idle")
                     }
 
                     if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
@@ -136,23 +102,43 @@ final class OpencodeDetector: ObservableObject {
 
     /// Check if Opencode is working by looking for status text via Accessibility API
     private func isOpencodeWorking() -> (Bool, String) {
-        // First check the GUI app
+        let debug = DebugSettings.shared.debugOpencode
+
+        // NOTE: Keep debug logs - helps diagnose detection issues
+        if debug {
+            print("🟢 Opencode: checking...")
+        }
+
         if let opencodeApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first {
+            if debug {
+                print("🟢 Opencode: GUI app found, checking windows...")
+            }
             let appElement = AXUIElementCreateApplication(opencodeApp.processIdentifier)
 
             var windowsValue: CFTypeRef?
             let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
 
             if result == .success, let windows = windowsValue as? [AXUIElement] {
+                if debug {
+                    print("🟢 Opencode: found \(windows.count) windows")
+                }
                 for window in windows {
                     if let statusText = findStatusText(in: window) {
                         return (true, "GUI: \(statusText)")
                     }
                 }
             }
+        } else if debug {
+            print("🟢 Opencode: GUI app not running")
         }
 
-        // Check for CLI in terminal - look for tabs titled "opencode" AND opencode process running
+        // Also check for CLI version in terminals.
+        // NOTE: This runs even when GUI isn't open, which uses some energy.
+        // If you only use GUI (not CLI), this could be optimized to skip.
+        if debug {
+            print("🟢 Opencode: checking CLI in terminals...")
+        }
+
         if isOpencodeCLIActive() {
             return (true, "CLI: opencode tab active")
         }
@@ -162,12 +148,10 @@ final class OpencodeDetector: ObservableObject {
 
     /// Check if Opencode CLI is active in a terminal using AppleScript
     private func isOpencodeCLIActive() -> Bool {
-        // Check iTerm2
         if isOpencodeActiveInITerm2() {
             return true
         }
 
-        // Check Terminal.app
         if isOpencodeActiveInTerminal() {
             return true
         }
@@ -175,27 +159,17 @@ final class OpencodeDetector: ObservableObject {
         return false
     }
 
-    /// Use AppleScript to check iTerm2 terminal content for opencode activity
+    /// Use AppleScript to get iTerm2 terminal content
     private func isOpencodeActiveInITerm2() -> Bool {
-        // Script to get all session content - last ~3000 chars (~30 lines)
+        // Use 'text' (visible screen) instead of 'contents' (full scrollback) for speed
         let script = """
-        tell application "System Events"
-            if not (exists process "iTerm2") then return "NOT_RUNNING"
-        end tell
-
         tell application "iTerm2"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
                     repeat with s in sessions of t
-                        set sessionContent to contents of s
-                        set contentLength to length of sessionContent
-                        if contentLength > 3000 then
-                            set recentContent to text (contentLength - 3000) thru contentLength of sessionContent
-                        else
-                            set recentContent to sessionContent
-                        end if
-                        set allContent to allContent & "---SESSION---" & recentContent
+                        set allContent to allContent & "---SESSION---" & text of s
                     end repeat
                 end repeat
             end repeat
@@ -211,10 +185,20 @@ final class OpencodeDetector: ObservableObject {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
@@ -224,43 +208,42 @@ final class OpencodeDetector: ObservableObject {
             return false
         }
 
-        // Check for "Generating..." followed by "press esc to exit cancel" on consecutive lines
         return hasGeneratingPattern(in: output)
     }
 
-    /// Check if output contains "Generating..." followed by "press esc to exit cancel" on consecutive lines
+    /// Check if "Generating..." + "press esc to exit cancel" appears in the last 10 lines of ANY session
     private func hasGeneratingPattern(in output: String) -> Bool {
-        let lines = output.components(separatedBy: .newlines)
-        for i in 0..<lines.count - 1 {
-            let currentLine = lines[i]
-            let nextLine = lines[i + 1]
-            if currentLine.contains("Generating...") && nextLine.contains("press esc to exit cancel") {
-                return true
+        let sessions = output.components(separatedBy: "---SESSION---") +
+                       output.components(separatedBy: "---TAB---")
+
+        for session in sessions {
+            let lines = session.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .suffix(10)
+
+            let lineArray = Array(lines)
+            guard lineArray.count >= 2 else { continue }
+
+            for i in 0..<(lineArray.count - 1) {
+                if lineArray[i].contains("Generating...") && lineArray[i + 1].contains("press esc to exit cancel") {
+                    return true
+                }
             }
         }
         return false
     }
 
-    /// Use AppleScript to check Terminal.app content for opencode activity
+    /// Use AppleScript to get Terminal.app content
     private func isOpencodeActiveInTerminal() -> Bool {
-        // Terminal.app uses "history" for full content, "contents" for visible only
+        // Note: Terminal.app uses 'history' property (no 'text' equivalent)
         let script = """
-        tell application "System Events"
-            if not (exists process "Terminal") then return "NOT_RUNNING"
-        end tell
-
         tell application "Terminal"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
-                    set tabContent to history of t
-                    set contentLength to length of tabContent
-                    if contentLength > 3000 then
-                        set recentContent to text (contentLength - 3000) thru contentLength of tabContent
-                    else
-                        set recentContent to tabContent
-                    end if
-                    set allContent to allContent & "---TAB---" & recentContent
+                    set allContent to allContent & "---TAB---" & history of t
                 end repeat
             end repeat
             return allContent
@@ -272,28 +255,27 @@ final class OpencodeDetector: ObservableObject {
         task.arguments = ["-e", script]
 
         let pipe = Pipe()
-        let errorPipe = Pipe()
         task.standardOutput = pipe
-        task.standardError = errorPipe
+        task.standardError = FileHandle.nullDevice
+
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
 
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
-        // Debug: check for errors
-        if let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
-            let debug = DebugSettings.shared.debugOpencode
-            if debug {
-                logger.debug("🟢 Terminal AppleScript error: \(errorOutput)")
-            }
-        }
-
         guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
               output != "NOT_RUNNING" else {
             return false
@@ -304,13 +286,11 @@ final class OpencodeDetector: ObservableObject {
 
     /// Check if text matches active status pattern (keyword + timer like "Making edits · 25s")
     private func isActiveStatus(_ text: String) -> Bool {
-        // Must contain a timer pattern (· Xs)
         let range = NSRange(text.startIndex..., in: text)
         guard timerPattern.firstMatch(in: text, options: [], range: range) != nil else {
             return false
         }
 
-        // Must contain one of our keywords
         for keyword in activeKeywords {
             if text.contains(keyword) {
                 return true
@@ -322,30 +302,26 @@ final class OpencodeDetector: ObservableObject {
 
     /// Recursively search for status text elements
     private func findStatusText(in element: AXUIElement, depth: Int = 0) -> String? {
-        guard depth < 15 else { return nil }  // Limit recursion
+        guard depth < 15 else { return nil }
 
-        // Check if this element has text that matches our active status pattern
         var valueRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
            let text = valueRef as? String, isActiveStatus(text) {
             return text
         }
 
-        // Also check title attribute
         var titleRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleRef) == .success,
            let text = titleRef as? String, isActiveStatus(text) {
             return text
         }
 
-        // Check description attribute (sometimes status is here)
         var descRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef) == .success,
            let text = descRef as? String, isActiveStatus(text) {
             return text
         }
 
-        // Recursively check children
         var childrenValue: CFTypeRef?
         if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenValue) == .success,
            let children = childrenValue as? [AXUIElement] {
@@ -357,9 +333,5 @@ final class OpencodeDetector: ObservableObject {
         }
 
         return nil
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

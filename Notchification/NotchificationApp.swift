@@ -7,10 +7,39 @@ import SwiftUI
 import Combine
 import Sparkle
 
+/// Sparkle delegate that gates updates to licensed users only
+final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
+    func updater(_ updater: SPUUpdater, shouldProceedWithUpdate item: SUAppcastItem, updateCheck: SPUUpdateCheck) -> Bool {
+        // Only allow updates for licensed users
+        return LicenseManager.shared.state == .licensed
+    }
+}
+
+/// App delegate to handle single-instance enforcement
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Check for other running instances after launch
+        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+        let otherInstances = runningApps.filter { $0 != NSRunningApplication.current }
+
+        if !otherInstances.isEmpty {
+            // Another instance is running - activate it and quit this one
+            otherInstances.first?.activate(options: .activateIgnoringOtherApps)
+            NSApp.terminate(nil)
+        }
+    }
+}
+
 @main
 struct NotchificationApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
-    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    private let updaterDelegate = UpdaterDelegate()
+    private var updaterController: SPUStandardUpdaterController
+
+    init() {
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: updaterDelegate, userDriverDelegate: nil)
+    }
 
     var body: some Scene {
         MenuBarExtra("Notchification", systemImage: "bell.badge") {
@@ -74,6 +103,24 @@ final class TrackingSettings: ObservableObject {
     @Published var trackCodex: Bool {
         didSet { UserDefaults.standard.set(trackCodex, forKey: "trackCodex") }
     }
+    @Published var trackDropbox: Bool {
+        didSet { UserDefaults.standard.set(trackDropbox, forKey: "trackDropbox") }
+    }
+    @Published var trackGoogleDrive: Bool {
+        didSet { UserDefaults.standard.set(trackGoogleDrive, forKey: "trackGoogleDrive") }
+    }
+    @Published var trackOneDrive: Bool {
+        didSet { UserDefaults.standard.set(trackOneDrive, forKey: "trackOneDrive") }
+    }
+    @Published var trackICloud: Bool {
+        didSet { UserDefaults.standard.set(trackICloud, forKey: "trackICloud") }
+    }
+    @Published var trackInstaller: Bool {
+        didSet { UserDefaults.standard.set(trackInstaller, forKey: "trackInstaller") }
+    }
+    @Published var trackAppStore: Bool {
+        didSet { UserDefaults.standard.set(trackAppStore, forKey: "trackAppStore") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -88,6 +135,12 @@ final class TrackingSettings: ObservableObject {
         self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? true
         self.trackOpencode = UserDefaults.standard.object(forKey: "trackOpencode") as? Bool ?? true
         self.trackCodex = UserDefaults.standard.object(forKey: "trackCodex") as? Bool ?? true
+        self.trackDropbox = UserDefaults.standard.object(forKey: "trackDropbox") as? Bool ?? true
+        self.trackGoogleDrive = UserDefaults.standard.object(forKey: "trackGoogleDrive") as? Bool ?? true
+        self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? true
+        self.trackICloud = UserDefaults.standard.object(forKey: "trackICloud") as? Bool ?? true
+        self.trackInstaller = UserDefaults.standard.object(forKey: "trackInstaller") as? Bool ?? true
+        self.trackAppStore = UserDefaults.standard.object(forKey: "trackAppStore") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -151,6 +204,12 @@ enum MockProcessType: String, CaseIterable {
     case finder = "Finder"
     case opencode = "Opencode"
     case codex = "Codex"
+    case dropbox = "Dropbox"
+    case googleDrive = "Google Drive"
+    case oneDrive = "OneDrive"
+    case icloud = "iCloud"
+    case installer = "Installer"
+    case appStore = "App Store"
     case all = "All"
 
     var processType: ProcessType? {
@@ -162,12 +221,18 @@ enum MockProcessType: String, CaseIterable {
         case .finder: return .finder
         case .opencode: return .opencode
         case .codex: return .codex
+        case .dropbox: return .dropbox
+        case .googleDrive: return .googleDrive
+        case .oneDrive: return .oneDrive
+        case .icloud: return .icloud
+        case .installer: return .installer
+        case .appStore: return .appStore
         case .all: return nil // Handled specially
         }
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex]
+        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
     }
 }
 
@@ -186,10 +251,26 @@ final class AppState: ObservableObject {
 
     private let processMonitor = ProcessMonitor()
     private let windowController = NotchWindowController()
+    private let licenseManager = LicenseManager.shared
     private var cancellables = Set<AnyCancellable>()
 
     init() {
         #if DEBUG
+        // IMPORTANT: Debug logs use os.Logger, not print()!
+        // To see debug output, open Console.app or run:
+        //   log stream --predicate 'subsystem == "com.hoi.Notchification"' --level debug
+        print("""
+
+        ╔═══════════════════════════════════════════════════════════════════════════════╗
+        ║  IMPORTANT: Debug logs are in Console.app, NOT Xcode console!                ║
+        ║                                                                               ║
+        ║  Run this in Terminal to see live debug logs:                                 ║
+        ║                                                                               ║
+        ║  log stream --predicate 'subsystem == "com.hoi.Notchification"' --level debug ║
+        ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+        """)
+
         // Load settings
         let savedMockType = UserDefaults.standard.string(forKey: "mockOnLaunchType") ?? "None"
         self.mockOnLaunchType = MockProcessType(rawValue: savedMockType) ?? .none
@@ -200,12 +281,17 @@ final class AppState: ObservableObject {
         if mockOnLaunchType != .none {
             runLaunchMock()
         } else {
-            startMonitoring()
+            startMonitoringIfLicensed()
         }
         #else
         setupBindings()
-        startMonitoring()
+        startMonitoringIfLicensed()
         #endif
+    }
+
+    private func startMonitoringIfLicensed() {
+        // Always start monitoring - we show a nag message if expired
+        startMonitoring()
     }
 
     private func setupBindings() {
@@ -298,9 +384,15 @@ struct MenuBarView: View {
     let updater: SPUUpdater
     @ObservedObject var debugSettings = DebugSettings.shared
     @ObservedObject var trackingSettings = TrackingSettings.shared
+    @ObservedObject var licenseManager = LicenseManager.shared
 
     var body: some View {
         VStack {
+            // License status
+            licenseStatusView
+
+            Divider()
+
             Toggle("Monitoring", isOn: Binding(
                 get: { appState.isMonitoring },
                 set: { _ in appState.toggleMonitoring() }
@@ -315,6 +407,12 @@ struct MenuBarView: View {
             Toggle("Finder", isOn: $trackingSettings.trackFinder)
             Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
             Toggle("Codex", isOn: $trackingSettings.trackCodex)
+            Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
+            Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
+            Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
+            Toggle("iCloud", isOn: $trackingSettings.trackICloud)
+            Toggle("Installer", isOn: $trackingSettings.trackInstaller)
+            Toggle("App Store", isOn: $trackingSettings.trackAppStore)
 
             Divider()
 
@@ -342,9 +440,23 @@ struct MenuBarView: View {
             Toggle("Finder", isOn: $debugSettings.debugFinder)
             Toggle("Opencode", isOn: $debugSettings.debugOpencode)
             Toggle("Codex", isOn: $debugSettings.debugCodex)
+
+            Divider()
+
+            Text("License Debug").font(.caption).foregroundColor(.secondary)
+            Button("Reset Trial") {
+                licenseManager.resetTrial()
+            }
+            Button("Expire Trial") {
+                licenseManager.expireTrial()
+            }
             #endif
 
             Divider()
+
+            Button("License...") {
+                LicenseWindowController.shared.showLicenseWindow()
+            }
 
             Button("Settings...") {
                 SettingsWindowController.shared.showSettings()
@@ -370,6 +482,32 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+        }
+    }
+
+    @ViewBuilder
+    private var licenseStatusView: some View {
+        switch licenseManager.state {
+        case .licensed:
+            HStack {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundColor(.green)
+                Text("Licensed")
+                    .font(.caption)
+            }
+
+        case .trial(let daysRemaining):
+            HStack {
+                Image(systemName: "clock")
+                    .foregroundColor(.orange)
+                Text("Trial: \(daysRemaining) days left")
+                    .font(.caption)
+            }
+
+        case .expired:
+            Label("Trial expired", systemImage: "xmark.circle.fill")
+                .font(.caption)
+                .foregroundColor(.red)
         }
     }
 }

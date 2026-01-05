@@ -12,6 +12,12 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case finder = "finder"
     case opencode = "opencode"
     case codex = "codex"
+    case dropbox = "dropbox"
+    case googleDrive = "googledrive"
+    case oneDrive = "onedrive"
+    case icloud = "icloud"
+    case installer = "installer"
+    case appStore = "appstore"
 
     var id: String { rawValue }
 
@@ -23,6 +29,12 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .finder: return "Finder"
         case .opencode: return "Opencode"
         case .codex: return "Codex"
+        case .dropbox: return "Dropbox"
+        case .googleDrive: return "Google Drive"
+        case .oneDrive: return "OneDrive"
+        case .icloud: return "iCloud"
+        case .installer: return "Installer"
+        case .appStore: return "App Store"
         }
     }
 
@@ -34,6 +46,12 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .finder: return Color(red: 0.902, green: 0.910, blue: 0.937) // #e6e8ef Finder gray
         case .opencode: return Color(red: 0.847, green: 0.847, blue: 0.847) // #D8D8D8 Opencode gray
         case .codex: return Color(red: 0.976, green: 0.976, blue: 0.976) // #F9F9F9 OpenAI light gray
+        case .dropbox: return Color(red: 0.0, green: 0.38, blue: 1.0) // #0061FF Dropbox blue
+        case .googleDrive: return Color(red: 0.26, green: 0.52, blue: 0.96) // #4285F4 Google blue
+        case .oneDrive: return Color(red: 0.0, green: 0.47, blue: 0.83) // #0078D4 Microsoft blue
+        case .icloud: return Color(red: 0.2, green: 0.6, blue: 1.0) // iCloud blue
+        case .installer: return Color(red: 0.6, green: 0.4, blue: 0.8) // Purple for system installer
+        case .appStore: return Color(red: 0.0, green: 0.48, blue: 1.0) // #007AFF App Store blue
         }
     }
 
@@ -45,6 +63,12 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .finder: return .white // White wave on gray base
         case .opencode: return .white // White wave on gray base
         case .codex: return .white // White wave on light gray base
+        case .dropbox: return Color(red: 0.4, green: 0.6, blue: 1.0) // Lighter Dropbox blue
+        case .googleDrive: return Color(red: 0.5, green: 0.7, blue: 1.0) // Lighter Google blue
+        case .oneDrive: return Color(red: 0.4, green: 0.65, blue: 0.95) // Lighter Microsoft blue
+        case .icloud: return Color(red: 0.5, green: 0.8, blue: 1.0) // Lighter iCloud blue
+        case .installer: return Color(red: 0.75, green: 0.55, blue: 0.9) // Lighter purple
+        case .appStore: return Color(red: 0.4, green: 0.7, blue: 1.0) // Lighter App Store blue
         }
     }
 
@@ -56,6 +80,12 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .finder: return .diagonalStripes
         case .opencode: return .solid
         case .codex: return .solid
+        case .dropbox: return .solid
+        case .googleDrive: return .solid
+        case .oneDrive: return .solid
+        case .icloud: return .solid
+        case .installer: return .solid
+        case .appStore: return .solid
         }
     }
 }

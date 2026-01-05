@@ -13,10 +13,10 @@ import os.log
 private let logger = Logger(subsystem: "com.hoi.Notchification", category: "XcodeDetector")
 
 /// Detects if Xcode is actively building
-final class XcodeDetector: ObservableObject {
+final class XcodeDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    private var timer: Timer?
+    let processType: ProcessType = .xcode
 
     // CPU threshold - read from settings
     private var cpuThreshold: Double { ThresholdSettings.shared.xcodeThreshold }
@@ -29,35 +29,22 @@ final class XcodeDetector: ObservableObject {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.xcode-check", qos: .utility)
+
     init() {
         logger.info("🔨 XcodeDetector init")
     }
 
-    func startMonitoring() {
-        logger.info("🔨 XcodeDetector startMonitoring")
+    func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
-
-        // Use Timer with .common mode so it fires even when menu is open
-        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.checkStatus()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-
-        // Fire immediately
-        checkStatus()
-    }
-
-    func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
         isActive = false
     }
 
-    private func checkStatus() {
-        // Run on background to not block UI
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+    func poll() {
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let (building, details) = self.isXcodeBuilding()
@@ -185,9 +172,5 @@ final class XcodeDetector: ObservableObject {
         }
 
         return cpu
-    }
-
-    deinit {
-        stopMonitoring()
     }
 }

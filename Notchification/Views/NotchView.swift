@@ -12,6 +12,7 @@ private let completionSound = NSSound(named: "Glass")
 
 struct NotchView: View {
     @ObservedObject var notchState: NotchState
+    @ObservedObject var licenseManager = LicenseManager.shared
     var screenWidth: CGFloat = 1440
     var screenHeight: CGFloat = 900
 
@@ -26,6 +27,12 @@ struct NotchView: View {
     @State private var finderConfettiTrigger: Int = 0
     @State private var opencodeConfettiTrigger: Int = 0
     @State private var codexConfettiTrigger: Int = 0
+    @State private var dropboxConfettiTrigger: Int = 0
+    @State private var googleDriveConfettiTrigger: Int = 0
+    @State private var oneDriveConfettiTrigger: Int = 0
+    @State private var icloudConfettiTrigger: Int = 0
+    @State private var installerConfettiTrigger: Int = 0
+    @State private var appStoreConfettiTrigger: Int = 0
 
     // Dimensions
     private let notchWidth: CGFloat = 300
@@ -42,7 +49,8 @@ struct NotchView: View {
     private var expandedHeight: CGFloat {
         let processCount = max(1, notchState.activeProcesses.count)
         let contentHeight = CGFloat(processCount) * logoSize + CGFloat(processCount - 1) * rowSpacing
-        return topPadding + contentHeight + 16  // 16 bottom padding
+        let trialTextHeight: CGFloat = licenseManager.state == .expired ? 20 : 0
+        return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
     var body: some View {
@@ -67,6 +75,12 @@ struct NotchView: View {
                         ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
                         ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
                         ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
+                        ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
+                        ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
+                        ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
+                        ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
+                        ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
+                        ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
                     }
                     .allowsHitTesting(false)
                 }
@@ -87,6 +101,15 @@ struct NotchView: View {
                             .frame(height: progressBarHeight)
                         }
                         .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    }
+
+                    // Trial expired message
+                    if licenseManager.state == .expired {
+                        Text("Thanks for trying! Please upgrade")
+                            .font(.system(size: 10))
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 4)
                     }
                 }
                 .padding(.horizontal, horizontalPadding)
@@ -134,6 +157,18 @@ struct NotchView: View {
                         opencodeConfettiTrigger += 1
                     case .codex:
                         codexConfettiTrigger += 1
+                    case .dropbox:
+                        dropboxConfettiTrigger += 1
+                    case .googleDrive:
+                        googleDriveConfettiTrigger += 1
+                    case .oneDrive:
+                        oneDriveConfettiTrigger += 1
+                    case .icloud:
+                        icloudConfettiTrigger += 1
+                    case .installer:
+                        installerConfettiTrigger += 1
+                    case .appStore:
+                        appStoreConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -179,6 +214,18 @@ struct ProcessLogo: View {
             OpencodeLogo()
         case .codex:
             CodexLogo()
+        case .dropbox:
+            DropboxLogo()
+        case .googleDrive:
+            GoogleDriveLogo()
+        case .oneDrive:
+            OneDriveLogo()
+        case .icloud:
+            iCloudLogo()
+        case .installer:
+            InstallerLogo()
+        case .appStore:
+            AppStoreLogo()
         }
     }
 }
@@ -395,6 +442,129 @@ struct CodexLogo: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .foregroundColor(ProcessType.codex.color)
+    }
+}
+
+// MARK: - Dropbox Logo
+
+struct DropboxLogo: View {
+    var body: some View {
+        Image("dropboxicon")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.dropbox.color)
+    }
+}
+
+// MARK: - Google Drive Logo
+
+struct GoogleDriveLogo: View {
+    var body: some View {
+        Image(systemName: "externaldrive.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.googleDrive.color)
+    }
+}
+
+// MARK: - OneDrive Logo
+
+struct OneDriveLogo: View {
+    var body: some View {
+        Image(systemName: "cloud.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.oneDrive.color)
+    }
+}
+
+// MARK: - iCloud Logo
+
+struct iCloudLogo: View {
+    var body: some View {
+        Image("icloudlogo")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.icloud.color)
+    }
+}
+
+// MARK: - Installer Logo
+
+struct InstallerLogo: View {
+    var body: some View {
+        // Package/box icon using SF Symbol
+        Image(systemName: "shippingbox.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.installer.color)
+    }
+}
+
+// MARK: - App Store Logo
+
+struct AppStoreLogo: View {
+    var body: some View {
+        Image("appstoreicon")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.appStore.color)
+    }
+}
+
+struct FrigginAppStoreIconShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 24.0
+        var path = Path()
+
+        // The "A" document shape (without the hammer)
+        path.move(to: p(16.1, 3.8, s))
+        path.addLine(to: p(0, 6.3, s))
+        path.addLine(to: p(2.6, 23, s))
+        path.addLine(to: p(11.2, 21.6, s))
+        path.addCurve(to: p(13.8, 13.8, s), control1: p(11.1, 20.9, s), control2: p(13.4, 15.1, s))
+        path.addLine(to: p(9.4, 14.5, s))
+        path.addLine(to: p(10, 12.7, s))
+        path.addLine(to: p(13.1, 12.2, s))
+        path.addLine(to: p(13.9, 13.2, s))
+        path.addCurve(to: p(14.1, 12.5, s), control1: p(14.1, 12.7, s), control2: p(14.1, 12.5, s))
+        path.addLine(to: p(9.8, 7.2, s))
+        path.addCurve(to: p(9.9, 6.3, s), control1: p(9.6, 6.9, s), control2: p(9.6, 6.5, s))
+        path.addLine(to: p(10.1, 6.1, s))
+        path.addCurve(to: p(11, 6.2, s), control1: p(10.4, 5.9, s), control2: p(10.8, 5.9, s))
+        path.addLine(to: p(14.8, 10.6, s))
+        path.addCurve(to: p(16.3, 5.4, s), control1: p(15.6, 8.2, s), control2: p(16.3, 6.1, s))
+        path.addCurve(to: p(16.1, 3.8, s), control1: p(16.4, 5.2, s), control2: p(16.4, 4.5, s))
+        path.closeSubpath()
+
+        // Small detail inside
+        path.move(to: p(4.1, 13.7, s))
+        path.addLine(to: p(6.8, 13.2, s))
+        path.addLine(to: p(6.1, 15, s))
+        path.addLine(to: p(4.3, 15.3, s))
+        path.closeSubpath()
+
+        // Another detail
+        path.move(to: p(9.9, 8.6, s))
+        path.addLine(to: p(10.2, 8.7, s))
+        path.addCurve(to: p(10.6, 9.6, s), control1: p(10.6, 8.8, s), control2: p(10.7, 9.1, s))
+        path.addLine(to: p(7.6, 17.6, s))
+        path.addLine(to: p(5.8, 20, s))
+        path.addLine(to: p(6, 17, s))
+        path.addLine(to: p(9, 9, s))
+        path.addCurve(to: p(9.9, 8.6, s), control1: p(9.1, 8.6, s), control2: p(9.5, 8.4, s))
+        path.closeSubpath()
+
+        let bounds = path.boundingRect
+        let xOffset = (rect.width - bounds.width) / 2 - bounds.minX
+        let yOffset = (rect.height - bounds.height) / 2 - bounds.minY
+        return path.offsetBy(dx: xOffset, dy: yOffset)
+    }
+
+    private func p(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) -> CGPoint {
+        CGPoint(x: x * s, y: y * s)
     }
 }
 
