@@ -264,13 +264,33 @@ final class ThresholdSettings: ObservableObject {
     }
 }
 
+/// Notch display style
+enum NotchStyle: String, CaseIterable {
+    case normal = "normal"      // Full size with icons and progress bars
+    case medium = "medium"      // Notch-width with smaller icons and bars
+    case minimal = "minimal"    // Just a colored stroke around the notch
+
+    var displayName: String {
+        switch self {
+        case .normal: return "Normal"
+        case .medium: return "Medium"
+        case .minimal: return "Minimal"
+        }
+    }
+}
+
 /// Visual style settings for the notch indicator
 final class StyleSettings: ObservableObject {
     static let shared = StyleSettings()
 
-    /// When true, shows only a 2px colored border around the notch (no icons/progress bars)
-    @Published var minimalStyle: Bool {
-        didSet { UserDefaults.standard.set(minimalStyle, forKey: "minimalStyle") }
+    /// The display style for the notch indicator
+    @Published var notchStyle: NotchStyle {
+        didSet { UserDefaults.standard.set(notchStyle.rawValue, forKey: "notchStyle") }
+    }
+
+    /// Convenience property for backward compatibility
+    var minimalStyle: Bool {
+        notchStyle == .minimal
     }
 
     /// Selected screen index (0 = main screen, 1+ = other screens)
@@ -283,7 +303,15 @@ final class StyleSettings: ObservableObject {
     }
 
     private init() {
-        self.minimalStyle = UserDefaults.standard.object(forKey: "minimalStyle") as? Bool ?? false
+        // Migrate from old minimalStyle boolean if needed
+        if let styleString = UserDefaults.standard.string(forKey: "notchStyle"),
+           let style = NotchStyle(rawValue: styleString) {
+            self.notchStyle = style
+        } else if let oldMinimal = UserDefaults.standard.object(forKey: "minimalStyle") as? Bool {
+            self.notchStyle = oldMinimal ? .minimal : .normal
+        } else {
+            self.notchStyle = .normal
+        }
         self.selectedScreenIndex = UserDefaults.standard.object(forKey: "selectedScreenIndex") as? Int ?? -1
     }
 

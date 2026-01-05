@@ -55,10 +55,25 @@ struct DisplaySettingsTab: View {
             }
 
             Section {
-                Toggle("Minimal Style", isOn: $styleSettings.minimalStyle)
-                Text("Shows only a colored border around the notch (no icons or progress bars)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Picker("Display Style", selection: $styleSettings.notchStyle) {
+                    ForEach(NotchStyle.allCases, id: \.self) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Group {
+                    switch styleSettings.notchStyle {
+                    case .normal:
+                        Text("Full size with icons and progress bars")
+                    case .medium:
+                        Text("Compact view at notch width with smaller icons")
+                    case .minimal:
+                        Text("Only a colored border around the notch")
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)

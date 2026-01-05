@@ -54,21 +54,36 @@ struct NotchView: View {
     }
 
     // Content dimensions
+    // Normal mode dimensions
     private let logoSize: CGFloat = 24
     private let progressBarHeight: CGFloat = 12
     private let horizontalPadding: CGFloat = 20
     private let rowSpacing: CGFloat = 8
     private let topPadding: CGFloat = 38  // Space below physical notch cutout (~34px)
 
+    // Medium mode dimensions (smaller, fits notch width)
+    private let mediumLogoSize: CGFloat = 14
+    private let mediumProgressBarHeight: CGFloat = 6
+    private let mediumHorizontalPadding: CGFloat = 8
+    private let mediumRowSpacing: CGFloat = 3
+    private let mediumTopPadding: CGFloat = 34
+
     // Minimal mode stroke width
     private let minimalStrokeWidth: CGFloat = 10
 
-    // Dynamic height based on number of processes
+    // Dynamic height based on number of processes (normal mode)
     private var expandedHeight: CGFloat {
         let processCount = max(1, notchState.activeProcesses.count)
         let contentHeight = CGFloat(processCount) * logoSize + CGFloat(processCount - 1) * rowSpacing
         let trialTextHeight: CGFloat = licenseManager.state == .expired ? 20 : 0
         return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
+    }
+
+    // Dynamic height for medium mode (smaller)
+    private var mediumExpandedHeight: CGFloat {
+        let processCount = max(1, notchState.activeProcesses.count)
+        let contentHeight = CGFloat(processCount) * mediumLogoSize + CGFloat(processCount - 1) * mediumRowSpacing
+        return mediumTopPadding + contentHeight + 8  // 8 bottom padding
     }
 
     /// Base color for minimal mode - first active process color
@@ -108,158 +123,28 @@ struct NotchView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            if styleSettings.minimalStyle {
+            switch styleSettings.notchStyle {
+            case .minimal:
                 // MINIMAL MODE: Base stroke + highlight pulses
-                // Uses real notch dimensions from NSScreen APIs
-                ZStack(alignment: .top) {
-                    // Black background fill - matches notch shape for screenshots
-                    MinimalNotchShape(cornerRadius: 8)
-                        .fill(Color.black)
+                minimalModeView
 
-                    // Base stroke layer - only shown for single process
-                    // For multiple processes, we just cycle through colors directly
-                    if showBaseStroke {
-                        MinimalNotchShape(cornerRadius: 13)
-                            .trim(from: 1 - strokeProgress, to: 1)
-                            .stroke(
-                                baseStrokeColor,
-                                style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
-                            )
-                    }
+            case .medium:
+                // MEDIUM MODE: Notch-width with smaller icons and progress bars
+                mediumModeView
 
-                    // Background layer for multiple processes - shows previous completed color
-                    if !showBaseStroke && previousWaveIndex >= 0 {
-                        MinimalNotchShape(cornerRadius: 13)
-                            .stroke(
-                                previousHighlightColor,
-                                style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
-                            )
-                    }
-
-                    // Highlight layer - sweeps same direction as base (right to left)
-                    // Single process: lighter waveColor that fades out on top of base
-                    // Multiple processes: cycles through actual process colors, animating on top
-                    if !notchState.activeProcesses.isEmpty {
-                        MinimalNotchShape(cornerRadius: 13)
-                            .trim(from: 1 - waveProgress, to: 1)
-                            .stroke(
-                                currentHighlightColor,
-                                style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round)
-                            )
-                            .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
-                    }
-
-                    // Black mask at top - covers stroke overflow (rendered ON TOP of strokes)
-                    // Width accounts for stroke (half on each side)
-                    Rectangle()
-                        .fill(Color.black)
-                        .frame(width: notchInfo.width - minimalStrokeWidth, height: minimalStrokeWidth)
-                }
-                .frame(width: notchInfo.width, height: notchInfo.height)
-                .opacity(isExpanded ? 1 : 0)
-                    .overlay(alignment: .top) {
-                        // Confetti still works in minimal mode
-                        ZStack {
-                            ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
-                            ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
-                            ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
-                            ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
-                            ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
-                            ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
-                            ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
-                            ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
-                            ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
-                            ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
-                            ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
-                            ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
-                            ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
-                            ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
-                        }
-                        .allowsHitTesting(false)
-                    }
-            } else {
+            case .normal:
                 // NORMAL MODE: Filled shape with icons and progress bars
-                NotchShape()
-                    .fill(Color.black)
-                    .frame(width: notchWidth, height: expandedHeight)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedHeight)
-                    .scaleEffect(
-                        x: isExpanded ? 1 : 0.3,
-                        y: isExpanded ? 1 : 0,
-                        anchor: .top
-                    )
-                    .overlay(alignment: .top) {
-                        // Separate confetti cannons - one per process type
-                        // Each has a fixed color, avoiding caching issues
-                        ZStack {
-                            ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
-                            ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
-                            ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
-                            ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
-                            ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
-                            ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
-                            ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
-                            ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
-                            ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
-                            ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
-                            ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
-                            ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
-                            ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
-                            ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
-                        }
-                        .allowsHitTesting(false)
-                    }
-
-                // Content: Multiple processes stacked vertically
-                if !notchState.activeProcesses.isEmpty {
-                    VStack(alignment: .leading, spacing: rowSpacing) {
-                        ForEach(notchState.activeProcesses) { process in
-                            ProcessRow(
-                                process: process,
-                                isExpanded: isExpanded,
-                                logoSize: logoSize,
-                                progressBarHeight: progressBarHeight,
-                                onDismiss: { dismissedProcess in
-                                    // Mark as dismissed (skips confetti)
-                                    ProcessMonitor.shared.dismissProcess(dismissedProcess)
-                                    // Also remove directly from notchState for immediate UI update
-                                    notchState.recentlyDismissed.insert(dismissedProcess)
-                                    notchState.activeProcesses.removeAll { $0 == dismissedProcess }
-                                }
-                            )
-                        }
-
-                        // Trial expired message
-                        if licenseManager.state == .expired {
-                            Text("Thanks for trying! Please upgrade")
-                                .font(.system(size: 10))
-                                .foregroundColor(.red)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.top, 4)
-                        }
-                    }
-                    .padding(.horizontal, horizontalPadding)
-                    .frame(width: notchWidth)
-                    .offset(y: topPadding)
-                    .opacity(isExpanded ? 1 : 0)
-                    .scaleEffect(
-                        x: isExpanded ? 1 : 0.3,  // Match notch's x-scale
-                        y: isExpanded ? 1 : 0,    // Match notch's y-scale
-                        anchor: .top
-                    )
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
-                }
+                normalModeView
             }
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .top)
         .drawingGroup()  // GPU acceleration for smoother animations
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
-            if styleSettings.minimalStyle {
+            switch styleSettings.notchStyle {
+            case .minimal:
                 // Minimal mode: animate stroke drawing around the notch
                 if isEmpty {
-                    // Mark as pending dismiss - the wave animation will complete and then hide
                     isPendingDismiss = true
-                    // Trigger the pop animation (wave completes full cycle then fades)
                     startWaveAnimation()
                 } else {
                     isPendingDismiss = false
@@ -271,13 +156,13 @@ struct NotchView: View {
                     withAnimation(.easeInOut(duration: 0.5)) {
                         strokeProgress = 1
                     }
-                    // Start wave animation after stroke completes
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         startWaveAnimation()
                     }
                 }
-            } else {
-                // Normal mode: bouncy scale animation
+
+            case .medium, .normal:
+                // Medium and Normal mode: bouncy scale animation
                 let animation: Animation = isEmpty
                     ? .easeOut(duration: 0.3)
                     : .spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)
@@ -369,6 +254,142 @@ struct NotchView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Mode Views
+
+    /// Minimal mode: Just a colored stroke around the notch
+    @ViewBuilder
+    private var minimalModeView: some View {
+        ZStack(alignment: .top) {
+            MinimalNotchShape(cornerRadius: 8)
+                .fill(Color.black)
+
+            if showBaseStroke {
+                MinimalNotchShape(cornerRadius: 13)
+                    .trim(from: 1 - strokeProgress, to: 1)
+                    .stroke(baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+            }
+
+            if !showBaseStroke && previousWaveIndex >= 0 {
+                MinimalNotchShape(cornerRadius: 13)
+                    .stroke(previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+            }
+
+            if !notchState.activeProcesses.isEmpty {
+                MinimalNotchShape(cornerRadius: 13)
+                    .trim(from: 1 - waveProgress, to: 1)
+                    .stroke(currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                    .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+            }
+
+            Rectangle()
+                .fill(Color.black)
+                .frame(width: notchInfo.width - minimalStrokeWidth, height: minimalStrokeWidth)
+        }
+        .frame(width: notchInfo.width, height: notchInfo.height)
+        .opacity(isExpanded ? 1 : 0)
+        .overlay(alignment: .top) { confettiEmitters }
+    }
+
+    /// Medium mode: Notch-width with smaller icons and progress bars
+    @ViewBuilder
+    private var mediumModeView: some View {
+        MinimalNotchShape(cornerRadius: 16)
+            .fill(Color.black)
+            .frame(width: notchInfo.width, height: mediumExpandedHeight)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: mediumExpandedHeight)
+            .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+            .overlay(alignment: .top) { confettiEmitters }
+
+        if !notchState.activeProcesses.isEmpty {
+            VStack(alignment: .leading, spacing: mediumRowSpacing) {
+                ForEach(notchState.activeProcesses) { process in
+                    ProcessRow(
+                        process: process,
+                        isExpanded: isExpanded,
+                        logoSize: mediumLogoSize,
+                        progressBarHeight: mediumProgressBarHeight,
+                        onDismiss: { dismissedProcess in
+                            ProcessMonitor.shared.dismissProcess(dismissedProcess)
+                            notchState.recentlyDismissed.insert(dismissedProcess)
+                            notchState.activeProcesses.removeAll { $0 == dismissedProcess }
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, mediumHorizontalPadding)
+            .frame(width: notchInfo.width)
+            .offset(y: mediumTopPadding)
+            .opacity(isExpanded ? 1 : 0)
+            .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
+        }
+    }
+
+    /// Normal mode: Full size with icons and progress bars
+    @ViewBuilder
+    private var normalModeView: some View {
+        NotchShape()
+            .fill(Color.black)
+            .frame(width: notchWidth, height: expandedHeight)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedHeight)
+            .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+            .overlay(alignment: .top) { confettiEmitters }
+
+        if !notchState.activeProcesses.isEmpty {
+            VStack(alignment: .leading, spacing: rowSpacing) {
+                ForEach(notchState.activeProcesses) { process in
+                    ProcessRow(
+                        process: process,
+                        isExpanded: isExpanded,
+                        logoSize: logoSize,
+                        progressBarHeight: progressBarHeight,
+                        onDismiss: { dismissedProcess in
+                            ProcessMonitor.shared.dismissProcess(dismissedProcess)
+                            notchState.recentlyDismissed.insert(dismissedProcess)
+                            notchState.activeProcesses.removeAll { $0 == dismissedProcess }
+                        }
+                    )
+                }
+
+                if licenseManager.state == .expired {
+                    Text("Thanks for trying! Please upgrade")
+                        .font(.system(size: 10))
+                        .foregroundColor(.red)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 4)
+                }
+            }
+            .padding(.horizontal, horizontalPadding)
+            .frame(width: notchWidth)
+            .offset(y: topPadding)
+            .opacity(isExpanded ? 1 : 0)
+            .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
+        }
+    }
+
+    /// Shared confetti emitters for all modes
+    @ViewBuilder
+    private var confettiEmitters: some View {
+        ZStack {
+            ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
+            ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
+            ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
+            ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
+            ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
+            ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
+            ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
+            ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
+            ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
+            ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
+            ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
+            ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
+            ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
+            ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
+        }
+        .allowsHitTesting(false)
     }
 
     /// Starts the highlight animation that cycles through active process colors
