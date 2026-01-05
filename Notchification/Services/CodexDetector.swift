@@ -3,7 +3,9 @@
 //  Notchification
 //
 //  Color: #F9F9F9 (OpenAI light gray)
-//  Detects Codex CLI activity by looking for "Working" status in terminal
+//  Detects Codex CLI activity by looking for "Working" + "esc to interrupt" in terminal
+//
+//  Uses shared TerminalScanner for terminal reading.
 //
 
 import Foundation
@@ -14,7 +16,7 @@ import os.log
 private let logger = Logger(subsystem: "com.hoi.Notchification", category: "CodexDetector")
 
 /// Detects if Codex CLI is actively working
-/// Uses AppleScript to read terminal content
+/// Uses TerminalScanner to read terminal content
 final class CodexDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
@@ -42,16 +44,20 @@ final class CodexDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        // Dispatch to serial queue - ensures checks run one at a time, never overlap
         checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let isWorking = self.isCodexWorking()
+            let debug = DebugSettings.shared.debugCodex
 
             DispatchQueue.main.async {
                 if isWorking {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0
+
+                    if debug {
+                        print("🤖 Codex active: \(self.consecutiveActiveReadings)/\(self.requiredToShow)")
+                    }
 
                     if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
                         logger.info("🤖 Codex started working")
@@ -60,6 +66,10 @@ final class CodexDetector: ObservableObject, Detector {
                 } else {
                     self.consecutiveInactiveReadings += 1
                     self.consecutiveActiveReadings = 0
+
+                    if debug {
+                        print("🤖 Codex inactive: \(self.consecutiveInactiveReadings)/\(self.requiredToHide)")
+                    }
 
                     if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
                         logger.info("🤖 Codex finished working")
@@ -70,134 +80,38 @@ final class CodexDetector: ObservableObject, Detector {
         }
     }
 
-    /// Check if Codex is working by looking in terminal apps
+    /// Check if Codex is working by scanning terminal apps
     private func isCodexWorking() -> Bool {
-        if isCodexActiveInITerm2() {
-            return true
-        }
+        let debug = DebugSettings.shared.debugCodex
 
-        if isCodexActiveInTerminal() {
-            return true
+        // Codex uses 'text' (visible screen) - faster than scrollback
+        let scanner = TerminalScanner(
+            lineCount: 10,
+            scanAllSessions: true,  // Check all sessions for Codex
+            useiTermContents: false // Use 'text' (visible only) for speed
+        )
+
+        if let output = scanner.scan() {
+            if debug {
+                print("🤖 Codex: scanning terminals...")
+            }
+            return hasCodexPattern(in: output, scanner: scanner)
         }
 
         return false
     }
 
-    /// Use AppleScript to get iTerm2 terminal content
-    private func isCodexActiveInITerm2() -> Bool {
-        // Use 'text' (visible screen) instead of 'contents' (full scrollback) for speed
-        let script = """
-        tell application "iTerm2"
-            if not running then return "NOT_RUNNING"
-            set allContent to ""
-            repeat with w in windows
-                repeat with t in tabs of w
-                    repeat with s in sessions of t
-                        set allContent to allContent & "---SESSION---" & text of s
-                    end repeat
-                end repeat
-            end repeat
-            return allContent
-        end tell
-        """
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        task.arguments = ["-e", script]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        // Timeout after 2 seconds
-        let timeoutWork = DispatchWorkItem { [weak task] in
-            if task?.isRunning == true {
-                task?.terminate()
-            }
-        }
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-            timeoutWork.cancel()
-        } catch {
-            timeoutWork.cancel()
-            return false
-        }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              output != "NOT_RUNNING" else {
-            return false
-        }
-
-        return hasCodexPattern(in: output)
-    }
-
-    /// Use AppleScript to get Terminal.app content
-    private func isCodexActiveInTerminal() -> Bool {
-        // Note: Terminal.app uses 'history' property (no 'text' equivalent)
-        let script = """
-        tell application "Terminal"
-            if not running then return "NOT_RUNNING"
-            set allContent to ""
-            repeat with w in windows
-                repeat with t in tabs of w
-                    set allContent to allContent & "---TAB---" & history of t
-                end repeat
-            end repeat
-            return allContent
-        end tell
-        """
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        task.arguments = ["-e", script]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        // Timeout after 2 seconds
-        let timeoutWork = DispatchWorkItem { [weak task] in
-            if task?.isRunning == true {
-                task?.terminate()
-            }
-        }
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-            timeoutWork.cancel()
-        } catch {
-            timeoutWork.cancel()
-            return false
-        }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              output != "NOT_RUNNING" else {
-            return false
-        }
-
-        return hasCodexPattern(in: output)
-    }
-
-    /// Check if "Working" + "esc to interrupt" appears in the last 10 non-empty lines of ANY session
-    private func hasCodexPattern(in output: String) -> Bool {
-        let sessions = output.components(separatedBy: "---SESSION---") +
-                       output.components(separatedBy: "---TAB---")
+    /// Check if "Working" + "esc to interrupt" appears in the last 10 lines of any session
+    private func hasCodexPattern(in output: String, scanner: TerminalScanner) -> Bool {
+        let debug = DebugSettings.shared.debugCodex
+        let sessions = scanner.parseSessions(from: output)
 
         for session in sessions {
-            let lines = session.components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty }
-                .suffix(10)
-
-            for line in lines {
+            for line in session.lastLines {
                 if line.contains("Working") && line.contains("esc to interrupt") {
+                    if debug {
+                        print("🤖 MATCH: \(line.prefix(80))")
+                    }
                     return true
                 }
             }
