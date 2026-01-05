@@ -45,7 +45,9 @@ final class OpencodeDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
-    // Serial queue ensures checks don't overlap
+    // Serial queue ensures checks don't overlap.
+    // Without this, if a check takes longer than 1 second (the poll interval),
+    // multiple checks could run concurrently and cause stuck states.
     private let checkQueue = DispatchQueue(label: "com.notchification.opencode-check", qos: .utility)
 
     init() {
@@ -130,6 +132,9 @@ final class OpencodeDetector: ObservableObject, Detector {
             print("🟢 Opencode: GUI app not running")
         }
 
+        // Also check for CLI version in terminals.
+        // NOTE: This runs even when GUI isn't open, which uses some energy.
+        // If you only use GUI (not CLI), this could be optimized to skip.
         if debug {
             print("🟢 Opencode: checking CLI in terminals...")
         }

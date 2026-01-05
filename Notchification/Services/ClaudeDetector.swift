@@ -5,6 +5,28 @@
 //  Color: #D97757 (Claude orange)
 //  Detects Claude Code activity by looking for status indicators in terminal
 //
+//  ARCHITECTURE NOTES:
+//  -------------------
+//  1. Serial Queue: All detectors use a dedicated serial DispatchQueue instead of
+//     DispatchQueue.global(). This prevents overlapping checks - if a check takes
+//     longer than the 1-second poll interval, subsequent polls queue up rather than
+//     running concurrently (which caused stuck states).
+//
+//  2. Timeouts: AppleScript/osascript calls have a 2-second timeout. Without this,
+//     a hanging osascript would block the serial queue forever.
+//
+//  3. 'text' vs 'contents': For iTerm2, we use the 'text' property (visible screen)
+//     instead of 'contents' (full scrollback). 'contents' can take 2-3 seconds on
+//     large scrollbacks, while 'text' is instant. Since we only need the last 10
+//     lines to detect "esc to interrupt", visible screen is sufficient.
+//
+//  4. No System Events check: We removed "tell application System Events" checks
+//     like "if exists process X". These cause -1712 timeout errors when run from
+//     within the app. Instead, we use "if not running" directly in the app's tell block.
+//
+//  5. Consecutive readings: We require multiple consecutive readings before changing
+//     state. This prevents flickering from transient states.
+//
 
 import Foundation
 import Combine
@@ -27,7 +49,7 @@ final class ClaudeDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
-    // Serial queue ensures checks don't overlap (no need for checkInProgress flag)
+    // See ARCHITECTURE NOTES at top of file for why we use serial queue
     private let checkQueue = DispatchQueue(label: "com.notchification.claude-check", qos: .utility)
 
     init() {
