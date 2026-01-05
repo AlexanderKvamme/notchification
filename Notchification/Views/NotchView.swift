@@ -41,6 +41,7 @@ struct NotchView: View {
     @State private var installerConfettiTrigger: Int = 0
     @State private var appStoreConfettiTrigger: Int = 0
     @State private var automatorConfettiTrigger: Int = 0
+    @State private var scriptEditorConfettiTrigger: Int = 0
 
     // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
@@ -170,6 +171,7 @@ struct NotchView: View {
                             ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
                             ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
                             ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
+                            ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
                         }
                         .allowsHitTesting(false)
                     }
@@ -201,6 +203,7 @@ struct NotchView: View {
                             ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
                             ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
                             ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
+                            ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
                         }
                         .allowsHitTesting(false)
                     }
@@ -327,6 +330,8 @@ struct NotchView: View {
                         appStoreConfettiTrigger += 1
                     case .automator:
                         automatorConfettiTrigger += 1
+                    case .scriptEditor:
+                        scriptEditorConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -529,6 +534,8 @@ struct ProcessLogo: View {
             AppStoreLogo()
         case .automator:
             AutomatorLogo()
+        case .scriptEditor:
+            ScriptEditorLogo()
         }
     }
 }
@@ -824,6 +831,18 @@ struct AutomatorLogo: View {
         Text("A")
             .font(.system(size: 18, weight: .bold, design: .rounded))
             .foregroundColor(ProcessType.automator.color)
+    }
+}
+
+// MARK: - Script Editor Logo
+
+struct ScriptEditorLogo: View {
+    var body: some View {
+        Image("codeicon")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(.white)
     }
 }
 

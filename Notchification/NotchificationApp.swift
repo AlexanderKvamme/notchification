@@ -185,6 +185,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackAutomator: Bool {
         didSet { UserDefaults.standard.set(trackAutomator, forKey: "trackAutomator") }
     }
+    @Published var trackScriptEditor: Bool {
+        didSet { UserDefaults.standard.set(trackScriptEditor, forKey: "trackScriptEditor") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -206,6 +209,7 @@ final class TrackingSettings: ObservableObject {
         self.trackInstaller = UserDefaults.standard.object(forKey: "trackInstaller") as? Bool ?? true
         self.trackAppStore = UserDefaults.standard.object(forKey: "trackAppStore") as? Bool ?? true
         self.trackAutomator = UserDefaults.standard.object(forKey: "trackAutomator") as? Bool ?? true
+        self.trackScriptEditor = UserDefaults.standard.object(forKey: "trackScriptEditor") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }

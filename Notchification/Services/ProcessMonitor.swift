@@ -36,6 +36,7 @@ final class ProcessMonitor: ObservableObject {
     private let installerDetector = InstallerDetector()
     private let appStoreDetector = AppStoreDetector()
     private let automatorDetector = AutomatorDetector()
+    private let scriptEditorDetector = ScriptEditorDetector()
 
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
@@ -90,11 +91,11 @@ final class ProcessMonitor: ObservableObject {
         installerDetector.reset()
         appStoreDetector.reset()
         automatorDetector.reset()
+        scriptEditorDetector.reset()
     }
 
     /// Central tick - polls all enabled detectors
     private func tick() {
-        print("⏱️ TICK - trackAutomator=\(trackingSettings.trackAutomator)")
 
         // Poll each enabled detector
         if trackingSettings.trackClaude {
@@ -134,10 +135,10 @@ final class ProcessMonitor: ObservableObject {
             appStoreDetector.poll()
         }
         if trackingSettings.trackAutomator {
-            print("⏱️ TICK - calling automatorDetector.poll()")
             automatorDetector.poll()
-        } else {
-            print("⏱️ TICK - Automator tracking DISABLED, skipping")
+        }
+        if trackingSettings.trackScriptEditor {
+            scriptEditorDetector.poll()
         }
     }
 
@@ -204,6 +205,11 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         automatorDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        scriptEditorDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -325,6 +331,15 @@ final class ProcessMonitor: ObservableObject {
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackScriptEditor
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.scriptEditorDetector.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -372,6 +387,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackAutomator && automatorDetector.isActive {
             currentlyActive.insert(.automator)
+        }
+        if trackingSettings.trackScriptEditor && scriptEditorDetector.isActive {
+            currentlyActive.insert(.scriptEditor)
         }
 
         // Clear dismissed flag for processes that have finished (were active, now inactive)
