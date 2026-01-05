@@ -6,6 +6,7 @@
 import SwiftUI
 import Combine
 import Sparkle
+import ApplicationServices  // For AXIsProcessTrusted()
 
 /// Sparkle delegate that gates updates to licensed users only
 final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
@@ -70,6 +71,10 @@ final class DebugSettings: ObservableObject {
     @Published var debugCodex: Bool {
         didSet { UserDefaults.standard.set(debugCodex, forKey: "debugCodex") }
     }
+    /// When true, scans all terminal sessions. When false (default), only scans frontmost session (faster).
+    @Published var claudeScanAllSessions: Bool {
+        didSet { UserDefaults.standard.set(claudeScanAllSessions, forKey: "claudeScanAllSessions") }
+    }
 
     private init() {
         self.debugClaude = UserDefaults.standard.object(forKey: "debugClaude") as? Bool ?? false
@@ -78,6 +83,7 @@ final class DebugSettings: ObservableObject {
         self.debugFinder = UserDefaults.standard.object(forKey: "debugFinder") as? Bool ?? true
         self.debugOpencode = UserDefaults.standard.object(forKey: "debugOpencode") as? Bool ?? false
         self.debugCodex = UserDefaults.standard.object(forKey: "debugCodex") as? Bool ?? false
+        self.claudeScanAllSessions = UserDefaults.standard.object(forKey: "claudeScanAllSessions") as? Bool ?? false
     }
 }
 
@@ -341,6 +347,106 @@ enum MockProcessType: String, CaseIterable {
     }
 }
 
+/// Checks and prints permission status on launch (DEBUG only)
+/// NEVER REMOVE THIS - Essential for diagnosing detection issues
+enum PermissionsChecker {
+    /// Check all required permissions and print status
+    /// Called on app launch in DEBUG builds - runs on background queue to avoid blocking main thread
+    static func checkAndPrintPermissions() {
+        DispatchQueue.global(qos: .utility).async {
+            // Small delay to let app finish launching
+            Thread.sleep(forTimeInterval: 0.5)
+
+            print("""
+
+            ╔═══════════════════════════════════════════════════════════════╗
+            ║                    PERMISSIONS CHECK                          ║
+            ╚═══════════════════════════════════════════════════════════════╝
+            """)
+
+            // 1. Check Accessibility permission (must be on main thread)
+            var accessibilityEnabled = false
+            DispatchQueue.main.sync {
+                accessibilityEnabled = AXIsProcessTrusted()
+            }
+
+            if accessibilityEnabled {
+                print("✅ Accessibility: ENABLED")
+            } else {
+                print("❌ Accessibility: DISABLED")
+                print("   → Go to: System Settings > Privacy & Security > Accessibility")
+                print("   → Add and enable Notchification")
+            }
+
+            // 2. Check Automation permissions for terminal apps
+            print("")
+            checkAutomationPermission(for: "iTerm", bundleId: "com.googlecode.iterm2")
+            checkAutomationPermission(for: "Terminal", bundleId: "com.apple.Terminal")
+
+            print("""
+
+            ═══════════════════════════════════════════════════════════════
+            """)
+        }
+    }
+
+    /// Check if we have automation permission for a specific app
+    private static func checkAutomationPermission(for appName: String, bundleId: String) {
+        // Try to run a simple AppleScript to check if we have permission
+        let script = """
+        tell application "\(appName)"
+            if running then
+                return "RUNNING"
+            else
+                return "NOT_RUNNING"
+            end if
+        end tell
+        """
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        task.arguments = ["-e", script]
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        task.standardOutput = outputPipe
+        task.standardError = errorPipe
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+
+            if task.terminationStatus == 0 {
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+                if output == "RUNNING" {
+                    print("✅ Automation (\(appName)): ENABLED - app is running")
+                } else {
+                    print("✅ Automation (\(appName)): ENABLED - app not running")
+                }
+            } else if errorOutput.contains("not allowed") || errorOutput.contains("1743") {
+                // Error -1743 is "AppleEvent timed out" which often means permission denied
+                print("❌ Automation (\(appName)): DISABLED")
+                print("   → Go to: System Settings > Privacy & Security > Automation")
+                print("   → Enable Notchification → \(appName)")
+            } else if errorOutput.contains("Application isn't running") {
+                print("⚠️  Automation (\(appName)): Unknown - app not installed or can't check")
+            } else {
+                print("⚠️  Automation (\(appName)): Unknown (exit code \(task.terminationStatus))")
+                if !errorOutput.isEmpty {
+                    print("   Error: \(errorOutput.prefix(100))")
+                }
+            }
+        } catch {
+            print("⚠️  Automation (\(appName)): Could not check - \(error.localizedDescription)")
+        }
+    }
+}
+
 /// Main app state that coordinates monitoring and UI
 final class AppState: ObservableObject {
     @Published var isMonitoring: Bool = true
@@ -380,6 +486,9 @@ final class AppState: ObservableObject {
         ╚═══════════════════════════════════════════════════════════════════════════════╝
 
         """)
+
+        // DEBUG: Check permissions on launch (NEVER REMOVE THIS)
+        PermissionsChecker.checkAndPrintPermissions()
 
         // Load settings
         let savedMockType = UserDefaults.standard.string(forKey: "mockOnLaunchType") ?? "None"
@@ -580,7 +689,6 @@ final class AppState: ObservableObject {
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
     let updater: SPUUpdater
-    @ObservedObject var debugSettings = DebugSettings.shared
     @ObservedObject var trackingSettings = TrackingSettings.shared
     @ObservedObject var licenseManager = LicenseManager.shared
 
@@ -623,40 +731,6 @@ struct MenuBarView: View {
                 appState.runQuickMock()
             }
 
-            #if DEBUG
-            Divider()
-
-            Text("Mock on Launch").font(.caption).foregroundColor(.secondary)
-            Picker("Mock Type", selection: $appState.mockOnLaunchType) {
-                ForEach(MockProcessType.allCases, id: \.self) { type in
-                    Text(type.rawValue).tag(type)
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-            Toggle("Repeat", isOn: $appState.mockRepeat)
-
-            Divider()
-
-            Text("Debug Logging").font(.caption).foregroundColor(.secondary)
-            Toggle("Claude", isOn: $debugSettings.debugClaude)
-            Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
-            Toggle("Xcode", isOn: $debugSettings.debugXcode)
-            Toggle("Finder", isOn: $debugSettings.debugFinder)
-            Toggle("Opencode", isOn: $debugSettings.debugOpencode)
-            Toggle("Codex", isOn: $debugSettings.debugCodex)
-
-            Divider()
-
-            Text("License Debug").font(.caption).foregroundColor(.secondary)
-            Button("Reset Trial") {
-                licenseManager.resetTrial()
-            }
-            Button("Expire Trial") {
-                licenseManager.expireTrial()
-            }
-            #endif
-
             Divider()
 
             Button("License...") {
@@ -666,6 +740,12 @@ struct MenuBarView: View {
             Button("Settings...") {
                 SettingsWindowController.shared.showSettings()
             }
+
+            #if DEBUG
+            Button("Debug...") {
+                DebugWindowController.shared.showDebugPanel()
+            }
+            #endif
 
             Button("Send Feedback") {
                 let subject = "Notchification Feedback"

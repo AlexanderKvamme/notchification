@@ -15,10 +15,9 @@
 //  2. Timeouts: AppleScript/osascript calls have a 2-second timeout. Without this,
 //     a hanging osascript would block the serial queue forever.
 //
-//  3. 'text' vs 'contents': For iTerm2, we use the 'text' property (visible screen)
-//     instead of 'contents' (full scrollback). 'contents' can take 2-3 seconds on
-//     large scrollbacks, while 'text' is instant. Since we only need the last 10
-//     lines to detect "esc to interrupt", visible screen is sufficient.
+//  3. Last 500 chars only: We get 'contents' from iTerm2 but only keep the last 500
+//     characters per session. This avoids reading old scrollback and focuses on
+//     the actual bottom of the terminal where the Claude status bar appears.
 //
 //  4. No System Events check: We removed "tell application System Events" checks
 //     like "if exists process X". These cause -1712 timeout errors when run from
@@ -52,6 +51,18 @@ final class ClaudeDetector: ObservableObject, Detector {
     // See ARCHITECTURE NOTES at top of file for why we use serial queue
     private let checkQueue = DispatchQueue(label: "com.notchification.claude-check", qos: .utility)
 
+    // Prevents polls from queuing up if checks take longer than poll interval
+    private let checkLock = NSLock()
+    private var _isCheckInProgress = false
+    private var isCheckInProgress: Bool {
+        get { checkLock.lock(); defer { checkLock.unlock() }; return _isCheckInProgress }
+        set { checkLock.lock(); defer { checkLock.unlock() }; _isCheckInProgress = newValue }
+    }
+
+    // Search pattern built at runtime to avoid false positives when source code is shown in terminal
+    // The pattern indicates Claude Code is actively working (see Claude Code docs)
+    private let searchPattern = ["esc", "to", "interrupt"].joined(separator: " ")
+
     init() {
         logger.info("🔶 ClaudeDetector init")
     }
@@ -63,9 +74,14 @@ final class ClaudeDetector: ObservableObject, Detector {
     }
 
     func poll() {
+        // Skip if a check is already in progress - prevents queue buildup
+        guard !isCheckInProgress else { return }
+        isCheckInProgress = true
+
         // Dispatch to serial queue - ensures checks run one at a time, never overlap
         checkQueue.async { [weak self] in
             guard let self = self else { return }
+            defer { self.isCheckInProgress = false }
 
             let isWorking = self.isClaudeWorking()
             let debug = DebugSettings.shared.debugClaude
@@ -104,38 +120,80 @@ final class ClaudeDetector: ObservableObject, Detector {
 
     /// Check if Claude Code is working by looking in terminal apps
     private func isClaudeWorking() -> Bool {
+        let debug = DebugSettings.shared.debugClaude
+
         // Check iTerm2
-        if isClaudeActiveInITerm2() {
+        let iTermStart = CFAbsoluteTimeGetCurrent()
+        let iTermResult = isClaudeActiveInITerm2()
+        let iTermTime = (CFAbsoluteTimeGetCurrent() - iTermStart) * 1000
+
+        if debug {
+            print("🔶 iTerm2 check: \(String(format: "%.1f", iTermTime))ms")
+        }
+
+        if iTermResult {
             return true
         }
 
         // Check Terminal.app
-        if isClaudeActiveInTerminal() {
+        let terminalStart = CFAbsoluteTimeGetCurrent()
+        let terminalResult = isClaudeActiveInTerminal()
+        let terminalTime = (CFAbsoluteTimeGetCurrent() - terminalStart) * 1000
+
+        if debug {
+            print("🔶 Terminal check: \(String(format: "%.1f", terminalTime))ms")
+            print("🔶 Total check time: \(String(format: "%.1f", iTermTime + terminalTime))ms")
+        }
+
+        if terminalResult {
             return true
         }
 
         return false
     }
 
-    /// Use AppleScript to get iTerm2 terminal content
+    /// Use AppleScript to get iTerm2 terminal content - only the last 500 chars per session
     private func isClaudeActiveInITerm2() -> Bool {
-        // Use 'text' (visible screen) instead of 'contents' (full scrollback).
-        // 'contents' can take 2-3 seconds on large scrollbacks, while 'text' is instant.
-        // Since we only need the last 10 lines to detect "esc to interrupt", visible screen is sufficient.
-        let script = """
-        tell application "iTerm2"
-            if not running then return "NOT_RUNNING"
-            set allContent to ""
-            repeat with w in windows
-                repeat with t in tabs of w
-                    repeat with s in sessions of t
-                        set allContent to allContent & "---SESSION---" & text of s
+        let scanAll = DebugSettings.shared.claudeScanAllSessions
+
+        // Fast path: only check frontmost session (default)
+        // Slow path: check all sessions (when claudeScanAllSessions is enabled)
+        let script: String
+        if scanAll {
+            script = """
+            tell application "iTerm2"
+                if not running then return "NOT_RUNNING"
+                set allContent to ""
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        repeat with s in sessions of t
+                            set sessionText to contents of s
+                            set textLen to length of sessionText
+                            if textLen > 500 then
+                                set sessionText to text (textLen - 499) thru textLen of sessionText
+                            end if
+                            set allContent to allContent & "---SESSION---" & sessionText
+                        end repeat
                     end repeat
                 end repeat
-            end repeat
-            return allContent
-        end tell
-        """
+                return allContent
+            end tell
+            """
+        } else {
+            // Fast: only frontmost session
+            script = """
+            tell application "iTerm2"
+                if not running then return "NOT_RUNNING"
+                if (count of windows) = 0 then return "NO_WINDOWS"
+                set sessionText to contents of current session of current window
+                set textLen to length of sessionText
+                if textLen > 500 then
+                    set sessionText to text (textLen - 499) thru textLen of sessionText
+                end if
+                return "---SESSION---" & sessionText
+            end tell
+            """
+        }
 
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -171,21 +229,46 @@ final class ClaudeDetector: ObservableObject, Detector {
         return hasClaudePattern(in: output)
     }
 
-    /// Use AppleScript to get Terminal.app content
+    /// Use AppleScript to get Terminal.app content - only the last 500 chars per tab
     private func isClaudeActiveInTerminal() -> Bool {
-        // Skip System Events check - it causes timeouts
-        let script = """
-        tell application "Terminal"
-            if not running then return "NOT_RUNNING"
-            set allContent to ""
-            repeat with w in windows
-                repeat with t in tabs of w
-                    set allContent to allContent & "---TAB---" & history of t
+        let scanAll = DebugSettings.shared.claudeScanAllSessions
+
+        // Fast path: only check frontmost tab (default)
+        // Slow path: check all tabs (when claudeScanAllSessions is enabled)
+        let script: String
+        if scanAll {
+            script = """
+            tell application "Terminal"
+                if not running then return "NOT_RUNNING"
+                set allContent to ""
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        set tabText to history of t
+                        set textLen to length of tabText
+                        if textLen > 500 then
+                            set tabText to text (textLen - 499) thru textLen of tabText
+                        end if
+                        set allContent to allContent & "---TAB---" & tabText
+                    end repeat
                 end repeat
-            end repeat
-            return allContent
-        end tell
-        """
+                return allContent
+            end tell
+            """
+        } else {
+            // Fast: only frontmost tab
+            script = """
+            tell application "Terminal"
+                if not running then return "NOT_RUNNING"
+                if (count of windows) = 0 then return "NO_WINDOWS"
+                set tabText to history of selected tab of front window
+                set textLen to length of tabText
+                if textLen > 500 then
+                    set tabText to text (textLen - 499) thru textLen of tabText
+                end if
+                return "---TAB---" & tabText
+            end tell
+            """
+        }
 
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -221,28 +304,67 @@ final class ClaudeDetector: ObservableObject, Detector {
         return hasClaudePattern(in: output)
     }
 
-    /// Check if "esc to interrupt" appears in the last 10 non-empty lines of ANY session
+    /// Check if the Claude status indicator appears in the last 5 non-empty lines of ANY session
+    /// Looks for the pattern: [esc] + [to] + [interrupt] to detect active Claude Code
+    /// DEBUG NOTE: Never remove the debug prints below - they are essential for diagnosing issues
     private func hasClaudePattern(in output: String) -> Bool {
-        // Split by session/tab separator and check each one
-        let sessions = output.components(separatedBy: "---SESSION---") +
-                       output.components(separatedBy: "---TAB---")
+        let debug = DebugSettings.shared.debugClaude
 
-        for session in sessions {
-            // Get last 10 non-empty lines of this session
+        // Split by session/tab separator and check each one
+        // Note: We split by both separators separately, then combine (excluding empty first elements)
+        var sessions: [String] = []
+        let sessionSplit = output.components(separatedBy: "---SESSION---").filter { !$0.isEmpty }
+        let tabSplit = output.components(separatedBy: "---TAB---").filter { !$0.isEmpty }
+        sessions.append(contentsOf: sessionSplit)
+        sessions.append(contentsOf: tabSplit)
+
+        if debug {
+            print("🔶 ═══════════════════════════════════════════════════")
+            print("🔶 Searching for pattern: '\(searchPattern)'")
+            print("🔶 Total sessions found: \(sessions.count)")
+            print("🔶 Raw output length: \(output.count) chars")
+        }
+
+        for (sessionIndex, session) in sessions.enumerated() {
+            // Skip empty sessions
+            guard !session.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+
+            // Get last 5 non-empty lines of this session (Claude status bar is at the very bottom)
             let lines = session.components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-                .suffix(10)
 
-            for line in lines {
-                if line.contains("esc to interrupt") {
-                    // NOTE: Keep this debug output - helps diagnose detection issues
-                    if DebugSettings.shared.debugClaude {
-                        print("🔶 Claude FOUND: \(line.prefix(100))")
-                    }
-                    return true
+            let last5 = Array(lines.suffix(5))
+
+            // Check if pattern exists in this session's last 5 lines only
+            var foundInSession = false
+            var foundLine = ""
+            for line in last5 {
+                if line.contains(searchPattern) {
+                    foundInSession = true
+                    foundLine = line
+                    break
                 }
             }
+
+            // DEBUG: Print session info (NEVER REMOVE THIS)
+            if debug && !last5.isEmpty {
+                let status = foundInSession ? "⚡ MATCH" : "✗ No match"
+                print("🔶 [Session \(sessionIndex)] \(status) | Total lines: \(lines.count) | Last 5:")
+                for (i, line) in last5.enumerated() {
+                    let marker = line.contains(searchPattern) ? ">>>" : "   "
+                    print("🔶 \(marker) [\(i+1)] \(line.prefix(100))")
+                }
+            }
+
+            if foundInSession {
+                return true
+            }
+        }
+
+        // DEBUG: Log when no pattern found (NEVER REMOVE THIS)
+        if debug {
+            print("🔶 No match found in any session")
         }
 
         return false

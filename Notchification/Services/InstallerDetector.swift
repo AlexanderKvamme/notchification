@@ -74,17 +74,18 @@ final class InstallerDetector: ObservableObject, Detector {
     /// Check if Installer.app has a busy or progress indicator visible (installation in progress)
     /// Note: System Events is required to check UI elements
     private func hasProgressBar() -> Bool {
+        // Search for any progress indicator anywhere in the Installer window
         let script = """
         tell application "System Events"
             tell process "Installer"
-                try
-                    set busyExists to exists (busy indicator 1 of group 1 of group 1 of window 1)
-                    if busyExists then return "BUSY"
-                end try
-                try
-                    set progressExists to exists (progress indicator 1 of group 1 of group 1 of window 1)
-                    if progressExists then return "PROGRESS"
-                end try
+                if not (exists window 1) then return "NONE"
+                set allElements to entire contents of window 1
+                repeat with elem in allElements
+                    set elemClass to class of elem as string
+                    if elemClass contains "progress indicator" or elemClass contains "busy indicator" then
+                        return "PROGRESS"
+                    end if
+                end repeat
                 return "NONE"
             end tell
         end tell
