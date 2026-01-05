@@ -69,16 +69,6 @@ struct NotchView: View {
         return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
-    // Height of the interactive area for mouse tracking (matches NotchMouseTracker)
-    private var interactiveHeight: CGFloat {
-        // Minimum height when no processes, expands with content
-        let baseHeight: CGFloat = 50  // Base notch area height
-        if notchState.activeProcesses.isEmpty {
-            return baseHeight
-        }
-        return max(baseHeight, expandedHeight + 20)  // Extra padding for easier clicking
-    }
-
     /// Base color for minimal mode - first active process color
     private var baseStrokeColor: Color {
         notchState.activeProcesses.first?.color ?? .white
@@ -254,15 +244,6 @@ struct NotchView: View {
             }
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .top)
-        #if DEBUG
-        // Debug overlay showing the interactive click area (matches NotchMouseTracker)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .stroke(Color.red, lineWidth: 2)
-                .frame(width: 320, height: interactiveHeight)
-                .allowsHitTesting(false)
-        }
-        #endif
         .drawingGroup()  // GPU acceleration for smoother animations
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
             if styleSettings.minimalStyle {

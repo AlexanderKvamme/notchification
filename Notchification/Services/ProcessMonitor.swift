@@ -311,6 +311,9 @@ final class ProcessMonitor: ObservableObject {
 
         if trackingSettings.trackClaude && claudeDetector.isActive {
             currentlyActive.insert(.claude)
+            if DebugSettings.shared.debugClaude {
+                logger.debug("🔶 Claude detector isActive=true, adding to currentlyActive")
+            }
         }
         if trackingSettings.trackAndroidStudio && androidStudioDetector.isActive {
             currentlyActive.insert(.androidStudio)
@@ -359,6 +362,17 @@ final class ProcessMonitor: ObservableObject {
         // Filter out dismissed processes for the UI
         let visibleProcesses = currentlyActive.subtracting(dismissedProcesses)
         activeProcesses = Array(visibleProcesses).sorted { $0.rawValue < $1.rawValue }
+
+        // Debug: Show what's happening with Claude
+        if DebugSettings.shared.debugClaude {
+            if currentlyActive.contains(.claude) {
+                if dismissedProcesses.contains(.claude) {
+                    logger.debug("🔶 Claude is DISMISSED - not showing (will reappear after Claude finishes)")
+                } else {
+                    logger.debug("🔶 Claude visible in UI, activeProcesses count: \(self.activeProcesses.count)")
+                }
+            }
+        }
     }
 
     deinit {
