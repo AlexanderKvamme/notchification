@@ -20,6 +20,8 @@ struct NotchView: View {
     // Animation state
     @State private var isExpanded: Bool = false
     @State private var previousProcesses: Set<ProcessType> = []
+    @State private var strokeProgress: CGFloat = 0  // For minimal mode stroke animation
+    @State private var gradientPhase: CGFloat = 0  // For animated gradient along stroke
 
     // Separate confetti triggers for each process type
     @State private var claudeConfettiTrigger: Int = 0
@@ -59,32 +61,45 @@ struct NotchView: View {
         return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
-    /// Gradient from active process colors for minimal mode
-    private var processGradient: AngularGradient {
-        let colors = notchState.activeProcesses.map { $0.color }
-        // If only one color, duplicate it to avoid gradient issues
-        let gradientColors = colors.count == 1 ? [colors[0], colors[0]] : colors
-        return AngularGradient(
-            colors: gradientColors,
-            center: .center,
-            startAngle: .degrees(0),
-            endAngle: .degrees(360)
-        )
+    /// Animated gradient for minimal mode stroke
+    /// Single process: base color + white shimmer
+    /// Multiple processes: rotating gradient of all colors
+    private var animatedStrokeGradient: LinearGradient {
+        let processes = notchState.activeProcesses
+
+        if processes.count <= 1 {
+            // Single process: color -> white -> color (shimmer effect)
+            let baseColor = processes.first?.color ?? .white
+            return LinearGradient(
+                colors: [baseColor, baseColor.opacity(0.7), .white, baseColor.opacity(0.7), baseColor],
+                startPoint: UnitPoint(x: gradientPhase - 0.5, y: 0),
+                endPoint: UnitPoint(x: gradientPhase + 0.5, y: 1)
+            )
+        } else {
+            // Multiple processes: flowing gradient of all colors
+            var colors = processes.map { $0.color }
+            colors.append(colors.first ?? .white)  // Loop back to first color
+            return LinearGradient(
+                colors: colors,
+                startPoint: UnitPoint(x: gradientPhase - 0.5, y: 0),
+                endPoint: UnitPoint(x: gradientPhase + 0.5, y: 1)
+            )
+        }
     }
 
     var body: some View {
         ZStack(alignment: .top) {
             if styleSettings.minimalStyle {
-                // MINIMAL MODE: Simple rounded rectangle matching the physical Mac notch
+                // MINIMAL MODE: Animated gradient stroke around the notch
                 // Uses real notch dimensions from NSScreen APIs
                 MinimalNotchShape(cornerRadius: 13)
-                    .stroke(processGradient, lineWidth: 4)
-                    .frame(width: notchInfo.width, height: notchInfo.height)
-                    .scaleEffect(
-                        x: isExpanded ? 1 : 0.3,
-                        y: isExpanded ? 1 : 0,
-                        anchor: .top
+                    .trim(from: 1 - strokeProgress, to: 1)
+                    .stroke(
+                        animatedStrokeGradient,
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
                     )
+                    .frame(width: notchInfo.width, height: notchInfo.height)
+                    .opacity(isExpanded ? 1 : 0)
                     .overlay(alignment: .top) {
                         // Confetti still works in minimal mode
                         ZStack {
@@ -177,11 +192,32 @@ struct NotchView: View {
         .frame(width: screenWidth, height: screenHeight, alignment: .top)
         .drawingGroup()  // GPU acceleration for smoother animations
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
-            let animation: Animation = isEmpty
-                ? .easeOut(duration: 0.3)  // Smooth close
-                : .spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)  // Bouncy open
-            withAnimation(animation) {
-                isExpanded = !isEmpty
+            if styleSettings.minimalStyle {
+                // Minimal mode: animate stroke drawing around the notch
+                if isEmpty {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        strokeProgress = 0
+                        gradientPhase = 0
+                        isExpanded = false
+                    }
+                } else {
+                    isExpanded = true
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        strokeProgress = 1
+                    }
+                    // Start gradient animation after stroke completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        startGradientAnimation()
+                    }
+                }
+            } else {
+                // Normal mode: bouncy scale animation
+                let animation: Animation = isEmpty
+                    ? .easeOut(duration: 0.3)
+                    : .spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)
+                withAnimation(animation) {
+                    isExpanded = !isEmpty
+                }
             }
         }
         .onChange(of: notchState.activeProcesses) { oldValue, newValue in
@@ -236,11 +272,33 @@ struct NotchView: View {
         .onAppear {
             previousProcesses = Set(notchState.activeProcesses)
             if !notchState.activeProcesses.isEmpty {
-                // Use withAnimation for explicit control
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)) {
+                if styleSettings.minimalStyle {
+                    // Minimal mode: animate stroke drawing
                     isExpanded = true
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        strokeProgress = 1
+                    }
+                    // Start gradient animation after stroke completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        startGradientAnimation()
+                    }
+                } else {
+                    // Normal mode: bouncy scale
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)) {
+                        isExpanded = true
+                    }
                 }
             }
+        }
+    }
+
+    /// Starts the continuous gradient animation for minimal mode
+    private func startGradientAnimation() {
+        guard isExpanded && styleSettings.minimalStyle else { return }
+
+        // Animate gradient phase continuously
+        withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+            gradientPhase = 2.0
         }
     }
 }

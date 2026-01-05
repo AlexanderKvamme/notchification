@@ -285,6 +285,7 @@ enum MockProcessType: String, CaseIterable {
     case icloud = "iCloud"
     case installer = "Installer"
     case appStore = "App Store"
+    case claudeAndFinder = "Claude + Finder"
     case all = "All"
 
     var processType: ProcessType? {
@@ -302,6 +303,7 @@ enum MockProcessType: String, CaseIterable {
         case .icloud: return .icloud
         case .installer: return .installer
         case .appStore: return .appStore
+        case .claudeAndFinder: return nil // Handled specially
         case .all: return nil // Handled specially
         }
     }
@@ -390,6 +392,12 @@ final class AppState: ObservableObject {
             return
         }
 
+        // Handle "Claude + Finder" mock type
+        if mockOnLaunchType == .claudeAndFinder {
+            runClaudeAndFinderMock()
+            return
+        }
+
         guard let processType = mockOnLaunchType.processType else {
             startMonitoring()
             return
@@ -400,6 +408,18 @@ final class AppState: ObservableObject {
 
         // Hide after 5 seconds and start monitoring
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            self?.windowController.update(with: [])
+            self?.isMocking = false
+            self?.startMonitoring()
+        }
+    }
+
+    private func runClaudeAndFinderMock() {
+        isMocking = true
+        windowController.update(with: [.claude, .finder])
+
+        // Keep showing for 10 seconds then hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
             self?.windowController.update(with: [])
             self?.isMocking = false
             self?.startMonitoring()
