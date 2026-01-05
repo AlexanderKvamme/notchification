@@ -40,9 +40,9 @@ final class ClaudeDetector: ObservableObject, Detector {
 
     let processType: ProcessType = .claude
 
-    // Consecutive readings required
+    // Consecutive readings required (1 = instant, no delay)
     private let requiredToShow: Int = 1
-    private let requiredToHide: Int = 3
+    private let requiredToHide: Int = 1
 
     // Counters
     private var consecutiveActiveReadings: Int = 0
@@ -59,9 +59,9 @@ final class ClaudeDetector: ObservableObject, Detector {
         set { checkLock.lock(); defer { checkLock.unlock() }; _isCheckInProgress = newValue }
     }
 
-    // Search pattern built at runtime to avoid false positives when source code is shown in terminal
-    // The pattern indicates Claude Code is actively working (see Claude Code docs)
-    private let searchPattern = ["esc", "to", "interrupt"].joined(separator: " ")
+    // Search patterns built at runtime to avoid false positives when source code is shown in terminal
+    // These patterns indicate Claude Code is actively working (see Claude Code docs)
+    private let escPattern = ["esc", "to", "interrupt"].joined(separator: " ")
 
     init() {
         logger.info("🔶 ClaudeDetector init")
@@ -305,66 +305,44 @@ final class ClaudeDetector: ObservableObject, Detector {
     }
 
     /// Check if the Claude status indicator appears in the last 5 non-empty lines of ANY session
-    /// Looks for the pattern: [esc] + [to] + [interrupt] to detect active Claude Code
+    /// Looks for patterns: "esc to interrupt" OR "accept edits on"
     /// DEBUG NOTE: Never remove the debug prints below - they are essential for diagnosing issues
     private func hasClaudePattern(in output: String) -> Bool {
         let debug = DebugSettings.shared.debugClaude
 
         // Split by session/tab separator and check each one
-        // Note: We split by both separators separately, then combine (excluding empty first elements)
         var sessions: [String] = []
         let sessionSplit = output.components(separatedBy: "---SESSION---").filter { !$0.isEmpty }
         let tabSplit = output.components(separatedBy: "---TAB---").filter { !$0.isEmpty }
         sessions.append(contentsOf: sessionSplit)
         sessions.append(contentsOf: tabSplit)
 
-        if debug {
-            print("🔶 ═══════════════════════════════════════════════════")
-            print("🔶 Searching for pattern: '\(searchPattern)'")
-            print("🔶 Total sessions found: \(sessions.count)")
-            print("🔶 Raw output length: \(output.count) chars")
-        }
-
-        for (sessionIndex, session) in sessions.enumerated() {
-            // Skip empty sessions
+        for session in sessions {
             guard !session.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
 
-            // Get last 5 non-empty lines of this session (Claude status bar is at the very bottom)
             let lines = session.components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
 
             let last5 = Array(lines.suffix(5))
 
-            // Check if pattern exists in this session's last 5 lines only
-            var foundInSession = false
-            var foundLine = ""
             for line in last5 {
-                if line.contains(searchPattern) {
-                    foundInSession = true
-                    foundLine = line
-                    break
-                }
-            }
+                let hasEsc = line.contains(escPattern)
 
-            // DEBUG: Print session info (NEVER REMOVE THIS)
-            if debug && !last5.isEmpty {
-                let status = foundInSession ? "⚡ MATCH" : "✗ No match"
-                print("🔶 [Session \(sessionIndex)] \(status) | Total lines: \(lines.count) | Last 5:")
-                for (i, line) in last5.enumerated() {
-                    let marker = line.contains(searchPattern) ? ">>>" : "   "
-                    print("🔶 \(marker) [\(i+1)] \(line.prefix(100))")
+                if hasEsc {
+                    // DEBUG: Only print matching lines (NEVER REMOVE THIS)
+                    if debug {
+                        let pattern = hasEsc ? "esc" : "accept"
+                        print("🔶 MATCH (\(pattern)): \(line.prefix(80))")
+                    }
+                    return true
                 }
-            }
-
-            if foundInSession {
-                return true
             }
         }
 
         // DEBUG: Log when no pattern found (NEVER REMOVE THIS)
         if debug {
-            print("🔶 No match found in any session")
+            print("🔶 No match")
         }
 
         return false

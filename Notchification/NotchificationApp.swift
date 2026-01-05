@@ -46,8 +46,51 @@ struct NotchificationApp: App {
         MenuBarExtra("Notchification", systemImage: "bell.badge") {
             MenuBarView(appState: appState, updater: updaterController.updater)
         }
+
+        #if DEBUG
+        MenuBarExtra("Debug", systemImage: "ladybug") {
+            DebugMenuView(appState: appState)
+        }
+        #endif
     }
 }
+
+#if DEBUG
+struct DebugMenuView: View {
+    @ObservedObject var appState: AppState
+    @ObservedObject var debugSettings = DebugSettings.shared
+    @ObservedObject var licenseManager = LicenseManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("Mock on Launch").font(.caption).foregroundColor(.secondary)
+            Picker("Mock Type", selection: $appState.mockOnLaunchType) {
+                ForEach(MockProcessType.allCases, id: \.self) { type in
+                    Text(type.rawValue).tag(type)
+                }
+            }
+            .labelsHidden()
+            Toggle("Repeat", isOn: $appState.mockRepeat)
+
+            Divider()
+
+            Text("Debug Logging").font(.caption).foregroundColor(.secondary)
+            Toggle("Claude", isOn: $debugSettings.debugClaude)
+            Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
+            Toggle("Xcode", isOn: $debugSettings.debugXcode)
+            Toggle("Finder", isOn: $debugSettings.debugFinder)
+            Toggle("Opencode", isOn: $debugSettings.debugOpencode)
+            Toggle("Codex", isOn: $debugSettings.debugCodex)
+
+            Divider()
+
+            Text("License").font(.caption).foregroundColor(.secondary)
+            Button("Reset Trial") { licenseManager.resetTrial() }
+            Button("Expire Trial") { licenseManager.expireTrial() }
+        }
+    }
+}
+#endif
 
 /// Debug settings
 final class DebugSettings: ObservableObject {
@@ -740,12 +783,6 @@ struct MenuBarView: View {
             Button("Settings...") {
                 SettingsWindowController.shared.showSettings()
             }
-
-            #if DEBUG
-            Button("Debug...") {
-                DebugWindowController.shared.showDebugPanel()
-            }
-            #endif
 
             Button("Send Feedback") {
                 let subject = "Notchification Feedback"

@@ -38,15 +38,20 @@ struct DisplaySettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Picker("Screen:", selection: $styleSettings.selectedScreenIndex) {
-                    Text("Main Screen").tag(-1)
-                    ForEach(Array(availableScreens.enumerated()), id: \.offset) { index, screen in
-                        Text(screenName(for: screen, at: index)).tag(index)
+                if availableScreens.count > 1 {
+                    Picker("Screen:", selection: $styleSettings.selectedScreenIndex) {
+                        Text("Main Screen").tag(-1)
+                        ForEach(Array(availableScreens.enumerated()), id: \.offset) { index, screen in
+                            Text(screenName(for: screen, at: index)).tag(index)
+                        }
                     }
+                    Text("Select which screen to show the notch indicator on")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Screen: Built-in Display")
+                        .foregroundColor(.secondary)
                 }
-                Text("Select which screen to show the notch indicator on")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
 
             Section {
