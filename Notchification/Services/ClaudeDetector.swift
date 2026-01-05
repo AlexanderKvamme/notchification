@@ -15,9 +15,10 @@
 //  2. Timeouts: AppleScript/osascript calls have a 2-second timeout. Without this,
 //     a hanging osascript would block the serial queue forever.
 //
-//  3. Last 500 chars only: We get 'contents' from iTerm2 but only keep the last 500
-//     characters per session. This avoids reading old scrollback and focuses on
+//  3. Last 20 lines only: We get 'contents' from iTerm2 but only keep the last 20
+//     lines per session. This avoids reading old scrollback and focuses on
 //     the actual bottom of the terminal where the Claude status bar appears.
+//     Using lines instead of characters avoids separator lines (────) eating up the limit.
 //
 //  4. No System Events check: We removed "tell application System Events" checks
 //     like "if exists process X". These cause -1712 timeout errors when run from
@@ -59,8 +60,8 @@ final class ClaudeDetector: ObservableObject, Detector {
         set { checkLock.lock(); defer { checkLock.unlock() }; _isCheckInProgress = newValue }
     }
 
-    // Search patterns built at runtime to avoid false positives when source code is shown in terminal
-    // These patterns indicate Claude Code is actively working (see Claude Code docs)
+    // Search pattern built at runtime to avoid false positives when source code is shown in terminal
+    // This pattern indicates Claude Code is actively working (see Claude Code docs)
     private let escPattern = ["esc", "to", "interrupt"].joined(separator: " ")
 
     init() {
@@ -152,12 +153,14 @@ final class ClaudeDetector: ObservableObject, Detector {
         return false
     }
 
-    /// Use AppleScript to get iTerm2 terminal content - only the last 500 chars per session
+    /// Use AppleScript to get iTerm2 terminal content - only the last 20 lines per session
     private func isClaudeActiveInITerm2() -> Bool {
         let scanAll = DebugSettings.shared.claudeScanAllSessions
 
         // Fast path: only check frontmost session (default)
         // Slow path: check all sessions (when claudeScanAllSessions is enabled)
+        // NOTE: We get the last 20 lines instead of last N characters to avoid
+        // separator lines (────) eating up the limit
         let script: String
         if scanAll {
             script = """
@@ -168,10 +171,14 @@ final class ClaudeDetector: ObservableObject, Detector {
                     repeat with t in tabs of w
                         repeat with s in sessions of t
                             set sessionText to contents of s
-                            set textLen to length of sessionText
-                            if textLen > 500 then
-                                set sessionText to text (textLen - 499) thru textLen of sessionText
+                            set lineList to paragraphs of sessionText
+                            set lineCount to count of lineList
+                            if lineCount > 20 then
+                                set lineList to items (lineCount - 19) thru lineCount of lineList
                             end if
+                            set AppleScript's text item delimiters to linefeed
+                            set sessionText to lineList as text
+                            set AppleScript's text item delimiters to ""
                             set allContent to allContent & "---SESSION---" & sessionText
                         end repeat
                     end repeat
@@ -186,10 +193,14 @@ final class ClaudeDetector: ObservableObject, Detector {
                 if not running then return "NOT_RUNNING"
                 if (count of windows) = 0 then return "NO_WINDOWS"
                 set sessionText to contents of current session of current window
-                set textLen to length of sessionText
-                if textLen > 500 then
-                    set sessionText to text (textLen - 499) thru textLen of sessionText
+                set lineList to paragraphs of sessionText
+                set lineCount to count of lineList
+                if lineCount > 20 then
+                    set lineList to items (lineCount - 19) thru lineCount of lineList
                 end if
+                set AppleScript's text item delimiters to linefeed
+                set sessionText to lineList as text
+                set AppleScript's text item delimiters to ""
                 return "---SESSION---" & sessionText
             end tell
             """
@@ -229,12 +240,14 @@ final class ClaudeDetector: ObservableObject, Detector {
         return hasClaudePattern(in: output)
     }
 
-    /// Use AppleScript to get Terminal.app content - only the last 500 chars per tab
+    /// Use AppleScript to get Terminal.app content - only the last 20 lines per tab
     private func isClaudeActiveInTerminal() -> Bool {
         let scanAll = DebugSettings.shared.claudeScanAllSessions
 
         // Fast path: only check frontmost tab (default)
         // Slow path: check all tabs (when claudeScanAllSessions is enabled)
+        // NOTE: We get the last 20 lines instead of last N characters to avoid
+        // separator lines (────) eating up the limit
         let script: String
         if scanAll {
             script = """
@@ -244,10 +257,14 @@ final class ClaudeDetector: ObservableObject, Detector {
                 repeat with w in windows
                     repeat with t in tabs of w
                         set tabText to history of t
-                        set textLen to length of tabText
-                        if textLen > 500 then
-                            set tabText to text (textLen - 499) thru textLen of tabText
+                        set lineList to paragraphs of tabText
+                        set lineCount to count of lineList
+                        if lineCount > 20 then
+                            set lineList to items (lineCount - 19) thru lineCount of lineList
                         end if
+                        set AppleScript's text item delimiters to linefeed
+                        set tabText to lineList as text
+                        set AppleScript's text item delimiters to ""
                         set allContent to allContent & "---TAB---" & tabText
                     end repeat
                 end repeat
@@ -261,10 +278,14 @@ final class ClaudeDetector: ObservableObject, Detector {
                 if not running then return "NOT_RUNNING"
                 if (count of windows) = 0 then return "NO_WINDOWS"
                 set tabText to history of selected tab of front window
-                set textLen to length of tabText
-                if textLen > 500 then
-                    set tabText to text (textLen - 499) thru textLen of tabText
+                set lineList to paragraphs of tabText
+                set lineCount to count of lineList
+                if lineCount > 20 then
+                    set lineList to items (lineCount - 19) thru lineCount of lineList
                 end if
+                set AppleScript's text item delimiters to linefeed
+                set tabText to lineList as text
+                set AppleScript's text item delimiters to ""
                 return "---TAB---" & tabText
             end tell
             """
@@ -310,12 +331,16 @@ final class ClaudeDetector: ObservableObject, Detector {
     private func hasClaudePattern(in output: String) -> Bool {
         let debug = DebugSettings.shared.debugClaude
 
-        // Split by session/tab separator and check each one
-        var sessions: [String] = []
-        let sessionSplit = output.components(separatedBy: "---SESSION---").filter { !$0.isEmpty }
-        let tabSplit = output.components(separatedBy: "---TAB---").filter { !$0.isEmpty }
-        sessions.append(contentsOf: sessionSplit)
-        sessions.append(contentsOf: tabSplit)
+        // Split by session/tab separator - use SESSION for iTerm2, TAB for Terminal.app
+        let sessions: [String]
+        if output.contains("---SESSION---") {
+            sessions = output.components(separatedBy: "---SESSION---").filter { !$0.isEmpty }
+        } else if output.contains("---TAB---") {
+            sessions = output.components(separatedBy: "---TAB---").filter { !$0.isEmpty }
+        } else {
+            // No separator found - treat entire output as one session
+            sessions = [output]
+        }
 
         for session in sessions {
             guard !session.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
@@ -326,14 +351,18 @@ final class ClaudeDetector: ObservableObject, Detector {
 
             let last5 = Array(lines.suffix(5))
 
-            for line in last5 {
-                let hasEsc = line.contains(escPattern)
+            // DEBUG: Print last 5 lines (NEVER REMOVE THIS)
+            if debug {
+                print("🔶 Last 5 lines:")
+                for (i, line) in last5.enumerated() {
+                    print("🔶   [\(i+1)] \(line.prefix(80))")
+                }
+            }
 
-                if hasEsc {
-                    // DEBUG: Only print matching lines (NEVER REMOVE THIS)
+            for line in last5 {
+                if line.contains(escPattern) {
                     if debug {
-                        let pattern = hasEsc ? "esc" : "accept"
-                        print("🔶 MATCH (\(pattern)): \(line.prefix(80))")
+                        print("🔶 MATCH: \(line.prefix(80))")
                     }
                     return true
                 }
