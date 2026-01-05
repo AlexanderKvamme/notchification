@@ -18,6 +18,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case icloud = "icloud"
     case installer = "installer"
     case appStore = "appstore"
+    case automator = "automator"
 
     var id: String { rawValue }
 
@@ -35,6 +36,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .icloud: return "iCloud"
         case .installer: return "Installer"
         case .appStore: return "App Store"
+        case .automator: return "Automator"
         }
     }
 
@@ -52,6 +54,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .icloud: return Color(red: 0.2, green: 0.6, blue: 1.0) // iCloud blue
         case .installer: return Color(red: 0.6, green: 0.4, blue: 0.8) // Purple for system installer
         case .appStore: return Color(red: 0.0, green: 0.48, blue: 1.0) // #007AFF App Store blue
+        case .automator: return Color(red: 0.75, green: 0.75, blue: 0.78) // Light gray like Automator robot
         }
     }
 
@@ -69,6 +72,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .icloud: return Color(red: 0.5, green: 0.8, blue: 1.0) // Lighter iCloud blue
         case .installer: return Color(red: 0.75, green: 0.55, blue: 0.9) // Lighter purple
         case .appStore: return Color(red: 0.4, green: 0.7, blue: 1.0) // Lighter App Store blue
+        case .automator: return .white // White wave on gray base
         }
     }
 
@@ -86,6 +90,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .icloud: return .solid
         case .installer: return .solid
         case .appStore: return .solid
+        case .automator: return .solid
         }
     }
 }

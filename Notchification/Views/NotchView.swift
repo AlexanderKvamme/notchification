@@ -40,6 +40,7 @@ struct NotchView: View {
     @State private var icloudConfettiTrigger: Int = 0
     @State private var installerConfettiTrigger: Int = 0
     @State private var appStoreConfettiTrigger: Int = 0
+    @State private var automatorConfettiTrigger: Int = 0
 
     // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
@@ -168,6 +169,7 @@ struct NotchView: View {
                             ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
                             ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
                             ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
+                            ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
                         }
                         .allowsHitTesting(false)
                     }
@@ -198,6 +200,7 @@ struct NotchView: View {
                             ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
                             ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
                             ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
+                            ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
                         }
                         .allowsHitTesting(false)
                     }
@@ -322,6 +325,8 @@ struct NotchView: View {
                         installerConfettiTrigger += 1
                     case .appStore:
                         appStoreConfettiTrigger += 1
+                    case .automator:
+                        automatorConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -522,6 +527,8 @@ struct ProcessLogo: View {
             InstallerLogo()
         case .appStore:
             AppStoreLogo()
+        case .automator:
+            AutomatorLogo()
         }
     }
 }
@@ -807,6 +814,16 @@ struct AppStoreLogo: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .foregroundColor(ProcessType.appStore.color)
+    }
+}
+
+// MARK: - Automator Logo
+
+struct AutomatorLogo: View {
+    var body: some View {
+        Text("A")
+            .font(.system(size: 18, weight: .bold, design: .rounded))
+            .foregroundColor(ProcessType.automator.color)
     }
 }
 

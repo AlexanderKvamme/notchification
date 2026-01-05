@@ -35,6 +35,7 @@ final class ProcessMonitor: ObservableObject {
     private let icloudDetector = iCloudDetector()
     private let installerDetector = InstallerDetector()
     private let appStoreDetector = AppStoreDetector()
+    private let automatorDetector = AutomatorDetector()
 
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
@@ -60,15 +61,15 @@ final class ProcessMonitor: ObservableObject {
 
         logger.info("ProcessMonitor: Starting central timer (1s interval)")
 
-        let newTimer = DispatchSource.makeTimerSource(queue: timerQueue)
+        let newTimer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
         newTimer.schedule(deadline: .now(), repeating: pollingInterval)
         newTimer.setEventHandler { [weak self] in
-            DispatchQueue.main.async {
-                self?.tick()
-            }
+            print("⏱️ TICK \(Date())")
+            self?.tick()
         }
         newTimer.resume()
         timer = newTimer
+        print("⏱️ Timer created and resumed")
     }
 
     func stopMonitoring() {
@@ -88,11 +89,12 @@ final class ProcessMonitor: ObservableObject {
         icloudDetector.reset()
         installerDetector.reset()
         appStoreDetector.reset()
+        automatorDetector.reset()
     }
 
     /// Central tick - polls all enabled detectors
     private func tick() {
-        logger.debug("[tick]")
+        print("⏱️ TICK - trackAutomator=\(trackingSettings.trackAutomator)")
 
         // Poll each enabled detector
         if trackingSettings.trackClaude {
@@ -130,6 +132,12 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackAppStore {
             appStoreDetector.poll()
+        }
+        if trackingSettings.trackAutomator {
+            print("⏱️ TICK - calling automatorDetector.poll()")
+            automatorDetector.poll()
+        } else {
+            print("⏱️ TICK - Automator tracking DISABLED, skipping")
         }
     }
 
@@ -191,6 +199,11 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         appStoreDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        automatorDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -303,6 +316,15 @@ final class ProcessMonitor: ObservableObject {
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackAutomator
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.automatorDetector.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -347,6 +369,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackAppStore && appStoreDetector.isActive {
             currentlyActive.insert(.appStore)
+        }
+        if trackingSettings.trackAutomator && automatorDetector.isActive {
+            currentlyActive.insert(.automator)
         }
 
         // Clear dismissed flag for processes that have finished (were active, now inactive)
