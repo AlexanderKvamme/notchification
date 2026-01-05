@@ -69,6 +69,16 @@ struct NotchView: View {
         return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
+    // Height of the interactive area for mouse tracking (matches NotchMouseTracker)
+    private var interactiveHeight: CGFloat {
+        // Minimum height when no processes, expands with content
+        let baseHeight: CGFloat = 50  // Base notch area height
+        if notchState.activeProcesses.isEmpty {
+            return baseHeight
+        }
+        return max(baseHeight, expandedHeight + 20)  // Extra padding for easier clicking
+    }
+
     /// Base color for minimal mode - first active process color
     private var baseStrokeColor: Color {
         notchState.activeProcesses.first?.color ?? .white
@@ -206,18 +216,19 @@ struct NotchView: View {
                 if !notchState.activeProcesses.isEmpty {
                     VStack(alignment: .leading, spacing: rowSpacing) {
                         ForEach(notchState.activeProcesses) { process in
-                            HStack(alignment: .center, spacing: 10) {
-                                ProcessLogo(processType: process)
-                                    .frame(width: logoSize, height: logoSize)
-
-                                AnimatedProgressBar(
-                                    isActive: isExpanded,
-                                    baseColor: process.color,
-                                    waveColor: process.waveColor
-                                )
-                                .frame(height: progressBarHeight)
-                            }
-                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                            ProcessRow(
+                                process: process,
+                                isExpanded: isExpanded,
+                                logoSize: logoSize,
+                                progressBarHeight: progressBarHeight,
+                                onDismiss: { dismissedProcess in
+                                    // Mark as dismissed (skips confetti)
+                                    ProcessMonitor.shared.dismissProcess(dismissedProcess)
+                                    // Also remove directly from notchState for immediate UI update
+                                    notchState.recentlyDismissed.insert(dismissedProcess)
+                                    notchState.activeProcesses.removeAll { $0 == dismissedProcess }
+                                }
+                            )
                         }
 
                         // Trial expired message
@@ -243,6 +254,15 @@ struct NotchView: View {
             }
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .top)
+        #if DEBUG
+        // Debug overlay showing the interactive click area (matches NotchMouseTracker)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .stroke(Color.red, lineWidth: 2)
+                .frame(width: 320, height: interactiveHeight)
+                .allowsHitTesting(false)
+        }
+        #endif
         .drawingGroup()  // GPU acceleration for smoother animations
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
             if styleSettings.minimalStyle {
@@ -285,6 +305,15 @@ struct NotchView: View {
 
             // Trigger effects for each removed process
             for removedProcess in removed {
+                // Skip confetti/sound for dismissed processes (user clicked X)
+                let wasDismissed = ProcessMonitor.shared.dismissedProcesses.contains(removedProcess) ||
+                                   notchState.recentlyDismissed.contains(removedProcess)
+                if wasDismissed {
+                    print("🚫 Skipping confetti for dismissed process: \(removedProcess)")
+                    notchState.recentlyDismissed.remove(removedProcess)  // Clear the flag
+                    continue
+                }
+
                 // Confetti (if enabled)
                 if TrackingSettings.shared.confettiEnabled {
                     switch removedProcess {
@@ -430,6 +459,54 @@ struct NotchView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Process Row (with hover dismiss)
+
+struct ProcessRow: View {
+    let process: ProcessType
+    let isExpanded: Bool
+    let logoSize: CGFloat
+    let progressBarHeight: CGFloat
+    var onDismiss: ((ProcessType) -> Void)?
+
+    @State private var isHovering: Bool = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            // Show X icon on hover, otherwise show logo
+            ZStack {
+                if isHovering {
+                    Image(systemName: "xmark")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .fontWeight(.bold)
+                        .foregroundColor(process.color)
+                        .padding(4)
+                } else {
+                    ProcessLogo(processType: process)
+                }
+            }
+            .frame(width: logoSize, height: logoSize)
+
+            AnimatedProgressBar(
+                isActive: isExpanded,
+                baseColor: process.color,
+                waveColor: process.waveColor
+            )
+            .frame(height: progressBarHeight)
+        }
+        .contentShape(Rectangle())  // Make entire row tappable
+        .onTapGesture {
+            onDismiss?(process)
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.8)))
     }
 }
 

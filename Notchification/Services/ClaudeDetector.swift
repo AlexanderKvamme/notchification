@@ -141,13 +141,14 @@ final class ClaudeDetector: ObservableObject, Detector {
     private func hasClaudePattern(in output: String, scanner: TerminalScanner) -> Bool {
         let debug = DebugSettings.shared.debugClaude
         let sessions = scanner.parseSessions(from: output)
-
+        let lineCount = 7
+        
         for session in sessions {
-            let last5 = Array(session.lastLines.suffix(5))
+            let last5 = Array(session.lastLines.suffix(7))
 
             // DEBUG: Print last 5 lines (helps diagnose detection issues)
             if debug {
-                print("🔶 Last 5 lines:")
+                print("🔶 Last \(lineCount) lines:")
                 for (i, line) in last5.enumerated() {
                     print("🔶   [\(i+1)] \(line.prefix(80))")
                 }

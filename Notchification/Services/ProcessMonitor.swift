@@ -12,7 +12,15 @@ private let logger = Logger(subsystem: "com.hoi.Notchification", category: "Proc
 /// Aggregates all process detectors and publishes the list of active processes
 /// Uses a single central timer to poll all enabled detectors
 final class ProcessMonitor: ObservableObject {
+    static let shared = ProcessMonitor()
+
     @Published private(set) var activeProcesses: [ProcessType] = []
+
+    /// Processes that were manually dismissed - won't show until they finish and restart
+    private(set) var dismissedProcesses: Set<ProcessType> = []
+
+    /// Track which processes were active last tick (to detect when they finish)
+    private var previouslyActiveDetectors: Set<ProcessType> = []
 
     // All detectors
     private let claudeDetector = ClaudeDetector()
@@ -36,8 +44,15 @@ final class ProcessMonitor: ObservableObject {
     private let pollingInterval: TimeInterval = 1.0
     private let timerQueue = DispatchQueue(label: "com.notchification.timer", qos: .userInitiated)
 
-    init() {
+    private init() {
         setupBindings()
+    }
+
+    /// Dismiss a process - removes it from view until it finishes and starts again
+    func dismissProcess(_ process: ProcessType) {
+        logger.info("Dismissing process: \(process.displayName)")
+        dismissedProcesses.insert(process)
+        updateActiveProcesses()
     }
 
     func startMonitoring() {
@@ -291,46 +306,59 @@ final class ProcessMonitor: ObservableObject {
     }
 
     private func updateActiveProcesses() {
-        var processes: [ProcessType] = []
+        // Build list of all currently active detectors (regardless of dismissal)
+        var currentlyActive: Set<ProcessType> = []
 
         if trackingSettings.trackClaude && claudeDetector.isActive {
-            processes.append(.claude)
+            currentlyActive.insert(.claude)
         }
         if trackingSettings.trackAndroidStudio && androidStudioDetector.isActive {
-            processes.append(.androidStudio)
+            currentlyActive.insert(.androidStudio)
         }
         if trackingSettings.trackXcode && xcodeDetector.isActive {
-            processes.append(.xcode)
+            currentlyActive.insert(.xcode)
         }
         if trackingSettings.trackFinder && finderDetector.isActive {
-            processes.append(.finder)
+            currentlyActive.insert(.finder)
         }
         if trackingSettings.trackOpencode && opencodeDetector.isActive {
-            processes.append(.opencode)
+            currentlyActive.insert(.opencode)
         }
         if trackingSettings.trackCodex && codexDetector.isActive {
-            processes.append(.codex)
+            currentlyActive.insert(.codex)
         }
         if trackingSettings.trackDropbox && dropboxDetector.isActive {
-            processes.append(.dropbox)
+            currentlyActive.insert(.dropbox)
         }
         if trackingSettings.trackGoogleDrive && googleDriveDetector.isActive {
-            processes.append(.googleDrive)
+            currentlyActive.insert(.googleDrive)
         }
         if trackingSettings.trackOneDrive && oneDriveDetector.isActive {
-            processes.append(.oneDrive)
+            currentlyActive.insert(.oneDrive)
         }
         if trackingSettings.trackICloud && icloudDetector.isActive {
-            processes.append(.icloud)
+            currentlyActive.insert(.icloud)
         }
         if trackingSettings.trackInstaller && installerDetector.isActive {
-            processes.append(.installer)
+            currentlyActive.insert(.installer)
         }
         if trackingSettings.trackAppStore && appStoreDetector.isActive {
-            processes.append(.appStore)
+            currentlyActive.insert(.appStore)
         }
 
-        activeProcesses = processes
+        // Clear dismissed flag for processes that have finished (were active, now inactive)
+        let finishedProcesses = previouslyActiveDetectors.subtracting(currentlyActive)
+        for finished in finishedProcesses {
+            if dismissedProcesses.contains(finished) {
+                logger.info("Process finished, clearing dismissed flag: \(finished.displayName)")
+                dismissedProcesses.remove(finished)
+            }
+        }
+        previouslyActiveDetectors = currentlyActive
+
+        // Filter out dismissed processes for the UI
+        let visibleProcesses = currentlyActive.subtracting(dismissedProcesses)
+        activeProcesses = Array(visibleProcesses).sorted { $0.rawValue < $1.rawValue }
     }
 
     deinit {

@@ -45,12 +45,19 @@ struct NotchificationApp: App {
     var body: some Scene {
         MenuBarExtra("Notchification", systemImage: "bell.badge") {
             MenuBarView(appState: appState, updater: updaterController.updater)
+                .frame(width: 200)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 4)
         }
+        .menuBarExtraStyle(.window)
 
         #if DEBUG
         MenuBarExtra("Debug", systemImage: "ladybug") {
             DebugMenuView(appState: appState)
+                .frame(width: 200)
+                .padding(8)
         }
+        .menuBarExtraStyle(.window)
         #endif
     }
 }
@@ -508,7 +515,7 @@ final class AppState: ObservableObject {
     }
     #endif
 
-    private let processMonitor = ProcessMonitor()
+    private let processMonitor = ProcessMonitor.shared
     private let windowController = NotchWindowController()
     private let licenseManager = LicenseManager.shared
     private var cancellables = Set<AnyCancellable>()
@@ -709,20 +716,30 @@ final class AppState: ObservableObject {
     }
 
     /// Run a quick mock for a specific process (triggered by command-click)
+    /// Currently mocked processes (for stacking demos)
+    private var mockProcesses: [ProcessType] = []
+
     func runQuickMock(process: ProcessType = .finder) {
-        // Don't run if already mocking
+        // Add to mock processes (avoid duplicates)
+        if !mockProcesses.contains(process) {
+            mockProcesses.append(process)
+        }
+
+        windowController.update(with: mockProcesses)
+
         #if DEBUG
-        guard !isMocking else { return }
         isMocking = true
         #endif
 
-        windowController.update(with: [process])
-
-        // Hide after 5 seconds
+        // Remove this specific process after 5 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            self?.windowController.update(with: [])
+            self?.mockProcesses.removeAll { $0 == process }
+            self?.windowController.update(with: self?.mockProcesses ?? [])
+
             #if DEBUG
-            self?.isMocking = false
+            if self?.mockProcesses.isEmpty == true {
+                self?.isMocking = false
+            }
             #endif
         }
     }
@@ -749,19 +766,19 @@ struct MenuBarView: View {
 
             Divider()
 
-            Text("Track Apps (⌘-click to demo)").font(.caption).foregroundColor(.secondary)
-            trackAppToggle("Claude", isOn: $trackingSettings.trackClaude, process: .claude)
-            trackAppToggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio, process: .androidStudio)
-            trackAppToggle("Xcode", isOn: $trackingSettings.trackXcode, process: .xcode)
-            trackAppToggle("Finder", isOn: $trackingSettings.trackFinder, process: .finder)
-            trackAppToggle("Opencode", isOn: $trackingSettings.trackOpencode, process: .opencode)
-            trackAppToggle("Codex", isOn: $trackingSettings.trackCodex, process: .codex)
-            trackAppToggle("Dropbox", isOn: $trackingSettings.trackDropbox, process: .dropbox)
-            trackAppToggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive, process: .googleDrive)
-            trackAppToggle("OneDrive", isOn: $trackingSettings.trackOneDrive, process: .oneDrive)
-            trackAppToggle("iCloud", isOn: $trackingSettings.trackICloud, process: .icloud)
-            trackAppToggle("Installer", isOn: $trackingSettings.trackInstaller, process: .installer)
-            trackAppToggle("App Store", isOn: $trackingSettings.trackAppStore, process: .appStore)
+            Text("Track Apps").font(.caption).foregroundColor(.secondary)
+            Toggle("Claude", isOn: $trackingSettings.trackClaude)
+            Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
+            Toggle("Xcode", isOn: $trackingSettings.trackXcode)
+            Toggle("Finder", isOn: $trackingSettings.trackFinder)
+            Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
+            Toggle("Codex", isOn: $trackingSettings.trackCodex)
+            Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
+            Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
+            Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
+            Toggle("iCloud", isOn: $trackingSettings.trackICloud)
+            Toggle("Installer", isOn: $trackingSettings.trackInstaller)
+            Toggle("App Store", isOn: $trackingSettings.trackAppStore)
 
             Divider()
 
@@ -771,7 +788,10 @@ struct MenuBarView: View {
             Divider()
 
             Button("Run Demo") {
-                appState.runQuickMock()
+                let allProcesses = ProcessType.allCases
+                if let randomProcess = allProcesses.randomElement() {
+                    appState.runQuickMock(process: randomProcess)
+                }
             }
 
             Divider()
@@ -804,26 +824,6 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
-        }
-    }
-
-    /// Toggle that also triggers a demo when command-clicked
-    @ViewBuilder
-    private func trackAppToggle(_ title: String, isOn: Binding<Bool>, process: ProcessType) -> some View {
-        Button(action: {
-            if NSEvent.modifierFlags.contains(.command) {
-                // Command-click: run demo for this process
-                appState.runQuickMock(process: process)
-            } else {
-                // Normal click: toggle tracking
-                isOn.wrappedValue.toggle()
-            }
-        }) {
-            HStack {
-                Image(systemName: isOn.wrappedValue ? "checkmark" : "")
-                    .frame(width: 14)
-                Text(title)
-            }
         }
     }
 
