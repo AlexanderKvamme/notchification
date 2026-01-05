@@ -3,6 +3,28 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.16</title>
+            <link>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.16</link>
+            <sparkle:releaseNotesLink>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.16</sparkle:releaseNotesLink>
+            <pubDate>Sun, 05 Jan 2026 10:53:51 +0100</pubDate>
+            <sparkle:version>16</sparkle:version>
+            <sparkle:shortVersionString>1.0.16</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.16/Notchification-1.0.16.zip"
+                sparkle:edSignature="0gwOTe5LPOcX/XtIn6O7hYsDgV01PCqKYuYi4zbePPUsqVnXL4+8E3HJIUhYxQa+PKV5Pk6xRKko/2C9t6XjAA=="
+                length="3324374"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.16</h2>
+                <ul>
+                    <li>Minimal mode improvements</li>
+                    <li>Wave animation enhancements</li>
+                    <li>Bug fixes and improvements</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.15</title>
             <link>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.15</link>
             <sparkle:releaseNotesLink>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.15</sparkle:releaseNotesLink>
@@ -16,7 +38,6 @@
                     <li>Simplified update system</li>
                     <li>Bug fixes and improvements</li>
                 </ul>
-                <p><strong>To update:</strong> Download the latest version from the link and replace the app in your Applications folder.</p>
             ]]></description>
         </item>
     </channel>
