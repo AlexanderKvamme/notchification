@@ -45,6 +45,9 @@ final class OpencodeDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Serial queue ensures checks don't overlap
+    private let checkQueue = DispatchQueue(label: "com.notchification.opencode-check", qos: .utility)
+
     init() {
         logger.info("🟢 OpencodeDetector init")
     }
@@ -56,7 +59,8 @@ final class OpencodeDetector: ObservableObject, Detector {
     }
 
     func poll() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Dispatch to serial queue - ensures checks run one at a time, never overlap
+        checkQueue.async { [weak self] in
             guard let self = self else { return }
 
             let (isWorking, statusText) = self.isOpencodeWorking()
@@ -67,8 +71,9 @@ final class OpencodeDetector: ObservableObject, Detector {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0
 
+                    // NOTE: Keep debug logs - helps diagnose detection issues
                     if debug {
-                        logger.debug("🟢 Opencode ACTIVE: \(statusText)")
+                        print("🟢 Opencode ACTIVE: \(statusText)")
                     }
 
                     if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
@@ -79,8 +84,9 @@ final class OpencodeDetector: ObservableObject, Detector {
                     self.consecutiveInactiveReadings += 1
                     self.consecutiveActiveReadings = 0
 
+                    // NOTE: Keep debug logs - helps diagnose detection issues
                     if debug {
-                        logger.debug("🟢 Opencode idle")
+                        print("🟢 Opencode idle")
                     }
 
                     if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
@@ -94,19 +100,38 @@ final class OpencodeDetector: ObservableObject, Detector {
 
     /// Check if Opencode is working by looking for status text via Accessibility API
     private func isOpencodeWorking() -> (Bool, String) {
+        let debug = DebugSettings.shared.debugOpencode
+
+        // NOTE: Keep debug logs - helps diagnose detection issues
+        if debug {
+            print("🟢 Opencode: checking...")
+        }
+
         if let opencodeApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first {
+            if debug {
+                print("🟢 Opencode: GUI app found, checking windows...")
+            }
             let appElement = AXUIElementCreateApplication(opencodeApp.processIdentifier)
 
             var windowsValue: CFTypeRef?
             let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
 
             if result == .success, let windows = windowsValue as? [AXUIElement] {
+                if debug {
+                    print("🟢 Opencode: found \(windows.count) windows")
+                }
                 for window in windows {
                     if let statusText = findStatusText(in: window) {
                         return (true, "GUI: \(statusText)")
                     }
                 }
             }
+        } else if debug {
+            print("🟢 Opencode: GUI app not running")
+        }
+
+        if debug {
+            print("🟢 Opencode: checking CLI in terminals...")
         }
 
         if isOpencodeCLIActive() {
@@ -131,17 +156,15 @@ final class OpencodeDetector: ObservableObject, Detector {
 
     /// Use AppleScript to get iTerm2 terminal content
     private func isOpencodeActiveInITerm2() -> Bool {
+        // Use 'text' (visible screen) instead of 'contents' (full scrollback) for speed
         let script = """
-        tell application "System Events"
-            if not (exists process "iTerm2") then return "NOT_RUNNING"
-        end tell
-
         tell application "iTerm2"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
                     repeat with s in sessions of t
-                        set allContent to allContent & "---SESSION---" & contents of s
+                        set allContent to allContent & "---SESSION---" & text of s
                     end repeat
                 end repeat
             end repeat
@@ -157,10 +180,20 @@ final class OpencodeDetector: ObservableObject, Detector {
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
+
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
@@ -198,12 +231,10 @@ final class OpencodeDetector: ObservableObject, Detector {
 
     /// Use AppleScript to get Terminal.app content
     private func isOpencodeActiveInTerminal() -> Bool {
+        // Note: Terminal.app uses 'history' property (no 'text' equivalent)
         let script = """
-        tell application "System Events"
-            if not (exists process "Terminal") then return "NOT_RUNNING"
-        end tell
-
         tell application "Terminal"
+            if not running then return "NOT_RUNNING"
             set allContent to ""
             repeat with w in windows
                 repeat with t in tabs of w
@@ -219,27 +250,27 @@ final class OpencodeDetector: ObservableObject, Detector {
         task.arguments = ["-e", script]
 
         let pipe = Pipe()
-        let errorPipe = Pipe()
         task.standardOutput = pipe
-        task.standardError = errorPipe
+        task.standardError = FileHandle.nullDevice
+
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
 
         do {
             try task.run()
             task.waitUntilExit()
+            timeoutWork.cancel()
         } catch {
+            timeoutWork.cancel()
             return false
         }
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
-        if let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
-            let debug = DebugSettings.shared.debugOpencode
-            if debug {
-                logger.debug("🟢 Terminal AppleScript error: \(errorOutput)")
-            }
-        }
-
         guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
               output != "NOT_RUNNING" else {
             return false
