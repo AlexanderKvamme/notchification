@@ -204,9 +204,35 @@ final class StyleSettings: ObservableObject {
         didSet { UserDefaults.standard.set(minimalStyle, forKey: "minimalStyle") }
     }
 
+    /// Selected screen index (0 = main screen, 1+ = other screens)
+    /// -1 means "Main Screen" which follows the system's main screen
+    @Published var selectedScreenIndex: Int {
+        didSet {
+            UserDefaults.standard.set(selectedScreenIndex, forKey: "selectedScreenIndex")
+            NotificationCenter.default.post(name: .screenSelectionChanged, object: nil)
+        }
+    }
+
     private init() {
         self.minimalStyle = UserDefaults.standard.object(forKey: "minimalStyle") as? Bool ?? false
+        self.selectedScreenIndex = UserDefaults.standard.object(forKey: "selectedScreenIndex") as? Int ?? -1
     }
+
+    /// Get the currently selected screen
+    var selectedScreen: NSScreen? {
+        if selectedScreenIndex == -1 {
+            return NSScreen.main
+        }
+        let screens = NSScreen.screens
+        guard selectedScreenIndex >= 0 && selectedScreenIndex < screens.count else {
+            return NSScreen.main
+        }
+        return screens[selectedScreenIndex]
+    }
+}
+
+extension Notification.Name {
+    static let screenSelectionChanged = Notification.Name("screenSelectionChanged")
 }
 
 /// Information about the physical notch on the current screen

@@ -46,8 +46,9 @@ struct NotchView: View {
     private let notchFrameWidth: CGFloat = 380  // Extra 80 for outward curves
 
     // Real notch dimensions from system APIs (for minimal mode)
+    // Uses the selected screen from settings
     private var notchInfo: NotchInfo {
-        NotchInfo.forScreen(NSScreen.main)
+        NotchInfo.forScreen(StyleSettings.shared.selectedScreen)
     }
 
     // Content dimensions

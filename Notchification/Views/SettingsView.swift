@@ -10,16 +10,32 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings = ThresholdSettings.shared
     @ObservedObject var styleSettings = StyleSettings.shared
+    @State private var availableScreens: [NSScreen] = NSScreen.screens
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // Style Section
-            Text("Display Style")
+            // Screen Selection Section
+            Text("Display")
                 .font(.title2)
                 .fontWeight(.semibold)
 
+            HStack {
+                Text("Screen:")
+                Picker("Screen", selection: $styleSettings.selectedScreenIndex) {
+                    Text("Main Screen").tag(-1)
+                    ForEach(Array(availableScreens.enumerated()), id: \.offset) { index, screen in
+                        Text(screenName(for: screen, at: index)).tag(index)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 200)
+            }
+            Text("Select which screen to show the notch indicator on")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
             Toggle("Minimal Style", isOn: $styleSettings.minimalStyle)
-            Text("Shows only a 2px colored border around the notch (no icons or progress bars)")
+            Text("Shows only a colored border around the notch (no icons or progress bars)")
                 .font(.caption)
                 .foregroundColor(.secondary)
 
@@ -153,6 +169,22 @@ struct ThresholdSection: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+extension SettingsView {
+    /// Generate a descriptive name for a screen
+    func screenName(for screen: NSScreen, at index: Int) -> String {
+        let isMain = screen == NSScreen.main
+        let hasNotch = NotchInfo.forScreen(screen).hasNotch
+
+        let name = screen.localizedName
+
+        var suffix = ""
+        if isMain { suffix += " (Main)" }
+        if hasNotch { suffix += " - Has Notch" }
+
+        return name + suffix
     }
 }
 

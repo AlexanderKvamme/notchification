@@ -14,13 +14,20 @@ final class NotchState: ObservableObject {
 /// A borderless window that displays the notch indicator at the top of the screen
 final class NotchWindow: NSWindow {
 
+    private var currentScreen: NSScreen? {
+        StyleSettings.shared.selectedScreen
+    }
+
     private var windowWidth: CGFloat {
-        NSScreen.main?.frame.width ?? 1440
+        currentScreen?.frame.width ?? 1440
     }
     private var windowHeight: CGFloat {
-        NSScreen.main?.frame.height ?? 900
+        currentScreen?.frame.height ?? 900
     }
     let notchState = NotchState()
+
+    private var screenObserver: NSObjectProtocol?
+    private var selectionObserver: NSObjectProtocol?
 
     init() {
         super.init(
@@ -31,8 +38,18 @@ final class NotchWindow: NSWindow {
         )
 
         configureWindow()
-        positionAtNotch()
+        positionOnSelectedScreen()
         setupContent()
+        observeScreenChanges()
+    }
+
+    deinit {
+        if let observer = screenObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = selectionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     private func configureWindow() {
@@ -53,11 +70,38 @@ final class NotchWindow: NSWindow {
         titleVisibility = .hidden
     }
 
-    private func positionAtNotch() {
-        guard let screen = NSScreen.main else { return }
+    private func observeScreenChanges() {
+        // Observe screen configuration changes (displays connected/disconnected)
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.repositionWindow()
+        }
 
-        // Full screen window
+        // Observe screen selection changes from settings
+        selectionObserver = NotificationCenter.default.addObserver(
+            forName: .screenSelectionChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.repositionWindow()
+        }
+    }
+
+    private func positionOnSelectedScreen() {
+        guard let screen = currentScreen else { return }
+
+        // Position window to cover the full screen
+        // The NotchView inside will center the notch content at the top
         setFrame(screen.frame, display: true)
+    }
+
+    /// Reposition the window on the selected screen and rebuild content
+    func repositionWindow() {
+        positionOnSelectedScreen()
+        setupContent()
     }
 
     private func setupContent() {
