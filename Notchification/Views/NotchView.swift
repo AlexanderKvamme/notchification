@@ -16,6 +16,7 @@ struct NotchView: View {
     @ObservedObject var styleSettings = StyleSettings.shared
     var screenWidth: CGFloat = 1440
     var screenHeight: CGFloat = 900
+    var screen: NSScreen? = nil  // The screen this view is displayed on
 
     // Animation state
     @State private var isExpanded: Bool = false
@@ -50,9 +51,9 @@ struct NotchView: View {
     private let notchFrameWidth: CGFloat = 380  // Extra 80 for outward curves
 
     // Real notch dimensions from system APIs (for minimal mode)
-    // Uses the selected screen from settings
+    // Uses the screen this view is displayed on
     private var notchInfo: NotchInfo {
-        NotchInfo.forScreen(StyleSettings.shared.selectedScreen)
+        NotchInfo.forScreen(screen)
     }
 
     // Content dimensions
@@ -68,7 +69,37 @@ struct NotchView: View {
     private let mediumProgressBarHeight: CGFloat = 6
     private let mediumHorizontalPadding: CGFloat = 13
     private let mediumRowSpacing: CGFloat = 3
-    private let mediumTopPadding: CGFloat = 34
+    private let mediumTopPaddingBase: CGFloat = 34
+
+    /// Effective top padding for normal mode - can be reduced based on settings
+    private var effectiveTopPadding: CGFloat {
+        // Check trim setting based on whether display has notch
+        if notchInfo.hasNotch {
+            if styleSettings.trimTopOnNotchDisplay {
+                return 8  // Minimal padding on notch display
+            }
+        } else {
+            if styleSettings.trimTopOnExternalDisplay {
+                return 8  // Minimal padding on external display
+            }
+        }
+        return topPadding
+    }
+
+    /// Effective top padding for medium mode - can be reduced based on settings
+    private var effectiveMediumTopPadding: CGFloat {
+        // Check trim setting based on whether display has notch
+        if notchInfo.hasNotch {
+            if styleSettings.trimTopOnNotchDisplay {
+                return 8  // Minimal padding on notch display
+            }
+        } else {
+            if styleSettings.trimTopOnExternalDisplay {
+                return 8  // Minimal padding on external display
+            }
+        }
+        return mediumTopPaddingBase
+    }
 
     // Minimal mode stroke width
     private let minimalStrokeWidth: CGFloat = 10
@@ -78,14 +109,14 @@ struct NotchView: View {
         let processCount = max(1, notchState.activeProcesses.count)
         let contentHeight = CGFloat(processCount) * logoSize + CGFloat(processCount - 1) * rowSpacing
         let trialTextHeight: CGFloat = licenseManager.state == .expired ? 20 : 0
-        return topPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
+        return effectiveTopPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
     // Dynamic height for medium mode (smaller)
     private var mediumExpandedHeight: CGFloat {
         let processCount = max(1, notchState.activeProcesses.count)
         let contentHeight = CGFloat(processCount) * mediumLogoSize + CGFloat(processCount - 1) * mediumRowSpacing
-        return mediumTopPadding + contentHeight + 13  // 13 bottom padding
+        return effectiveMediumTopPadding + contentHeight + 13  // 13 bottom padding
     }
 
     /// Base color for minimal mode - first active process color
@@ -139,6 +170,7 @@ struct NotchView: View {
                 normalModeView
             }
         }
+        .offset(x: styleSettings.horizontalOffset)
         .frame(width: screenWidth, height: screenHeight, alignment: .top)
         .drawingGroup()  // GPU acceleration for smoother animations
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
@@ -327,7 +359,7 @@ struct NotchView: View {
             .padding(.leading, 13)
             .padding(.trailing, 16)
             .frame(width: notchInfo.width)
-            .offset(y: mediumTopPadding)
+            .offset(y: effectiveMediumTopPadding)
             .opacity(isExpanded ? 1 : 0)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
@@ -370,7 +402,7 @@ struct NotchView: View {
             }
             .padding(.horizontal, horizontalPadding)
             .frame(width: notchWidth)
-            .offset(y: topPadding)
+            .offset(y: effectiveTopPadding)
             .opacity(isExpanded ? 1 : 0)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)

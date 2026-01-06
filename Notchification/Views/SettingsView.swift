@@ -33,25 +33,18 @@ struct SettingsView: View {
 
 struct DisplaySettingsTab: View {
     @ObservedObject var styleSettings = StyleSettings.shared
-    @State private var availableScreens: [NSScreen] = NSScreen.screens
 
     var body: some View {
         Form {
             Section {
-                if availableScreens.count > 1 {
-                    Picker("Screen:", selection: $styleSettings.selectedScreenIndex) {
-                        Text("Main Screen").tag(-1)
-                        ForEach(Array(availableScreens.enumerated()), id: \.offset) { index, screen in
-                            Text(screenName(for: screen, at: index)).tag(index)
-                        }
+                Picker("Screen:", selection: $styleSettings.screenMode) {
+                    ForEach(ScreenMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
                     }
-                    Text("Select which screen to show the notch indicator on")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("Screen: Built-in Display")
-                        .foregroundColor(.secondary)
                 }
+                Text("Select which screen(s) to show the notch indicator on")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section {
@@ -77,6 +70,38 @@ struct DisplaySettingsTab: View {
             }
 
             Section {
+                Toggle("Trim top on notch displays", isOn: $styleSettings.trimTopOnNotchDisplay)
+                Text("Remove extra padding above progress bars on MacBook displays")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Toggle("Trim top on external displays", isOn: $styleSettings.trimTopOnExternalDisplay)
+                Text("Remove extra padding above progress bars on displays without a notch")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                HStack {
+                    Text("Horizontal Position")
+                    Slider(value: $styleSettings.horizontalOffset, in: -500...500, step: 1)
+                        .onChange(of: styleSettings.horizontalOffset) { _, _ in
+                            NotificationCenter.default.post(name: .showPositionPreview, object: nil)
+                        }
+                    Text("\(Int(styleSettings.horizontalOffset))")
+                        .frame(width: 40)
+                        .monospacedDigit()
+                }
+                Button("Reset to Center") {
+                    styleSettings.horizontalOffset = 0
+                }
+                .disabled(styleSettings.horizontalOffset == 0)
+                Text("Adjust horizontal position for external displays")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
                 Button("Manage License...") {
                     LicenseWindowController.shared.showLicenseWindow()
                 }
@@ -84,16 +109,12 @@ struct DisplaySettingsTab: View {
         }
         .formStyle(.grouped)
         .padding()
-    }
-
-    func screenName(for screen: NSScreen, at index: Int) -> String {
-        let isMain = screen == NSScreen.main
-        let hasNotch = NotchInfo.forScreen(screen).hasNotch
-        let name = screen.localizedName
-        var suffix = ""
-        if isMain { suffix += " (Main)" }
-        if hasNotch { suffix += " - Has Notch" }
-        return name + suffix
+        .onAppear {
+            NotificationCenter.default.post(name: .showSettingsPreview, object: nil)
+        }
+        .onDisappear {
+            NotificationCenter.default.post(name: .hideSettingsPreview, object: nil)
+        }
     }
 }
 

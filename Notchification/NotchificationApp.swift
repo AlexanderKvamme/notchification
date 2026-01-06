@@ -306,6 +306,21 @@ enum NotchStyle: String, CaseIterable {
     }
 }
 
+/// Which screen(s) to show the notch indicator on
+enum ScreenMode: String, CaseIterable {
+    case builtIn = "builtin"    // MacBook display only
+    case external = "external"  // External display only
+    case both = "both"          // Both displays
+
+    var displayName: String {
+        switch self {
+        case .builtIn: return "MacBook"
+        case .external: return "External"
+        case .both: return "Both"
+        }
+    }
+}
+
 /// Visual style settings for the notch indicator
 final class StyleSettings: ObservableObject {
     static let shared = StyleSettings()
@@ -320,13 +335,27 @@ final class StyleSettings: ObservableObject {
         notchStyle == .minimal
     }
 
-    /// Selected screen index (0 = main screen, 1+ = other screens)
-    /// -1 means "Main Screen" which follows the system's main screen
-    @Published var selectedScreenIndex: Int {
+    /// Which screen(s) to show the indicator on
+    @Published var screenMode: ScreenMode {
         didSet {
-            UserDefaults.standard.set(selectedScreenIndex, forKey: "selectedScreenIndex")
+            UserDefaults.standard.set(screenMode.rawValue, forKey: "screenMode")
             NotificationCenter.default.post(name: .screenSelectionChanged, object: nil)
         }
+    }
+
+    /// Trim extra top padding on displays without a notch
+    @Published var trimTopOnExternalDisplay: Bool {
+        didSet { UserDefaults.standard.set(trimTopOnExternalDisplay, forKey: "trimTopOnExternalDisplay") }
+    }
+
+    /// Trim extra top padding on displays with a notch
+    @Published var trimTopOnNotchDisplay: Bool {
+        didSet { UserDefaults.standard.set(trimTopOnNotchDisplay, forKey: "trimTopOnNotchDisplay") }
+    }
+
+    /// Horizontal offset for positioning (useful for external displays)
+    @Published var horizontalOffset: CGFloat {
+        didSet { UserDefaults.standard.set(horizontalOffset, forKey: "horizontalOffset") }
     }
 
     private init() {
@@ -339,24 +368,61 @@ final class StyleSettings: ObservableObject {
         } else {
             self.notchStyle = .normal
         }
-        self.selectedScreenIndex = UserDefaults.standard.object(forKey: "selectedScreenIndex") as? Int ?? -1
+        if let modeString = UserDefaults.standard.string(forKey: "screenMode"),
+           let mode = ScreenMode(rawValue: modeString) {
+            self.screenMode = mode
+        } else {
+            self.screenMode = .builtIn
+        }
+        self.trimTopOnExternalDisplay = UserDefaults.standard.object(forKey: "trimTopOnExternalDisplay") as? Bool ?? true
+        self.trimTopOnNotchDisplay = UserDefaults.standard.object(forKey: "trimTopOnNotchDisplay") as? Bool ?? false
+        self.horizontalOffset = UserDefaults.standard.object(forKey: "horizontalOffset") as? CGFloat ?? 0
     }
 
-    /// Get the currently selected screen
+    /// Get the built-in (MacBook) display
+    var builtInScreen: NSScreen? {
+        NSScreen.screens.first { screen in
+            // Built-in displays have localizedName containing "Built-in" or are the only screen
+            screen.localizedName.contains("Built-in") || screen.localizedName.contains("Retina")
+        } ?? NSScreen.screens.first
+    }
+
+    /// Get the first external display
+    var externalScreen: NSScreen? {
+        NSScreen.screens.first { screen in
+            !screen.localizedName.contains("Built-in") && !screen.localizedName.contains("Retina")
+        }
+    }
+
+    /// Get all screens to show the indicator on based on current mode
+    var screensToShow: [NSScreen] {
+        switch screenMode {
+        case .builtIn:
+            if let screen = builtInScreen {
+                return [screen]
+            }
+            return NSScreen.screens.isEmpty ? [] : [NSScreen.screens[0]]
+        case .external:
+            if let screen = externalScreen {
+                return [screen]
+            }
+            return []  // No external display connected
+        case .both:
+            return NSScreen.screens
+        }
+    }
+
+    /// For backward compatibility - returns first screen to show
     var selectedScreen: NSScreen? {
-        if selectedScreenIndex == -1 {
-            return NSScreen.main
-        }
-        let screens = NSScreen.screens
-        guard selectedScreenIndex >= 0 && selectedScreenIndex < screens.count else {
-            return NSScreen.main
-        }
-        return screens[selectedScreenIndex]
+        screensToShow.first
     }
 }
 
 extension Notification.Name {
     static let screenSelectionChanged = Notification.Name("screenSelectionChanged")
+    static let showPositionPreview = Notification.Name("showPositionPreview")
+    static let showSettingsPreview = Notification.Name("showSettingsPreview")
+    static let hideSettingsPreview = Notification.Name("hideSettingsPreview")
 }
 
 /// Information about the physical notch on the current screen
@@ -632,6 +698,8 @@ final class AppState: ObservableObject {
         startMonitoring()
     }
 
+    private var previewTimer: Timer?
+
     private func setupBindings() {
         processMonitor.$activeProcesses
             .receive(on: DispatchQueue.main)
@@ -643,6 +711,76 @@ final class AppState: ObservableObject {
                 self.windowController.update(with: processes)
             }
             .store(in: &cancellables)
+
+        // Listen for position preview requests from settings
+        NotificationCenter.default.addObserver(
+            forName: .showPositionPreview,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showPositionPreview()
+        }
+
+        // Listen for settings tab appearing/disappearing
+        NotificationCenter.default.addObserver(
+            forName: .showSettingsPreview,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showSettingsPreviewPersistent()
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: .hideSettingsPreview,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.hideSettingsPreview()
+        }
+    }
+
+    private var isShowingSettingsPreview = false
+
+    /// Show a temporary preview when adjusting position in settings
+    private func showPositionPreview() {
+        // If settings preview is active, it's already showing - just reset the timer
+        if isShowingSettingsPreview {
+            return
+        }
+
+        // Cancel any existing timer
+        previewTimer?.invalidate()
+
+        // Show a mock process
+        windowController.update(with: [.claude])
+
+        // Hide after 1.5 seconds of no changes
+        previewTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
+            // Only hide if there are no real active processes
+            if self?.processMonitor.activeProcesses.isEmpty == true {
+                self?.windowController.update(with: [])
+            } else {
+                self?.windowController.update(with: self?.processMonitor.activeProcesses ?? [])
+            }
+        }
+    }
+
+    /// Show preview while Display settings tab is open
+    private func showSettingsPreviewPersistent() {
+        isShowingSettingsPreview = true
+        previewTimer?.invalidate()
+        windowController.update(with: [.claude])
+    }
+
+    /// Hide preview when Display settings tab closes
+    private func hideSettingsPreview() {
+        isShowingSettingsPreview = false
+        // Restore real active processes or hide
+        if processMonitor.activeProcesses.isEmpty {
+            windowController.update(with: [])
+        } else {
+            windowController.update(with: processMonitor.activeProcesses)
+        }
     }
 
     #if DEBUG
