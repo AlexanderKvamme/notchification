@@ -89,6 +89,7 @@ struct DebugMenuView: View {
             Toggle("Opencode", isOn: $debugSettings.debugOpencode)
             Toggle("Codex", isOn: $debugSettings.debugCodex)
             Toggle("Automator", isOn: $debugSettings.debugAutomator)
+            Toggle("Downloads", isOn: $debugSettings.debugDownloads)
 
             Divider()
 
@@ -125,6 +126,9 @@ final class DebugSettings: ObservableObject {
     @Published var debugAutomator: Bool {
         didSet { UserDefaults.standard.set(debugAutomator, forKey: "debugAutomator") }
     }
+    @Published var debugDownloads: Bool {
+        didSet { UserDefaults.standard.set(debugDownloads, forKey: "debugDownloads") }
+    }
     /// When true, scans all terminal sessions. When false (default), only scans frontmost session (faster).
     @Published var claudeScanAllSessions: Bool {
         didSet { UserDefaults.standard.set(claudeScanAllSessions, forKey: "claudeScanAllSessions") }
@@ -138,6 +142,7 @@ final class DebugSettings: ObservableObject {
         self.debugOpencode = UserDefaults.standard.object(forKey: "debugOpencode") as? Bool ?? false
         self.debugCodex = UserDefaults.standard.object(forKey: "debugCodex") as? Bool ?? false
         self.debugAutomator = UserDefaults.standard.object(forKey: "debugAutomator") as? Bool ?? false
+        self.debugDownloads = UserDefaults.standard.object(forKey: "debugDownloads") as? Bool ?? false
         self.claudeScanAllSessions = UserDefaults.standard.object(forKey: "claudeScanAllSessions") as? Bool ?? false
     }
 }
@@ -188,6 +193,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackScriptEditor: Bool {
         didSet { UserDefaults.standard.set(trackScriptEditor, forKey: "trackScriptEditor") }
     }
+    @Published var trackDownloads: Bool {
+        didSet { UserDefaults.standard.set(trackDownloads, forKey: "trackDownloads") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -210,6 +218,7 @@ final class TrackingSettings: ObservableObject {
         self.trackAppStore = UserDefaults.standard.object(forKey: "trackAppStore") as? Bool ?? true
         self.trackAutomator = UserDefaults.standard.object(forKey: "trackAutomator") as? Bool ?? true
         self.trackScriptEditor = UserDefaults.standard.object(forKey: "trackScriptEditor") as? Bool ?? true
+        self.trackDownloads = UserDefaults.standard.object(forKey: "trackDownloads") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }

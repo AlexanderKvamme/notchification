@@ -37,6 +37,7 @@ final class ProcessMonitor: ObservableObject {
     private let appStoreDetector = AppStoreDetector()
     private let automatorDetector = AutomatorDetector()
     private let scriptEditorDetector = ScriptEditorDetector()
+    private let downloadDetector = DownloadDetector()
 
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
@@ -92,6 +93,7 @@ final class ProcessMonitor: ObservableObject {
         appStoreDetector.reset()
         automatorDetector.reset()
         scriptEditorDetector.reset()
+        downloadDetector.reset()
     }
 
     /// Central tick - polls all enabled detectors
@@ -139,6 +141,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackScriptEditor {
             scriptEditorDetector.poll()
+        }
+        if trackingSettings.trackDownloads {
+            downloadDetector.poll()
         }
     }
 
@@ -210,6 +215,11 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         scriptEditorDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        downloadDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -340,6 +350,15 @@ final class ProcessMonitor: ObservableObject {
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackDownloads
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.downloadDetector.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -390,6 +409,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackScriptEditor && scriptEditorDetector.isActive {
             currentlyActive.insert(.scriptEditor)
+        }
+        if trackingSettings.trackDownloads && downloadDetector.isActive {
+            currentlyActive.insert(.downloads)
         }
 
         // Clear dismissed flag for processes that have finished (were active, now inactive)

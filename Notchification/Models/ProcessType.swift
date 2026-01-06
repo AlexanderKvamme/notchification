@@ -20,6 +20,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case appStore = "appstore"
     case automator = "automator"
     case scriptEditor = "scripteditor"
+    case downloads = "downloads"
 
     var id: String { rawValue }
 
@@ -39,6 +40,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .appStore: return "App Store"
         case .automator: return "Automator"
         case .scriptEditor: return "Script Editor"
+        case .downloads: return "Downloads"
         }
     }
 
@@ -58,6 +60,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .appStore: return Color(red: 0.0, green: 0.48, blue: 1.0) // #007AFF App Store blue
         case .automator: return Color(red: 0.75, green: 0.75, blue: 0.78) // Light gray like Automator robot
         case .scriptEditor: return .white // White for Script Editor
+        case .downloads: return Color(red: 0.757, green: 0.765, blue: 1.0) // #c1c3ff Light purple
         }
     }
 
@@ -77,6 +80,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .appStore: return Color(red: 0.4, green: 0.7, blue: 1.0) // Lighter App Store blue
         case .automator: return .white // White wave on gray base
         case .scriptEditor: return Color(red: 0.85, green: 0.85, blue: 0.85) // Light gray wave on white
+        case .downloads: return Color(red: 0.85, green: 0.86, blue: 1.0) // Lighter purple
         }
     }
 
@@ -96,6 +100,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .appStore: return .solid
         case .automator: return .solid
         case .scriptEditor: return .solid
+        case .downloads: return .solid
         }
     }
 }

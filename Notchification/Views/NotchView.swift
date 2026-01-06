@@ -42,6 +42,7 @@ struct NotchView: View {
     @State private var appStoreConfettiTrigger: Int = 0
     @State private var automatorConfettiTrigger: Int = 0
     @State private var scriptEditorConfettiTrigger: Int = 0
+    @State private var downloadsConfettiTrigger: Int = 0
 
     // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
@@ -219,6 +220,8 @@ struct NotchView: View {
                         automatorConfettiTrigger += 1
                     case .scriptEditor:
                         scriptEditorConfettiTrigger += 1
+                    case .downloads:
+                        downloadsConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -389,6 +392,7 @@ struct NotchView: View {
             ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
             ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
             ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
+            ConfettiEmitter(trigger: $downloadsConfettiTrigger, color: ProcessType.downloads.color)
         }
         .allowsHitTesting(false)
     }
@@ -560,7 +564,21 @@ struct ProcessLogo: View {
             AutomatorLogo()
         case .scriptEditor:
             ScriptEditorLogo()
+        case .downloads:
+            DownloadsLogo()
         }
+    }
+}
+
+// MARK: - Downloads Logo
+
+struct DownloadsLogo: View {
+    var body: some View {
+        Image(systemName: "arrow.down")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .fontWeight(.bold)
+            .foregroundColor(ProcessType.downloads.color)
     }
 }
 
