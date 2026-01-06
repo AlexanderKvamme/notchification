@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import AppKit
 import os.log
 
 private let logger = Logger(subsystem: "com.hoi.Notchification", category: "ProcessMonitor")
@@ -50,6 +51,48 @@ final class ProcessMonitor: ObservableObject {
 
     private init() {
         setupBindings()
+        setupSystemNotifications()
+    }
+
+    /// Listen for system wake and screen unlock to restart monitoring
+    private func setupSystemNotifications() {
+        let workspace = NSWorkspace.shared.notificationCenter
+
+        // System woke from sleep
+        workspace.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            logger.info("⏰ System woke from sleep - restarting monitoring")
+            self?.restartMonitoring()
+        }
+
+        // Screen unlocked / session became active
+        workspace.addObserver(
+            forName: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            logger.info("⏰ Session became active - restarting monitoring")
+            self?.restartMonitoring()
+        }
+
+        // Also handle screens waking up (useful for external displays)
+        workspace.addObserver(
+            forName: NSWorkspace.screensDidWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            logger.info("⏰ Screens woke up - restarting monitoring")
+            self?.restartMonitoring()
+        }
+    }
+
+    /// Restart monitoring by stopping and starting the timer
+    private func restartMonitoring() {
+        stopMonitoring()
+        startMonitoring()
     }
 
     /// Dismiss a process - removes it from view until it finishes and starts again
