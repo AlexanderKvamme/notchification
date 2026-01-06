@@ -2,14 +2,52 @@
 
 ## IMPORTANT: Debug Output Rules
 
-**NEVER REMOVE these debug statements** - they are essential for debugging Claude detection:
+**NEVER REMOVE debug statements** - they are essential for diagnosing detection issues.
 
-1. In `ClaudeDetector.swift`, the debug logging must always print the **last 5 lines** of terminal content when `debugClaude` is enabled
-2. Keep all `logger.debug` and `print` statements related to Claude detection
-3. When debugging Claude detection issues, always check:
-   - Is `debugClaude` enabled in DebugSettings?
-   - What does the terminal content actually show?
-   - Are the last 5 lines being printed?
+### Adding Debug Logging to Detectors
+
+Every detector MUST have a corresponding debug toggle in `DebugSettings` (in `NotchificationApp.swift`). When adding a new detector:
+
+1. **Add a debug setting** in `DebugSettings`:
+   ```swift
+   @Published var debugMyDetector: Bool {
+       didSet { UserDefaults.standard.set(debugMyDetector, forKey: "debugMyDetector") }
+   }
+   // Initialize in init():
+   self.debugMyDetector = UserDefaults.standard.object(forKey: "debugMyDetector") as? Bool ?? false
+   ```
+
+2. **Add a menu toggle** in the Debug menu (ladybug icon):
+   ```swift
+   Toggle("My Detector", isOn: $debugSettings.debugMyDetector)
+   ```
+
+3. **Use verbose logging** in the detector when debug is enabled:
+   ```swift
+   private var debug: Bool { DebugSettings.shared.debugMyDetector }
+
+   // In init:
+   if debug { print("🔍 MyDetector init - status: ...") }
+
+   // In poll/detection:
+   if debug { print("🔍 MyDetector checking... result=\(result)") }
+   ```
+
+4. **Use an emoji prefix** for each detector (makes log filtering easier):
+   - Claude: 🔶
+   - Android Studio: 🤖
+   - Xcode: 🔨
+   - etc.
+
+### Existing Debug Settings
+
+- `debugClaude` - Claude CLI detection (🔶)
+- `debugAndroid` - Android Studio / Gradle detection (🤖)
+- `debugXcode` - Xcode build detection (🔨)
+- `debugFinder` - Finder copy operations
+- `debugOpencode` - Opencode CLI detection
+- `debugCodex` - Codex CLI detection
+- `debugAutomator` - Automator workflow detection
 
 ## ClaudeDetector Architecture
 

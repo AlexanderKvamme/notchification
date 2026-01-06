@@ -3,8 +3,9 @@
 //  Notchification
 //
 //  Color: #2BA160 (Android green)
-//  Detects Android Studio builds using gradle --status command
-//  which shows BUSY when a build is running
+//  Detects Android Studio builds using `gradle --status` command
+//  which shows BUSY when a Gradle daemon is building.
+//  Works with any Gradle version - searches dynamically.
 //
 
 import Foundation
@@ -28,26 +29,40 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     // Serial queue ensures checks don't overlap
     private let checkQueue = DispatchQueue(label: "com.notchification.android-check", qos: .utility)
 
+    private var debug: Bool { DebugSettings.shared.debugAndroid }
+
     init() {
         findGradlePath()
+        if debug {
+            if let path = gradlePath {
+                print("🤖 AndroidStudioDetector init - gradle found: \(path)")
+            } else {
+                print("🤖 AndroidStudioDetector init - NO GRADLE FOUND")
+            }
+        }
     }
 
     /// Find the gradle executable path
     private func findGradlePath() {
-        let possiblePaths = [
+        let debug = DebugSettings.shared.debugAndroid
+
+        // Check common Homebrew locations first
+        let homebrewPaths = [
             "/opt/homebrew/bin/gradle",
-            "/usr/local/bin/gradle",
-            NSString(string: "~/.gradle/wrapper/dists/gradle-9.0.0-bin").expandingTildeInPath + "/d6wjpkvcgsg3oed0qlfss3wgl/gradle-9.0.0/bin/gradle"
+            "/usr/local/bin/gradle"
         ]
 
-        for path in possiblePaths {
+        for path in homebrewPaths {
             if FileManager.default.fileExists(atPath: path) {
+                if debug { print("🤖 Found gradle at Homebrew path: \(path)") }
                 gradlePath = path
                 return
             }
         }
 
-        // Try to find dynamically
+        if debug { print("🤖 No Homebrew gradle, searching ~/.gradle/wrapper/dists...") }
+
+        // Search for any gradle wrapper version dynamically
         let pipe = Pipe()
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -61,10 +76,13 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !path.isEmpty {
+                if debug { print("🤖 Found gradle wrapper: \(path)") }
                 gradlePath = path
+            } else {
+                if debug { print("🤖 No gradle wrapper found in ~/.gradle/wrapper/dists") }
             }
         } catch {
-            // Silently fail - gradle not found
+            if debug { print("🤖 Error searching for gradle: \(error)") }
         }
     }
 
@@ -72,6 +90,43 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
         isActive = false
+    }
+
+    /// Find Java home using macOS java_home utility, fallback to Android Studio's bundled JBR
+    private func findJavaHome() -> String? {
+        // Try macOS built-in java_home utility first
+        let pipe = Pipe()
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/libexec/java_home")
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            if task.terminationStatus == 0 {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !path.isEmpty {
+                    return path
+                }
+            }
+        } catch {
+            // java_home not available or failed
+        }
+
+        // Fallback: Android Studio's bundled JBR
+        let jbrPaths = [
+            "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
+            NSString(string: "~/Applications/Android Studio.app/Contents/jbr/Contents/Home").expandingTildeInPath
+        ]
+        for path in jbrPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+
+        return nil
     }
 
     func poll() {
@@ -120,11 +175,12 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
         task.arguments = ["-c", "\(gradle) --status 2>&1"]
 
+        // Set JAVA_HOME if not already set
         var env = ProcessInfo.processInfo.environment
         if env["JAVA_HOME"] == nil {
-            let jbrPath = NSString(string: "~/Applications/Android Studio.app/Contents/jbr/Contents/Home").expandingTildeInPath
-            if FileManager.default.fileExists(atPath: jbrPath) {
-                env["JAVA_HOME"] = jbrPath
+            if let javaHome = findJavaHome() {
+                env["JAVA_HOME"] = javaHome
+                if debug { print("🤖 Using JAVA_HOME: \(javaHome)") }
             }
         }
         task.environment = env

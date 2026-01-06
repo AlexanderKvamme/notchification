@@ -64,7 +64,7 @@ struct NotchView: View {
     // Medium mode dimensions (smaller, fits notch width)
     private let mediumLogoSize: CGFloat = 14
     private let mediumProgressBarHeight: CGFloat = 6
-    private let mediumHorizontalPadding: CGFloat = 8
+    private let mediumHorizontalPadding: CGFloat = 13
     private let mediumRowSpacing: CGFloat = 3
     private let mediumTopPadding: CGFloat = 34
 
@@ -318,7 +318,8 @@ struct NotchView: View {
                     )
                 }
             }
-            .padding(.horizontal, mediumHorizontalPadding)
+            .padding(.leading, 13)
+            .padding(.trailing, 16)
             .frame(width: notchInfo.width)
             .offset(y: mediumTopPadding)
             .opacity(isExpanded ? 1 : 0)
