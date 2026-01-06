@@ -1021,14 +1021,14 @@ struct MenuBarView: View {
                 updater.checkForUpdates()
             }
 
-            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+
+            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
         .padding(.leading, 16)
         .padding(.vertical, 12)

@@ -24,18 +24,23 @@ final class NotchMouseTracker {
     private var isMouseInNotch = false
     private var hasActiveProcesses = false  // Only capture mouse when processes are visible
 
-    private var notchWidth: CGFloat = 320
     private var screenFrame: NSRect = .zero
+    private weak var targetScreen: NSScreen?
 
-    // Layout constants (must match NotchView)
-    private let logoSize: CGFloat = 24
-    private let rowSpacing: CGFloat = 8
-    private let topPadding: CGFloat = 38
-    private let baseHeight: CGFloat = 50
+    // Layout constants for normal mode (must match NotchView)
+    private let normalNotchWidth: CGFloat = 300
+    private let normalLogoSize: CGFloat = 24
+    private let normalRowSpacing: CGFloat = 8
+    private let normalTopPadding: CGFloat = 38
+
+    // Layout constants for medium mode
+    private let mediumLogoSize: CGFloat = 14
+    private let mediumRowSpacing: CGFloat = 3
+    private let mediumTopPadding: CGFloat = 34
 
     // Debug overlay window
     private var debugWindow: NSWindow?
-    static var showDebugOverlay = true  // TEMP: Toggle this to show/hide click area
+    static var showDebugOverlay = false  // Set to true to debug click area
 
     init(window: NSWindow) {
         self.window = window
@@ -43,35 +48,63 @@ final class NotchMouseTracker {
     }
 
     func updateNotchRect(notchWidth: CGFloat, notchHeight: CGFloat, screenFrame: NSRect) {
-        self.notchWidth = notchWidth
         self.screenFrame = screenFrame
-        // Notch area at top center of screen (in screen coordinates)
-        let x = screenFrame.minX + (screenFrame.width - notchWidth) / 2
-        let y = screenFrame.maxY - notchHeight
-        notchRect = NSRect(x: x, y: y, width: notchWidth, height: notchHeight)
     }
 
-    /// Update the interactive height based on process count
+    func setTargetScreen(_ screen: NSScreen) {
+        self.targetScreen = screen
+        self.screenFrame = screen.frame
+    }
+
+    /// Update the interactive area based on process count and current display mode
     func updateForProcessCount(_ count: Int) {
         guard screenFrame != .zero else { return }
 
         hasActiveProcesses = count > 0
 
-        // When no processes, immediately disable mouse events
+        // When no processes, immediately disable mouse events and hide debug
         if count == 0 {
             window?.ignoresMouseEvents = true
             isMouseInNotch = false
+            notchRect = .zero
             updateDebugOverlay()
             return
         }
 
-        let contentHeight = CGFloat(count) * logoSize + CGFloat(count - 1) * rowSpacing
-        let expandedHeight = topPadding + contentHeight + 16
-        let height = max(baseHeight, expandedHeight + 20)
+        let settings = StyleSettings.shared
+        let notchInfo = NotchInfo.forScreen(targetScreen)
+        let horizontalOffset = settings.horizontalOffset
 
-        let x = screenFrame.minX + (screenFrame.width - notchWidth) / 2
+        let width: CGFloat
+        let height: CGFloat
+
+        switch settings.notchStyle {
+        case .minimal:
+            // Minimal mode: just the notch outline area
+            width = notchInfo.width + 20  // Small padding
+            height = notchInfo.height + 10
+
+        case .medium:
+            // Medium mode: notch width with smaller content
+            width = notchInfo.width
+            let contentHeight = CGFloat(count) * mediumLogoSize + CGFloat(count - 1) * mediumRowSpacing
+            let effectiveTopPadding = (settings.trimTopOnNotchDisplay && notchInfo.hasNotch) ||
+                                      (settings.trimTopOnExternalDisplay && !notchInfo.hasNotch) ? 8 : mediumTopPadding
+            height = effectiveTopPadding + contentHeight + 13
+
+        case .normal:
+            // Normal mode: full width with icons and progress bars
+            width = normalNotchWidth
+            let contentHeight = CGFloat(count) * normalLogoSize + CGFloat(count - 1) * normalRowSpacing
+            let effectiveTopPadding = (settings.trimTopOnNotchDisplay && notchInfo.hasNotch) ||
+                                      (settings.trimTopOnExternalDisplay && !notchInfo.hasNotch) ? 8 : normalTopPadding
+            height = effectiveTopPadding + contentHeight + 16
+        }
+
+        // Calculate position: center of screen + horizontal offset
+        let x = screenFrame.minX + (screenFrame.width - width) / 2 + horizontalOffset
         let y = screenFrame.maxY - height
-        notchRect = NSRect(x: x, y: y, width: notchWidth, height: height)
+        notchRect = NSRect(x: x, y: y, width: width, height: height)
         updateDebugOverlay()
     }
 
@@ -210,14 +243,8 @@ final class NotchWindow: NSWindow {
         contentView = hostingView
 
         // Setup mouse tracker for the notch area
-        let notchWidth: CGFloat = 320
-        let initialHeight: CGFloat = 50  // Base height, will expand dynamically
         mouseTracker = NotchMouseTracker(window: self)
-        mouseTracker?.updateNotchRect(
-            notchWidth: notchWidth,
-            notchHeight: initialHeight,
-            screenFrame: targetScreen.frame
-        )
+        mouseTracker?.setTargetScreen(targetScreen)
 
         // Update mouse tracker when process count changes
         notchState.onProcessCountChanged = { [weak self] count in
