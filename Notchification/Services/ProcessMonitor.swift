@@ -38,6 +38,7 @@ final class ProcessMonitor: ObservableObject {
     private let automatorDetector = AutomatorDetector()
     private let scriptEditorDetector = ScriptEditorDetector()
     private let downloadDetector = DownloadDetector()
+    private let davinciResolveDetector = DaVinciResolveDetector()
 
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
@@ -94,6 +95,7 @@ final class ProcessMonitor: ObservableObject {
         automatorDetector.reset()
         scriptEditorDetector.reset()
         downloadDetector.reset()
+        davinciResolveDetector.reset()
     }
 
     /// Central tick - polls all enabled detectors
@@ -144,6 +146,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackDownloads {
             downloadDetector.poll()
+        }
+        if trackingSettings.trackDaVinciResolve {
+            davinciResolveDetector.poll()
         }
     }
 
@@ -220,6 +225,11 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         downloadDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        davinciResolveDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -359,6 +369,15 @@ final class ProcessMonitor: ObservableObject {
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackDaVinciResolve
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.davinciResolveDetector.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -412,6 +431,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackDownloads && downloadDetector.isActive {
             currentlyActive.insert(.downloads)
+        }
+        if trackingSettings.trackDaVinciResolve && davinciResolveDetector.isActive {
+            currentlyActive.insert(.davinciResolve)
         }
 
         // Clear dismissed flag for processes that have finished (were active, now inactive)

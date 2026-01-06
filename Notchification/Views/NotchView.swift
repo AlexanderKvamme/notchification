@@ -43,6 +43,7 @@ struct NotchView: View {
     @State private var automatorConfettiTrigger: Int = 0
     @State private var scriptEditorConfettiTrigger: Int = 0
     @State private var downloadsConfettiTrigger: Int = 0
+    @State private var davinciResolveConfettiTrigger: Int = 0
 
     // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
@@ -222,6 +223,8 @@ struct NotchView: View {
                         scriptEditorConfettiTrigger += 1
                     case .downloads:
                         downloadsConfettiTrigger += 1
+                    case .davinciResolve:
+                        davinciResolveConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -393,6 +396,7 @@ struct NotchView: View {
             ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
             ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
             ConfettiEmitter(trigger: $downloadsConfettiTrigger, color: ProcessType.downloads.color)
+            ConfettiEmitter(trigger: $davinciResolveConfettiTrigger, color: ProcessType.davinciResolve.color)
         }
         .allowsHitTesting(false)
     }
@@ -566,7 +570,21 @@ struct ProcessLogo: View {
             ScriptEditorLogo()
         case .downloads:
             DownloadsLogo()
+        case .davinciResolve:
+            DaVinciResolveLogo()
         }
+    }
+}
+
+// MARK: - DaVinci Resolve Logo
+
+struct DaVinciResolveLogo: View {
+    var body: some View {
+        Image("davinciresolve")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(ProcessType.davinciResolve.color)
     }
 }
 

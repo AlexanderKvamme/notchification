@@ -90,6 +90,7 @@ struct DebugMenuView: View {
             Toggle("Codex", isOn: $debugSettings.debugCodex)
             Toggle("Automator", isOn: $debugSettings.debugAutomator)
             Toggle("Downloads", isOn: $debugSettings.debugDownloads)
+            Toggle("DaVinci Resolve", isOn: $debugSettings.debugDaVinciResolve)
 
             Divider()
 
@@ -129,6 +130,9 @@ final class DebugSettings: ObservableObject {
     @Published var debugDownloads: Bool {
         didSet { UserDefaults.standard.set(debugDownloads, forKey: "debugDownloads") }
     }
+    @Published var debugDaVinciResolve: Bool {
+        didSet { UserDefaults.standard.set(debugDaVinciResolve, forKey: "debugDaVinciResolve") }
+    }
     /// When true, scans all terminal sessions. When false (default), only scans frontmost session (faster).
     @Published var claudeScanAllSessions: Bool {
         didSet { UserDefaults.standard.set(claudeScanAllSessions, forKey: "claudeScanAllSessions") }
@@ -143,6 +147,7 @@ final class DebugSettings: ObservableObject {
         self.debugCodex = UserDefaults.standard.object(forKey: "debugCodex") as? Bool ?? false
         self.debugAutomator = UserDefaults.standard.object(forKey: "debugAutomator") as? Bool ?? false
         self.debugDownloads = UserDefaults.standard.object(forKey: "debugDownloads") as? Bool ?? false
+        self.debugDaVinciResolve = UserDefaults.standard.object(forKey: "debugDaVinciResolve") as? Bool ?? false
         self.claudeScanAllSessions = UserDefaults.standard.object(forKey: "claudeScanAllSessions") as? Bool ?? false
     }
 }
@@ -196,6 +201,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackDownloads: Bool {
         didSet { UserDefaults.standard.set(trackDownloads, forKey: "trackDownloads") }
     }
+    @Published var trackDaVinciResolve: Bool {
+        didSet { UserDefaults.standard.set(trackDaVinciResolve, forKey: "trackDaVinciResolve") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -219,6 +227,7 @@ final class TrackingSettings: ObservableObject {
         self.trackAutomator = UserDefaults.standard.object(forKey: "trackAutomator") as? Bool ?? true
         self.trackScriptEditor = UserDefaults.standard.object(forKey: "trackScriptEditor") as? Bool ?? true
         self.trackDownloads = UserDefaults.standard.object(forKey: "trackDownloads") as? Bool ?? true
+        self.trackDaVinciResolve = UserDefaults.standard.object(forKey: "trackDaVinciResolve") as? Bool ?? true
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
