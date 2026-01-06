@@ -3,6 +3,29 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.18</title>
+            <link>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.18</link>
+            <sparkle:releaseNotesLink>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.18</sparkle:releaseNotesLink>
+            <pubDate>Mon, 06 Jan 2026 22:14:00 +0100</pubDate>
+            <sparkle:version>18</sparkle:version>
+            <sparkle:shortVersionString>1.0.18</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/AlexanderKvamme/notchification/releases/download/v1.0.18/Notchification-1.0.18.zip"
+                sparkle:edSignature="jO/L9EVq1ocvVcdfq+eGQx8HRKC4QTeoEdEoUf8JL8ARvC6TYvsgP7IK2cFda+XIs8TySndJuMQNvfhkZG3LBA=="
+                length="1759336"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.18</h2>
+                <ul>
+                    <li>Multi-monitor support: show on MacBook, external display, or both</li>
+                    <li>Horizontal position slider for precise placement</li>
+                    <li>Trim top padding options for notch and external displays</li>
+                    <li>Improved click detection and menu organization</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.17</title>
             <link>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.17</link>
             <sparkle:releaseNotesLink>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.17</sparkle:releaseNotesLink>
