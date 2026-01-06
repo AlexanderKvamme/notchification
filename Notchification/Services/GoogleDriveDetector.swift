@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import AppKit
 
 /// Detects if Google Drive is actively syncing by reading its menu bar status
 final class GoogleDriveDetector: ObservableObject, Detector {
@@ -82,24 +83,7 @@ final class GoogleDriveDetector: ObservableObject, Detector {
     }
 
     private func isGoogleDriveRunning() -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-x", "Google Drive"]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch {
-            return false
-        }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return !output.isEmpty
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.google.drivefs" }
     }
 
     /// Get Google Drive menu bar status via AppleScript

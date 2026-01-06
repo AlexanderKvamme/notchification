@@ -10,6 +10,7 @@
 
 import Foundation
 import Combine
+import AppKit
 
 /// Detects if Android Studio is actively building
 final class AndroidStudioDetector: ObservableObject, Detector {
@@ -138,7 +139,20 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         return nil
     }
 
+    /// Check if Android Studio is running (cheap check using NSWorkspace)
+    private var isAndroidStudioRunning: Bool {
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.google.android.studio" }
+    }
+
     func poll() {
+        // Skip expensive checks if Android Studio isn't running
+        guard isAndroidStudioRunning else {
+            if isActive {
+                DispatchQueue.main.async { self.reset() }
+            }
+            return
+        }
+
         // Dispatch to serial queue - ensures checks run one at a time, never overlap
         checkQueue.async { [weak self] in
             guard let self = self else { return }

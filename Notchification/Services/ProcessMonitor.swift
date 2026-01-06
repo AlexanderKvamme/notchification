@@ -110,12 +110,10 @@ final class ProcessMonitor: ObservableObject {
         let newTimer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
         newTimer.schedule(deadline: .now(), repeating: pollingInterval)
         newTimer.setEventHandler { [weak self] in
-            print("⏱️ TICK \(Date())")
             self?.tick()
         }
         newTimer.resume()
         timer = newTimer
-        print("⏱️ Timer created and resumed")
     }
 
     func stopMonitoring() {

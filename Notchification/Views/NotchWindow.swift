@@ -44,7 +44,7 @@ final class NotchMouseTracker {
 
     init(window: NSWindow) {
         self.window = window
-        startTracking()
+        // Timer starts only when processes become active
     }
 
     func updateNotchRect(notchWidth: CGFloat, notchHeight: CGFloat, screenFrame: NSRect) {
@@ -62,13 +62,20 @@ final class NotchMouseTracker {
 
         hasActiveProcesses = count > 0
 
-        // When no processes, immediately disable mouse events and hide debug
+        // When no processes, stop timer and disable mouse events
         if count == 0 {
+            timer?.invalidate()
+            timer = nil
             window?.ignoresMouseEvents = true
             isMouseInNotch = false
             notchRect = .zero
             updateDebugOverlay()
             return
+        }
+
+        // Start timer if not already running
+        if timer == nil {
+            startTracking()
         }
 
         let settings = StyleSettings.shared
@@ -109,8 +116,7 @@ final class NotchMouseTracker {
     }
 
     private func startTracking() {
-        // Poll mouse position frequently
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.checkMousePosition()
         }
     }

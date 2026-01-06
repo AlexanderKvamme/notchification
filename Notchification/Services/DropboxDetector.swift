@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import AppKit
 
 /// Detects if Dropbox is actively syncing by reading its menu bar status
 final class DropboxDetector: ObservableObject, Detector {
@@ -83,24 +84,7 @@ final class DropboxDetector: ObservableObject, Detector {
     }
 
     private func isDropboxRunning() -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-x", "Dropbox"]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch {
-            return false
-        }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return !output.isEmpty
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.getdropbox.dropbox" }
     }
 
     /// Get Dropbox menu bar status via AppleScript

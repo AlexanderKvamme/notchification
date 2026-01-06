@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import AppKit
 
 /// Detects App Store downloads by checking for progress button (e.g. "75% loaded")
 final class AppStoreDetector: ObservableObject, Detector {
@@ -34,7 +35,20 @@ final class AppStoreDetector: ObservableObject, Detector {
         isActive = false
     }
 
+    /// Check if App Store is running (cheap check using NSWorkspace)
+    private var isAppStoreRunning: Bool {
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.apple.AppStore" }
+    }
+
     func poll() {
+        // Skip expensive checks if App Store isn't running
+        guard isAppStoreRunning else {
+            if isActive {
+                DispatchQueue.main.async { self.reset() }
+            }
+            return
+        }
+
         // Dispatch to serial queue - ensures checks run one at a time, never overlap
         checkQueue.async { [weak self] in
             guard let self = self else { return }

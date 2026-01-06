@@ -221,22 +221,22 @@ final class TrackingSettings: ObservableObject {
     }
 
     private init() {
-        self.trackClaude = UserDefaults.standard.object(forKey: "trackClaude") as? Bool ?? true
-        self.trackAndroidStudio = UserDefaults.standard.object(forKey: "trackAndroidStudio") as? Bool ?? true
-        self.trackXcode = UserDefaults.standard.object(forKey: "trackXcode") as? Bool ?? true
-        self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? true
-        self.trackOpencode = UserDefaults.standard.object(forKey: "trackOpencode") as? Bool ?? true
-        self.trackCodex = UserDefaults.standard.object(forKey: "trackCodex") as? Bool ?? true
-        self.trackDropbox = UserDefaults.standard.object(forKey: "trackDropbox") as? Bool ?? true
-        self.trackGoogleDrive = UserDefaults.standard.object(forKey: "trackGoogleDrive") as? Bool ?? true
-        self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? true
-        self.trackICloud = UserDefaults.standard.object(forKey: "trackICloud") as? Bool ?? true
-        self.trackInstaller = UserDefaults.standard.object(forKey: "trackInstaller") as? Bool ?? true
-        self.trackAppStore = UserDefaults.standard.object(forKey: "trackAppStore") as? Bool ?? true
-        self.trackAutomator = UserDefaults.standard.object(forKey: "trackAutomator") as? Bool ?? true
-        self.trackScriptEditor = UserDefaults.standard.object(forKey: "trackScriptEditor") as? Bool ?? true
-        self.trackDownloads = UserDefaults.standard.object(forKey: "trackDownloads") as? Bool ?? true
-        self.trackDaVinciResolve = UserDefaults.standard.object(forKey: "trackDaVinciResolve") as? Bool ?? true
+        self.trackClaude = UserDefaults.standard.object(forKey: "trackClaude") as? Bool ?? false
+        self.trackAndroidStudio = UserDefaults.standard.object(forKey: "trackAndroidStudio") as? Bool ?? false
+        self.trackXcode = UserDefaults.standard.object(forKey: "trackXcode") as? Bool ?? false
+        self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? false
+        self.trackOpencode = UserDefaults.standard.object(forKey: "trackOpencode") as? Bool ?? false
+        self.trackCodex = UserDefaults.standard.object(forKey: "trackCodex") as? Bool ?? false
+        self.trackDropbox = UserDefaults.standard.object(forKey: "trackDropbox") as? Bool ?? false
+        self.trackGoogleDrive = UserDefaults.standard.object(forKey: "trackGoogleDrive") as? Bool ?? false
+        self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? false
+        self.trackICloud = UserDefaults.standard.object(forKey: "trackICloud") as? Bool ?? false
+        self.trackInstaller = UserDefaults.standard.object(forKey: "trackInstaller") as? Bool ?? false
+        self.trackAppStore = UserDefaults.standard.object(forKey: "trackAppStore") as? Bool ?? false
+        self.trackAutomator = UserDefaults.standard.object(forKey: "trackAutomator") as? Bool ?? false
+        self.trackScriptEditor = UserDefaults.standard.object(forKey: "trackScriptEditor") as? Bool ?? false
+        self.trackDownloads = UserDefaults.standard.object(forKey: "trackDownloads") as? Bool ?? false
+        self.trackDaVinciResolve = UserDefaults.standard.object(forKey: "trackDaVinciResolve") as? Bool ?? false
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }

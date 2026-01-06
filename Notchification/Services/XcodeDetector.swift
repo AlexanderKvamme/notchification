@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import AppKit
 import os.log
 
 private let logger = Logger(subsystem: "com.hoi.Notchification", category: "XcodeDetector")
@@ -42,7 +43,20 @@ final class XcodeDetector: ObservableObject, Detector {
         isActive = false
     }
 
+    /// Check if Xcode is running (cheap check using NSWorkspace)
+    private var isXcodeRunning: Bool {
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.apple.dt.Xcode" }
+    }
+
     func poll() {
+        // Skip expensive checks if Xcode isn't running
+        guard isXcodeRunning else {
+            if isActive {
+                DispatchQueue.main.async { self.reset() }
+            }
+            return
+        }
+
         // Dispatch to serial queue - ensures checks run one at a time, never overlap
         checkQueue.async { [weak self] in
             guard let self = self else { return }
