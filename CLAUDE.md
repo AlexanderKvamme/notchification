@@ -49,6 +49,30 @@ Every detector MUST have a corresponding debug toggle in `DebugSettings` (in `No
 - `debugCodex` - Codex CLI detection
 - `debugAutomator` - Automator workflow detection
 
+## Adding a New Detector Checklist
+
+When adding a new detector, you MUST complete ALL of these steps:
+
+1. **Create the detector** in `Services/` (e.g., `MyDetector.swift`)
+2. **Add ProcessType** case in `Models/ProcessType.swift` with:
+   - Raw value, displayName, color, waveColor, grayscalePattern
+3. **Add tracking setting** in `TrackingSettings` (NotchificationApp.swift):
+   - `@Published var trackMyDetector: Bool` with UserDefaults persistence
+4. **Add debug setting** in `DebugSettings` (NotchificationApp.swift)
+5. **Wire up in ProcessMonitor.swift**:
+   - Create detector instance
+   - Add poll() call in tick()
+   - Add isActive binding in setupBindings()
+   - Add to updateActiveProcesses()
+   - Add tracking settings listener
+6. **Add toggle to MenuBarView** in the "Track Apps" section:
+   ```swift
+   Toggle("My Detector", isOn: $trackingSettings.trackMyDetector)
+   ```
+   **IMPORTANT: Every tracker MUST have a toggle in the menu bar!**
+7. **Add debug toggle** to DebugMenuView (ladybug menu)
+8. **Add logo** in NotchView.swift if using a custom icon
+
 ## ClaudeDetector Architecture
 
 The detector:

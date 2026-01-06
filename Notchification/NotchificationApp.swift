@@ -97,6 +97,15 @@ struct DebugMenuView: View {
             Text("License").font(.caption).foregroundColor(.secondary)
             Button("Reset Trial") { licenseManager.resetTrial() }
             Button("Expire Trial") { licenseManager.expireTrial() }
+
+            Divider()
+
+            Button("Run Demo") {
+                let allProcesses = ProcessType.allCases
+                if let randomProcess = allProcesses.randomElement() {
+                    appState.runQuickMock(process: randomProcess)
+                }
+            }
         }
     }
 }
@@ -812,52 +821,51 @@ struct MenuBarView: View {
     @ObservedObject var licenseManager = LicenseManager.shared
 
     var body: some View {
-        VStack {
+        VStack(alignment: .leading) {
             // License status
             licenseStatusView
 
             Divider()
 
-            Toggle("Monitoring", isOn: Binding(
+            Toggle("Enabled", isOn: Binding(
                 get: { appState.isMonitoring },
                 set: { _ in appState.toggleMonitoring() }
             ))
+            .toggleStyle(.switch)
 
             Divider()
 
-            Text("Track Apps").font(.caption).foregroundColor(.secondary)
-            Toggle("Claude", isOn: $trackingSettings.trackClaude)
-            Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
-            Toggle("Xcode", isOn: $trackingSettings.trackXcode)
-            Toggle("Finder", isOn: $trackingSettings.trackFinder)
-            Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
-            Toggle("Codex", isOn: $trackingSettings.trackCodex)
-            Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
-            Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
-            Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
-            Toggle("iCloud", isOn: $trackingSettings.trackICloud)
-            Toggle("Installer", isOn: $trackingSettings.trackInstaller)
-            Toggle("App Store", isOn: $trackingSettings.trackAppStore)
-
-            Divider()
-
-            Toggle("Confetti", isOn: $trackingSettings.confettiEnabled)
-            Toggle("Sound", isOn: $trackingSettings.soundEnabled)
-
-            Divider()
-
-            Button("Run Demo") {
-                let allProcesses = ProcessType.allCases
-                if let randomProcess = allProcesses.randomElement() {
-                    appState.runQuickMock(process: randomProcess)
-                }
+            Group {
+                Text("Track Apps").font(.caption).foregroundColor(.secondary)
+                Toggle("Claude", isOn: $trackingSettings.trackClaude)
+                Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
+                Toggle("Xcode", isOn: $trackingSettings.trackXcode)
+                Toggle("Finder", isOn: $trackingSettings.trackFinder)
+                Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
+                Toggle("Codex", isOn: $trackingSettings.trackCodex)
+                Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
+                Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
+                Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
+                Toggle("iCloud", isOn: $trackingSettings.trackICloud)
             }
+            .disabled(!appState.isMonitoring)
+
+            Group {
+                Toggle("Installer", isOn: $trackingSettings.trackInstaller)
+                Toggle("App Store", isOn: $trackingSettings.trackAppStore)
+                Toggle("Automator", isOn: $trackingSettings.trackAutomator)
+                Toggle("Script Editor", isOn: $trackingSettings.trackScriptEditor)
+                Toggle("Downloads", isOn: $trackingSettings.trackDownloads)
+                Toggle("DaVinci Resolve", isOn: $trackingSettings.trackDaVinciResolve)
+
+                Divider()
+
+                Toggle("Confetti", isOn: $trackingSettings.confettiEnabled)
+                Toggle("Sound", isOn: $trackingSettings.soundEnabled)
+            }
+            .disabled(!appState.isMonitoring)
 
             Divider()
-
-            Button("License...") {
-                LicenseWindowController.shared.showLicenseWindow()
-            }
 
             Button("Settings...") {
                 SettingsWindowController.shared.showSettings()
@@ -884,6 +892,8 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("q")
         }
+        .padding(.leading, 16)
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder

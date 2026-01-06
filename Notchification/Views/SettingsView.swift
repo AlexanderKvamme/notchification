@@ -75,6 +75,12 @@ struct DisplaySettingsTab: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
+
+            Section {
+                Button("Manage License...") {
+                    LicenseWindowController.shared.showLicenseWindow()
+                }
+            }
         }
         .formStyle(.grouped)
         .padding()
