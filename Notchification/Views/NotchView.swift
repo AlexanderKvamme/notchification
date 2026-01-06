@@ -83,7 +83,7 @@ struct NotchView: View {
     private var mediumExpandedHeight: CGFloat {
         let processCount = max(1, notchState.activeProcesses.count)
         let contentHeight = CGFloat(processCount) * mediumLogoSize + CGFloat(processCount - 1) * mediumRowSpacing
-        return mediumTopPadding + contentHeight + 8  // 8 bottom padding
+        return mediumTopPadding + contentHeight + 13  // 13 bottom padding
     }
 
     /// Base color for minimal mode - first active process color

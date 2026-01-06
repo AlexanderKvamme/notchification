@@ -63,10 +63,16 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         if debug { print("🤖 No Homebrew gradle, searching ~/.gradle/wrapper/dists...") }
 
         // Search for any gradle wrapper version dynamically
+        // Check GRADLE_USER_HOME first, fall back to ~/.gradle
+        let gradleHome = ProcessInfo.processInfo.environment["GRADLE_USER_HOME"]
+            ?? NSString(string: "~/.gradle").expandingTildeInPath
+
+        if debug { print("🤖 Searching for gradle in: \(gradleHome)/wrapper/dists") }
+
         let pipe = Pipe()
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
-        task.arguments = ["-c", "find ~/.gradle/wrapper/dists -name 'gradle' -type f -path '*/bin/*' 2>/dev/null | head -1"]
+        task.arguments = ["-c", "find '\(gradleHome)/wrapper/dists' -name 'gradle' -type f -path '*/bin/*' 2>/dev/null | head -1"]
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
 
@@ -115,14 +121,17 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             // java_home not available or failed
         }
 
-        // Fallback: Android Studio's bundled JBR
-        let jbrPaths = [
-            "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
-            NSString(string: "~/Applications/Android Studio.app/Contents/jbr/Contents/Home").expandingTildeInPath
-        ]
-        for path in jbrPaths {
-            if FileManager.default.fileExists(atPath: path) {
-                return path
+        // Fallback: Search for any Android Studio variant's bundled JBR
+        let appDirs = ["/Applications", NSString(string: "~/Applications").expandingTildeInPath]
+
+        for appDir in appDirs {
+            if let contents = try? FileManager.default.contentsOfDirectory(atPath: appDir) {
+                for app in contents where app.hasPrefix("Android Studio") && app.hasSuffix(".app") {
+                    let jbrPath = "\(appDir)/\(app)/Contents/jbr/Contents/Home"
+                    if FileManager.default.fileExists(atPath: jbrPath) {
+                        return jbrPath
+                    }
+                }
             }
         }
 
