@@ -7,6 +7,6 @@
 	<key>NSAppSleepDisabled</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/AlexanderKvamme/notchification/main/appcast.xml</string>
+	<string>https://featurefest.dev/notchification/appcast.xml</string>
 </dict>
 </plist>
