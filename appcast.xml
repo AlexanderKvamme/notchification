@@ -3,9 +3,25 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.20</title>
+            <pubDate>Tue, 07 Jan 2026 06:29:00 +0100</pubDate>
+            <sparkle:version>20</sparkle:version>
+            <sparkle:shortVersionString>1.0.20</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.20.zip"
+                sparkle:edSignature="MGkt11xlW53JklWPa5hiNr3AL4WZM4BnK0OBih0bn955TyPHM90cwj1eiqy3A4422kWHUlyCFN+ZSbId9X0BCw=="
+                length="1760659"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.20</h2>
+                <ul>
+                    <li>Updates now delivered via featurefest.dev</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.19</title>
-            <link>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.19</link>
-            <sparkle:releaseNotesLink>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.19</sparkle:releaseNotesLink>
             <pubDate>Mon, 06 Jan 2026 22:42:00 +0100</pubDate>
             <sparkle:version>19</sparkle:version>
             <sparkle:shortVersionString>1.0.19</sparkle:shortVersionString>
