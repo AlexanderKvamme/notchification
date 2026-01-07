@@ -10,6 +10,9 @@ import AppKit
 // Shared sound instance for completion sound
 private let completionSound = NSSound(named: "Glass")
 
+// Pure black color to match the physical notch - using NSColor for accurate color
+private let notchBlack = Color(nsColor: .black)
+
 struct NotchView: View {
     @ObservedObject var notchState: NotchState
     @ObservedObject var licenseManager = LicenseManager.shared
@@ -326,7 +329,7 @@ struct NotchView: View {
             // When Teams is active, show expanded background with camera
             if hasTeams {
                 MinimalNotchShape(cornerRadius: 16)
-                    .fill(Color.black)
+                    .fill(notchBlack)
                     .frame(width: cameraWidth + 20, height: notchInfo.height + 5 + cameraHeight + 16)
                     .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
 
@@ -344,7 +347,7 @@ struct NotchView: View {
             } else {
                 // Normal minimal mode - just stroke
                 MinimalNotchShape(cornerRadius: 8)
-                    .fill(Color.black)
+                    .fill(notchBlack)
             }
 
             // Stroke animation (only show when no Teams, or show around expanded shape)
@@ -368,7 +371,7 @@ struct NotchView: View {
                 }
 
                 Rectangle()
-                    .fill(Color.black)
+                    .fill(notchBlack)
                     .frame(width: notchInfo.width - minimalStrokeWidth, height: minimalStrokeWidth)
             }
         }
@@ -386,7 +389,7 @@ struct NotchView: View {
         let cameraWidth: CGFloat = 280  // Same as normal mode
 
         MinimalNotchShape(cornerRadius: 16)
-            .fill(Color.black)
+            .fill(notchBlack)
             .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: mediumExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: mediumExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
@@ -456,7 +459,7 @@ struct NotchView: View {
         }()
 
         NotchShape()
-            .fill(Color.black)
+            .fill(notchBlack)
             .frame(width: notchWidth, height: teamsExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: teamsExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)

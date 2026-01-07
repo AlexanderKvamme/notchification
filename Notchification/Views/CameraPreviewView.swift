@@ -10,6 +10,9 @@ import SwiftUI
 import AVFoundation
 import AppKit
 
+// Pure black color to match the physical notch - using NSColor for accurate color
+private let notchBlack = Color(nsColor: .black)
+
 /// SwiftUI wrapper for camera preview
 /// Hover to enlarge, move mouse away to dismiss
 struct CameraPreviewView: View {
@@ -22,7 +25,7 @@ struct CameraPreviewView: View {
     var body: some View {
         ZStack {
             // Solid black background to prevent anything showing through
-            Color.black
+            notchBlack
                 .clipShape(RoundedRectangle(cornerRadius: 20))
 
             if let image = cameraManager.currentFrame {
@@ -226,5 +229,5 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 #Preview {
     CameraPreviewView()
         .frame(width: 200, height: 150)
-        .background(Color.black)
+        .background(notchBlack)
 }
