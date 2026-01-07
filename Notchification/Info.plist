@@ -8,5 +8,7 @@
 	<true/>
 	<key>SUFeedURL</key>
 	<string>https://featurefest.dev/notchification/appcast.xml</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Notchification uses the camera to show a preview before your Teams meetings so you can check your appearance.</string>
 </dict>
 </plist>

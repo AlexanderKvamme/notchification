@@ -40,6 +40,7 @@ final class ProcessMonitor: ObservableObject {
     private let scriptEditorDetector = ScriptEditorDetector()
     private let downloadDetector = DownloadDetector()
     private let davinciResolveDetector = DaVinciResolveDetector()
+    private let teamsDetector = TeamsDetector()
 
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
@@ -137,6 +138,7 @@ final class ProcessMonitor: ObservableObject {
         scriptEditorDetector.reset()
         downloadDetector.reset()
         davinciResolveDetector.reset()
+        teamsDetector.reset()
     }
 
     /// Central tick - polls all enabled detectors
@@ -190,6 +192,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackDaVinciResolve {
             davinciResolveDetector.poll()
+        }
+        if trackingSettings.trackTeams {
+            teamsDetector.poll()
         }
     }
 
@@ -271,6 +276,11 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         davinciResolveDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        teamsDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -419,6 +429,15 @@ final class ProcessMonitor: ObservableObject {
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackTeams
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.teamsDetector.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -475,6 +494,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackDaVinciResolve && davinciResolveDetector.isActive {
             currentlyActive.insert(.davinciResolve)
+        }
+        if trackingSettings.trackTeams && teamsDetector.isActive {
+            currentlyActive.insert(.teams)
         }
 
         // Clear dismissed flag for processes that have finished (were active, now inactive)

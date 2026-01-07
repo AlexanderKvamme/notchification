@@ -22,6 +22,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case scriptEditor = "scripteditor"
     case downloads = "downloads"
     case davinciResolve = "davinciresolve"
+    case teams = "teams"
 
     var id: String { rawValue }
 
@@ -43,6 +44,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .scriptEditor: return "Script Editor"
         case .downloads: return "Downloads"
         case .davinciResolve: return "DaVinci Resolve"
+        case .teams: return "Teams"
         }
     }
 
@@ -64,6 +66,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .scriptEditor: return .white // White for Script Editor
         case .downloads: return Color(red: 0.757, green: 0.765, blue: 1.0) // #c1c3ff Light purple
         case .davinciResolve: return Color(red: 0.176, green: 0.294, blue: 0.416) // #2d4b6a DaVinci blue
+        case .teams: return Color(red: 0.384, green: 0.392, blue: 0.655) // #6264A7 Teams purple
         }
     }
 
@@ -85,6 +88,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .scriptEditor: return Color(red: 0.85, green: 0.85, blue: 0.85) // Light gray wave on white
         case .downloads: return Color(red: 0.85, green: 0.86, blue: 1.0) // Lighter purple
         case .davinciResolve: return Color(red: 0.35, green: 0.5, blue: 0.7) // Lighter DaVinci blue
+        case .teams: return Color(red: 0.55, green: 0.56, blue: 0.8) // Lighter Teams purple
         }
     }
 
@@ -106,6 +110,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .scriptEditor: return .solid
         case .downloads: return .solid
         case .davinciResolve: return .solid
+        case .teams: return .solid
         }
     }
 }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct SettingsView: View {
     var body: some View {
@@ -13,6 +14,11 @@ struct SettingsView: View {
             DisplaySettingsTab()
                 .tabItem {
                     Label("Display", systemImage: "display")
+                }
+
+            SmartFeaturesTab()
+                .tabItem {
+                    Label("Smart Features", systemImage: "sparkles")
                 }
 
             DetectionSettingsTab()
@@ -25,7 +31,7 @@ struct SettingsView: View {
                     Label("Thresholds", systemImage: "slider.horizontal.3")
                 }
         }
-        .frame(width: 450, height: 350)
+        .frame(width: 450, height: 380)
     }
 }
 
@@ -114,6 +120,67 @@ struct DisplaySettingsTab: View {
         }
         .onDisappear {
             NotificationCenter.default.post(name: .hideSettingsPreview, object: nil)
+        }
+    }
+}
+
+// MARK: - Smart Features Tab
+
+struct SmartFeaturesTab: View {
+    @ObservedObject var trackingSettings = TrackingSettings.shared
+    @State private var cameraStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+
+    var body: some View {
+        Form {
+            Section("Teams Camera Preview") {
+                Toggle("Enable", isOn: $trackingSettings.trackTeams)
+                    .onChange(of: trackingSettings.trackTeams) { _, enabled in
+                        if enabled {
+                            handleCameraPermission()
+                        }
+                    }
+                Text("Show a camera preview when Microsoft Teams launches, so you can check your appearance before joining a meeting. Hover to enlarge, move mouse away to dismiss.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if cameraStatus == .denied || cameraStatus == .restricted {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text("Camera access denied")
+                            .font(.caption)
+                        Spacer()
+                        Button("Open Settings") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+        .onAppear {
+            cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        }
+    }
+
+    private func handleCameraPermission() {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        cameraStatus = status
+
+        if status == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+                }
+            }
+        } else if status == .denied || status == .restricted {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+                NSWorkspace.shared.open(url)
+            }
         }
     }
 }

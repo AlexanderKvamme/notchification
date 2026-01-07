@@ -45,6 +45,7 @@ struct NotchView: View {
     @State private var scriptEditorConfettiTrigger: Int = 0
     @State private var downloadsConfettiTrigger: Int = 0
     @State private var davinciResolveConfettiTrigger: Int = 0
+    @State private var teamsConfettiTrigger: Int = 0
 
     // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
@@ -76,11 +77,12 @@ struct NotchView: View {
         // Check trim setting based on whether display has notch
         if notchInfo.hasNotch {
             if styleSettings.trimTopOnNotchDisplay {
-                return 8  // Minimal padding on notch display
+                // On notch displays, must stay below the notch + small buffer
+                return notchInfo.height + 4
             }
         } else {
             if styleSettings.trimTopOnExternalDisplay {
-                return 8  // Minimal padding on external display
+                return 8  // Minimal padding on external display (no notch to avoid)
             }
         }
         return topPadding
@@ -91,11 +93,12 @@ struct NotchView: View {
         // Check trim setting based on whether display has notch
         if notchInfo.hasNotch {
             if styleSettings.trimTopOnNotchDisplay {
-                return 8  // Minimal padding on notch display
+                // On notch displays, must stay below the notch + small buffer
+                return notchInfo.height + 4
             }
         } else {
             if styleSettings.trimTopOnExternalDisplay {
-                return 8  // Minimal padding on external display
+                return 8  // Minimal padding on external display (no notch to avoid)
             }
         }
         return mediumTopPaddingBase
@@ -112,11 +115,24 @@ struct NotchView: View {
         return effectiveTopPadding + contentHeight + trialTextHeight + 16  // 16 bottom padding
     }
 
-    // Dynamic height for medium mode (smaller)
+    // Dynamic height for medium mode (smaller, but full camera size)
     private var mediumExpandedHeight: CGFloat {
-        let processCount = max(1, notchState.activeProcesses.count)
-        let contentHeight = CGFloat(processCount) * mediumLogoSize + CGFloat(processCount - 1) * mediumRowSpacing
-        return effectiveMediumTopPadding + contentHeight + 13  // 13 bottom padding
+        let hasTeams = notchState.activeProcesses.contains(.teams)
+        let teamsOnly = notchState.activeProcesses == [.teams]
+        let cameraHeight: CGFloat = 150  // Same as normal mode
+
+        if teamsOnly {
+            // Camera starts below notch, so use notchInfo.height as top offset
+            return notchInfo.height + 5 + cameraHeight + 16
+        } else if hasTeams {
+            let otherCount = notchState.activeProcesses.count - 1
+            let otherHeight = CGFloat(otherCount) * mediumLogoSize + CGFloat(max(0, otherCount - 1)) * mediumRowSpacing
+            return notchInfo.height + 5 + cameraHeight + 8 + otherHeight + 13
+        } else {
+            let processCount = max(1, notchState.activeProcesses.count)
+            let contentHeight = CGFloat(processCount) * mediumLogoSize + CGFloat(processCount - 1) * mediumRowSpacing
+            return effectiveMediumTopPadding + contentHeight + 13  // 13 bottom padding
+        }
     }
 
     /// Base color for minimal mode - first active process color
@@ -257,6 +273,8 @@ struct NotchView: View {
                         downloadsConfettiTrigger += 1
                     case .davinciResolve:
                         davinciResolveConfettiTrigger += 1
+                    case .teams:
+                        teamsConfettiTrigger += 1
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -297,35 +315,64 @@ struct NotchView: View {
     // MARK: - Mode Views
 
     /// Minimal mode: Just a colored stroke around the notch
+    /// Shows camera preview when Teams is active
     @ViewBuilder
     private var minimalModeView: some View {
+        let hasTeams = notchState.activeProcesses.contains(.teams)
+        let cameraHeight: CGFloat = 150
+        let cameraWidth: CGFloat = 280  // Same as normal mode
+
         ZStack(alignment: .top) {
-            MinimalNotchShape(cornerRadius: 8)
-                .fill(Color.black)
+            // When Teams is active, show expanded background with camera
+            if hasTeams {
+                MinimalNotchShape(cornerRadius: 16)
+                    .fill(Color.black)
+                    .frame(width: cameraWidth + 20, height: notchInfo.height + 5 + cameraHeight + 16)
+                    .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
 
-            if showBaseStroke {
-                MinimalNotchShape(cornerRadius: 13)
-                    .trim(from: 1 - strokeProgress, to: 1)
-                    .stroke(baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                // Camera preview - positioned below the notch
+                CameraPreviewView(onDismiss: {
+                    ProcessMonitor.shared.dismissProcess(.teams)
+                    notchState.recentlyDismissed.insert(.teams)
+                    notchState.activeProcesses.removeAll { $0 == .teams }
+                    CameraManager.shared.stopSession()
+                })
+                .frame(width: cameraWidth, height: cameraHeight)
+                .offset(y: notchInfo.height + 5)
+                .opacity(isExpanded ? 1 : 0)
+                .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+            } else {
+                // Normal minimal mode - just stroke
+                MinimalNotchShape(cornerRadius: 8)
+                    .fill(Color.black)
             }
 
-            if !showBaseStroke && previousWaveIndex >= 0 {
-                MinimalNotchShape(cornerRadius: 13)
-                    .stroke(previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-            }
+            // Stroke animation (only show when no Teams, or show around expanded shape)
+            if !hasTeams {
+                if showBaseStroke {
+                    MinimalNotchShape(cornerRadius: 13)
+                        .trim(from: 1 - strokeProgress, to: 1)
+                        .stroke(baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                }
 
-            if !notchState.activeProcesses.isEmpty {
-                MinimalNotchShape(cornerRadius: 13)
-                    .trim(from: 1 - waveProgress, to: 1)
-                    .stroke(currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-                    .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
-            }
+                if !showBaseStroke && previousWaveIndex >= 0 {
+                    MinimalNotchShape(cornerRadius: 13)
+                        .stroke(previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                }
 
-            Rectangle()
-                .fill(Color.black)
-                .frame(width: notchInfo.width - minimalStrokeWidth, height: minimalStrokeWidth)
+                if !notchState.activeProcesses.isEmpty {
+                    MinimalNotchShape(cornerRadius: 13)
+                        .trim(from: 1 - waveProgress, to: 1)
+                        .stroke(currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                        .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+                }
+
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: notchInfo.width - minimalStrokeWidth, height: minimalStrokeWidth)
+            }
         }
-        .frame(width: notchInfo.width, height: notchInfo.height)
+        .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: hasTeams ? notchInfo.height + 5 + cameraHeight + 16 : notchInfo.height)
         .opacity(isExpanded ? 1 : 0)
         .overlay(alignment: .top) { confettiEmitters }
     }
@@ -333,16 +380,34 @@ struct NotchView: View {
     /// Medium mode: Notch-width with smaller icons and progress bars
     @ViewBuilder
     private var mediumModeView: some View {
+        let hasTeams = notchState.activeProcesses.contains(.teams)
+        let teamsOnly = notchState.activeProcesses == [.teams]
+        let cameraHeight: CGFloat = 150
+        let cameraWidth: CGFloat = 280  // Same as normal mode
+
         MinimalNotchShape(cornerRadius: 16)
             .fill(Color.black)
-            .frame(width: notchInfo.width, height: mediumExpandedHeight)
+            .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: mediumExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: mediumExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
             .overlay(alignment: .top) { confettiEmitters }
 
         if !notchState.activeProcesses.isEmpty {
-            VStack(alignment: .leading, spacing: mediumRowSpacing) {
-                ForEach(notchState.activeProcesses) { process in
+            VStack(alignment: .center, spacing: mediumRowSpacing) {
+                // Show camera preview if Teams is active
+                if hasTeams {
+                    CameraPreviewView(onDismiss: {
+                        ProcessMonitor.shared.dismissProcess(.teams)
+                        notchState.recentlyDismissed.insert(.teams)
+                        notchState.activeProcesses.removeAll { $0 == .teams }
+                        CameraManager.shared.stopSession()
+                    })
+                    .frame(width: cameraWidth, height: cameraHeight)
+                    .padding(.bottom, teamsOnly ? 0 : 8)
+                }
+
+                // Show other processes (not Teams)
+                ForEach(notchState.activeProcesses.filter { $0 != .teams }) { process in
                     ProcessRow(
                         process: process,
                         isExpanded: isExpanded,
@@ -356,10 +421,10 @@ struct NotchView: View {
                     )
                 }
             }
-            .padding(.leading, 13)
-            .padding(.trailing, 16)
-            .frame(width: notchInfo.width)
-            .offset(y: effectiveMediumTopPadding)
+            .padding(.horizontal, 8)
+            .padding(.top, hasTeams ? 0 : 4)
+            .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width)
+            .offset(y: hasTeams ? notchInfo.height + 5 : effectiveMediumTopPadding)
             .opacity(isExpanded ? 1 : 0)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
@@ -367,18 +432,52 @@ struct NotchView: View {
     }
 
     /// Normal mode: Full size with icons and progress bars
+    /// Shows camera preview when Teams is active
     @ViewBuilder
     private var normalModeView: some View {
+        // Check if only Teams is active - show camera-only view
+        let teamsOnly = notchState.activeProcesses == [.teams]
+        let hasTeams = notchState.activeProcesses.contains(.teams)
+        let cameraHeight: CGFloat = 150
+        let cameraWidth: CGFloat = notchWidth - 20  // Fill notch width with small padding
+
+        // Calculate height: if teams is active, include camera height
+        let teamsExpandedHeight: CGFloat = {
+            if teamsOnly {
+                return effectiveTopPadding + cameraHeight + 16  // No extra padding when Teams only
+            } else if hasTeams {
+                // Camera + other processes (add spacing between camera and bars)
+                let otherCount = notchState.activeProcesses.count - 1
+                let otherHeight = CGFloat(otherCount) * logoSize + CGFloat(max(0, otherCount - 1)) * rowSpacing
+                return effectiveTopPadding + cameraHeight + 8 + otherHeight + 16  // 8px between camera and bars
+            } else {
+                return expandedHeight
+            }
+        }()
+
         NotchShape()
             .fill(Color.black)
-            .frame(width: notchWidth, height: expandedHeight)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedHeight)
+            .frame(width: notchWidth, height: teamsExpandedHeight)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: teamsExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
             .overlay(alignment: .top) { confettiEmitters }
 
         if !notchState.activeProcesses.isEmpty {
-            VStack(alignment: .leading, spacing: rowSpacing) {
-                ForEach(notchState.activeProcesses) { process in
+            VStack(alignment: .center, spacing: rowSpacing) {
+                // Show camera preview if Teams is active
+                if hasTeams {
+                    CameraPreviewView(onDismiss: {
+                        ProcessMonitor.shared.dismissProcess(.teams)
+                        notchState.recentlyDismissed.insert(.teams)
+                        notchState.activeProcesses.removeAll { $0 == .teams }
+                        CameraManager.shared.stopSession()
+                    })
+                    .frame(width: cameraWidth, height: cameraHeight)
+                    .padding(.bottom, teamsOnly ? 0 : 8)  // Only add padding if other bars below
+                }
+
+                // Show other processes (not Teams)
+                ForEach(notchState.activeProcesses.filter { $0 != .teams }) { process in
                     ProcessRow(
                         process: process,
                         isExpanded: isExpanded,
@@ -390,6 +489,7 @@ struct NotchView: View {
                             notchState.activeProcesses.removeAll { $0 == dismissedProcess }
                         }
                     )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if licenseManager.state == .expired {
@@ -429,6 +529,7 @@ struct NotchView: View {
             ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
             ConfettiEmitter(trigger: $downloadsConfettiTrigger, color: ProcessType.downloads.color)
             ConfettiEmitter(trigger: $davinciResolveConfettiTrigger, color: ProcessType.davinciResolve.color)
+            ConfettiEmitter(trigger: $teamsConfettiTrigger, color: ProcessType.teams.color)
         }
         .allowsHitTesting(false)
     }
@@ -604,7 +705,21 @@ struct ProcessLogo: View {
             DownloadsLogo()
         case .davinciResolve:
             DaVinciResolveLogo()
+        case .teams:
+            TeamsLogo()
         }
+    }
+}
+
+// MARK: - Teams Logo
+
+struct TeamsLogo: View {
+    var body: some View {
+        Image(systemName: "video.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .symbolRenderingMode(.monochrome)
+            .foregroundColor(.white)
     }
 }
 

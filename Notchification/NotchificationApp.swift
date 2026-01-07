@@ -7,6 +7,7 @@ import SwiftUI
 import Combine
 import Sparkle
 import ApplicationServices  // For AXIsProcessTrusted()
+import AVFoundation  // For camera permission
 
 /// Sparkle delegate that gates updates to licensed users only
 final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
@@ -91,6 +92,7 @@ struct DebugMenuView: View {
             Toggle("Automator", isOn: $debugSettings.debugAutomator)
             Toggle("Downloads", isOn: $debugSettings.debugDownloads)
             Toggle("DaVinci Resolve", isOn: $debugSettings.debugDaVinciResolve)
+            Toggle("Teams", isOn: $debugSettings.debugTeams)
 
             Divider()
 
@@ -101,11 +103,11 @@ struct DebugMenuView: View {
             Divider()
 
             Button("Run Demo") {
-                let allProcesses = ProcessType.allCases
-                if let randomProcess = allProcesses.randomElement() {
-                    appState.runQuickMock(process: randomProcess)
+                if let processType = appState.mockOnLaunchType.processType {
+                    appState.runQuickMock(process: processType)
                 }
             }
+            .disabled(appState.mockOnLaunchType == .none)
         }
     }
 }
@@ -142,6 +144,9 @@ final class DebugSettings: ObservableObject {
     @Published var debugDaVinciResolve: Bool {
         didSet { UserDefaults.standard.set(debugDaVinciResolve, forKey: "debugDaVinciResolve") }
     }
+    @Published var debugTeams: Bool {
+        didSet { UserDefaults.standard.set(debugTeams, forKey: "debugTeams") }
+    }
     /// When true, scans all terminal sessions. When false (default), only scans frontmost session (faster).
     @Published var claudeScanAllSessions: Bool {
         didSet { UserDefaults.standard.set(claudeScanAllSessions, forKey: "claudeScanAllSessions") }
@@ -157,6 +162,7 @@ final class DebugSettings: ObservableObject {
         self.debugAutomator = UserDefaults.standard.object(forKey: "debugAutomator") as? Bool ?? false
         self.debugDownloads = UserDefaults.standard.object(forKey: "debugDownloads") as? Bool ?? false
         self.debugDaVinciResolve = UserDefaults.standard.object(forKey: "debugDaVinciResolve") as? Bool ?? false
+        self.debugTeams = UserDefaults.standard.object(forKey: "debugTeams") as? Bool ?? false
         self.claudeScanAllSessions = UserDefaults.standard.object(forKey: "claudeScanAllSessions") as? Bool ?? false
     }
 }
@@ -213,6 +219,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackDaVinciResolve: Bool {
         didSet { UserDefaults.standard.set(trackDaVinciResolve, forKey: "trackDaVinciResolve") }
     }
+    @Published var trackTeams: Bool {
+        didSet { UserDefaults.standard.set(trackTeams, forKey: "trackTeams") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -237,6 +246,7 @@ final class TrackingSettings: ObservableObject {
         self.trackScriptEditor = UserDefaults.standard.object(forKey: "trackScriptEditor") as? Bool ?? false
         self.trackDownloads = UserDefaults.standard.object(forKey: "trackDownloads") as? Bool ?? false
         self.trackDaVinciResolve = UserDefaults.standard.object(forKey: "trackDaVinciResolve") as? Bool ?? false
+        self.trackTeams = UserDefaults.standard.object(forKey: "trackTeams") as? Bool ?? false
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -501,6 +511,7 @@ enum MockProcessType: String, CaseIterable {
     case icloud = "iCloud"
     case installer = "Installer"
     case appStore = "App Store"
+    case teams = "Teams"
     case claudeAndFinder = "Claude + Finder"
     case threeProcesses = "Claude + Finder + Android"
     case all = "All"
@@ -520,6 +531,7 @@ enum MockProcessType: String, CaseIterable {
         case .icloud: return .icloud
         case .installer: return .installer
         case .appStore: return .appStore
+        case .teams: return .teams
         case .claudeAndFinder: return nil // Handled specially
         case .threeProcesses: return nil // Handled specially
         case .all: return nil // Handled specially
@@ -527,7 +539,7 @@ enum MockProcessType: String, CaseIterable {
     }
 
     var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
+        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore, .teams]
     }
 }
 
@@ -809,9 +821,26 @@ final class AppState: ObservableObject {
         }
 
         isMocking = true
+
+        // For Teams, start the camera (view shows immediately with black bg)
+        if processType == .teams {
+            CameraManager.shared.startSession()
+        }
+
+        showLaunchMock(processType: processType)
+    }
+
+    private func showLaunchMock(processType: ProcessType) {
         windowController.update(with: [processType])
 
-        // Hide after 5 seconds
+        // Teams is dismissed via hover interaction, not timeout
+        if processType == .teams {
+            // Start monitoring in background so other detectors work
+            startMonitoring()
+            return
+        }
+
+        // Hide after 5 seconds (non-Teams)
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             self?.windowController.update(with: [])
 
@@ -926,6 +955,15 @@ final class AppState: ObservableObject {
     private var mockProcesses: [ProcessType] = []
 
     func runQuickMock(process: ProcessType = .finder) {
+        // For Teams, start camera and show immediately (black bg until frames arrive)
+        if process == .teams {
+            CameraManager.shared.startSession()
+        }
+
+        showMockProcess(process)
+    }
+
+    private func showMockProcess(_ process: ProcessType) {
         // Add to mock processes (avoid duplicates)
         if !mockProcesses.contains(process) {
             mockProcesses.append(process)
@@ -937,7 +975,12 @@ final class AppState: ObservableObject {
         isMocking = true
         #endif
 
-        // Remove this specific process after 5 seconds
+        // Teams is dismissed via hover interaction, not timeout
+        if process == .teams {
+            return
+        }
+
+        // Remove this specific process after 5 seconds (non-Teams)
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             self?.mockProcesses.removeAll { $0 == process }
             self?.windowController.update(with: self?.mockProcesses ?? [])
@@ -948,6 +991,79 @@ final class AppState: ObservableObject {
             }
             #endif
         }
+    }
+}
+
+/// Triggers macOS camera permission prompt by actually accessing the camera
+private func triggerCameraPermissionPrompt() {
+    // Create and start a capture session - this forces the permission prompt
+    let session = AVCaptureSession()
+
+    DispatchQueue.global(qos: .userInitiated).async {
+        session.beginConfiguration()
+
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+                ?? AVCaptureDevice.default(for: .video) else {
+            print("No camera found")
+            return
+        }
+
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            if session.canAddInput(input) {
+                session.addInput(input)
+            }
+            session.commitConfiguration()
+
+            // Actually start the session briefly to trigger permission
+            session.startRunning()
+
+            // Stop after a moment
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                session.stopRunning()
+            }
+        } catch {
+            print("Camera access error: \(error)")
+            // If we get here with authorization error, open Settings
+            DispatchQueue.main.async {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+    }
+}
+
+/// Toggle that supports ⌘-click to demo the feature
+struct DemoableToggle: View {
+    let label: String
+    @Binding var isOn: Bool
+    let processType: ProcessType
+    let appState: AppState
+    var onChange: ((Bool) -> Void)?
+
+    var body: some View {
+        HStack {
+            Button(action: {
+                if NSEvent.modifierFlags.contains(.command) {
+                    appState.runQuickMock(process: processType)
+                } else {
+                    isOn.toggle()
+                }
+            }) {
+                Text(label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .onChange(of: isOn) { _, newValue in
+                    onChange?(newValue)
+                }
+        }
+        .padding(.trailing, 8)
     }
 }
 
@@ -970,36 +1086,43 @@ struct MenuBarView: View {
                 set: { _ in appState.toggleMonitoring() }
             ))
             .toggleStyle(.switch)
+            .padding(.trailing, 8)
 
             Divider()
 
             Group {
-                Text("Track Apps").font(.caption).foregroundColor(.secondary)
-                Toggle("Claude", isOn: $trackingSettings.trackClaude)
-                Toggle("Android Studio", isOn: $trackingSettings.trackAndroidStudio)
-                Toggle("Xcode", isOn: $trackingSettings.trackXcode)
-                Toggle("Finder", isOn: $trackingSettings.trackFinder)
-                Toggle("Opencode", isOn: $trackingSettings.trackOpencode)
-                Toggle("Codex", isOn: $trackingSettings.trackCodex)
-                Toggle("Dropbox", isOn: $trackingSettings.trackDropbox)
-                Toggle("Google Drive", isOn: $trackingSettings.trackGoogleDrive)
-                Toggle("OneDrive", isOn: $trackingSettings.trackOneDrive)
-                Toggle("iCloud", isOn: $trackingSettings.trackICloud)
+                HStack {
+                    Text("Track Apps").font(.caption).foregroundColor(.secondary)
+                    Spacer()
+                    Text("⌘-click to demo").font(.caption2).foregroundColor(.secondary.opacity(0.6))
+                }
+                DemoableToggle(label: "Claude", isOn: $trackingSettings.trackClaude, processType: .claude, appState: appState)
+                DemoableToggle(label: "Android Studio", isOn: $trackingSettings.trackAndroidStudio, processType: .androidStudio, appState: appState)
+                DemoableToggle(label: "Xcode", isOn: $trackingSettings.trackXcode, processType: .xcode, appState: appState)
+                DemoableToggle(label: "Finder", isOn: $trackingSettings.trackFinder, processType: .finder, appState: appState)
+                DemoableToggle(label: "Opencode", isOn: $trackingSettings.trackOpencode, processType: .opencode, appState: appState)
+                DemoableToggle(label: "Codex", isOn: $trackingSettings.trackCodex, processType: .codex, appState: appState)
+                DemoableToggle(label: "Dropbox", isOn: $trackingSettings.trackDropbox, processType: .dropbox, appState: appState)
+                DemoableToggle(label: "Google Drive", isOn: $trackingSettings.trackGoogleDrive, processType: .googleDrive, appState: appState)
+                DemoableToggle(label: "OneDrive", isOn: $trackingSettings.trackOneDrive, processType: .oneDrive, appState: appState)
+                DemoableToggle(label: "iCloud", isOn: $trackingSettings.trackICloud, processType: .icloud, appState: appState)
             }
             .disabled(!appState.isMonitoring)
 
             Group {
-                Toggle("Installer", isOn: $trackingSettings.trackInstaller)
-                Toggle("App Store", isOn: $trackingSettings.trackAppStore)
-                Toggle("Automator", isOn: $trackingSettings.trackAutomator)
-                Toggle("Script Editor", isOn: $trackingSettings.trackScriptEditor)
-                Toggle("Downloads", isOn: $trackingSettings.trackDownloads)
-                Toggle("DaVinci Resolve", isOn: $trackingSettings.trackDaVinciResolve)
+                DemoableToggle(label: "Installer", isOn: $trackingSettings.trackInstaller, processType: .installer, appState: appState)
+                DemoableToggle(label: "App Store", isOn: $trackingSettings.trackAppStore, processType: .appStore, appState: appState)
+                DemoableToggle(label: "Automator", isOn: $trackingSettings.trackAutomator, processType: .automator, appState: appState)
+                DemoableToggle(label: "Script Editor", isOn: $trackingSettings.trackScriptEditor, processType: .scriptEditor, appState: appState)
+                DemoableToggle(label: "Downloads", isOn: $trackingSettings.trackDownloads, processType: .downloads, appState: appState)
+                DemoableToggle(label: "DaVinci Resolve", isOn: $trackingSettings.trackDaVinciResolve, processType: .davinciResolve, appState: appState)
 
                 Divider()
 
                 Toggle("Confetti", isOn: $trackingSettings.confettiEnabled)
+                    .padding(.trailing, 8)
                 Toggle("Sound", isOn: $trackingSettings.soundEnabled)
+                    .padding(.trailing, 8)
             }
             .disabled(!appState.isMonitoring)
 
