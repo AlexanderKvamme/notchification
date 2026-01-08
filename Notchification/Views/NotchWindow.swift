@@ -5,15 +5,67 @@
 
 import AppKit
 import SwiftUI
+import ConfettiSwiftUI
+
+/// Shared confetti state - allows NotchView to trigger confetti in the separate ConfettiWindow
+final class ConfettiState: ObservableObject {
+    static let shared = ConfettiState()
+
+    @Published var claudeTrigger: Int = 0
+    @Published var xcodeTrigger: Int = 0
+    @Published var androidTrigger: Int = 0
+    @Published var finderTrigger: Int = 0
+    @Published var opencodeTrigger: Int = 0
+    @Published var codexTrigger: Int = 0
+    @Published var dropboxTrigger: Int = 0
+    @Published var googleDriveTrigger: Int = 0
+    @Published var oneDriveTrigger: Int = 0
+    @Published var icloudTrigger: Int = 0
+    @Published var installerTrigger: Int = 0
+    @Published var appStoreTrigger: Int = 0
+    @Published var automatorTrigger: Int = 0
+    @Published var scriptEditorTrigger: Int = 0
+    @Published var downloadsTrigger: Int = 0
+    @Published var davinciResolveTrigger: Int = 0
+    @Published var teamsTrigger: Int = 0
+
+    func trigger(for process: ProcessType) {
+        switch process {
+        case .claude: claudeTrigger += 1
+        case .xcode: xcodeTrigger += 1
+        case .androidStudio: androidTrigger += 1
+        case .finder: finderTrigger += 1
+        case .opencode: opencodeTrigger += 1
+        case .codex: codexTrigger += 1
+        case .dropbox: dropboxTrigger += 1
+        case .googleDrive: googleDriveTrigger += 1
+        case .oneDrive: oneDriveTrigger += 1
+        case .icloud: icloudTrigger += 1
+        case .installer: installerTrigger += 1
+        case .appStore: appStoreTrigger += 1
+        case .automator: automatorTrigger += 1
+        case .scriptEditor: scriptEditorTrigger += 1
+        case .downloads: downloadsTrigger += 1
+        case .davinciResolve: davinciResolveTrigger += 1
+        case .teams: teamsTrigger += 1
+        case .preview: break  // No confetti for preview
+        }
+    }
+}
 
 /// Observable state for the notch view
 final class NotchState: ObservableObject {
-    @Published var activeProcesses: [ProcessType] = []
+    @Published var activeProcesses: [ProcessType] = [] {
+        didSet {
+            // Notify callback whenever processes change (including direct modifications)
+            onProcessesChanged?(activeProcesses)
+        }
+    }
     /// Processes that were manually dismissed (skip confetti for these)
     var recentlyDismissed: Set<ProcessType> = []
 
-    /// Callback when processes change (for updating mouse tracker)
-    var onProcessCountChanged: ((Int) -> Void)?
+    /// Callback when processes change (for updating mouse tracker and window size)
+    var onProcessesChanged: (([ProcessType]) -> Void)?
 }
 
 /// Tracks mouse position and toggles window mouse events when cursor enters notch area
@@ -23,24 +75,14 @@ final class NotchMouseTracker {
     private var notchRect: NSRect = .zero
     private var isMouseInNotch = false
     private var hasActiveProcesses = false  // Only capture mouse when processes are visible
+    private var pendingShrinkWorkItem: DispatchWorkItem?  // For delayed shrinking
 
     private var screenFrame: NSRect = .zero
     private weak var targetScreen: NSScreen?
 
-    // Layout constants for normal mode (must match NotchView)
-    private let normalNotchWidth: CGFloat = 300
-    private let normalLogoSize: CGFloat = 24
-    private let normalRowSpacing: CGFloat = 8
-    private let normalTopPadding: CGFloat = 38
-
-    // Layout constants for medium mode
-    private let mediumLogoSize: CGFloat = 14
-    private let mediumRowSpacing: CGFloat = 3
-    private let mediumTopPadding: CGFloat = 34
-
     // Debug overlay window
     private var debugWindow: NSWindow?
-    static var showDebugOverlay = false  // Set to true to debug click area
+    static var showDebugOverlay = true  // Set to true to debug click area
 
     init(window: NSWindow) {
         self.window = window
@@ -56,20 +98,29 @@ final class NotchMouseTracker {
         self.screenFrame = screen.frame
     }
 
-    /// Update the interactive area based on process count and current display mode
-    func updateForProcessCount(_ count: Int) {
-        guard screenFrame != .zero else { return }
+    /// Update the interactive area based on active processes
+    /// Uses shared NotchLayout.windowFrame for consistent sizing with NotchWindow
+    func updateForProcesses(_ processes: [ProcessType]) {
+        guard let screen = targetScreen else { return }
 
-        hasActiveProcesses = count > 0
+        // Cancel any pending shrink operation
+        pendingShrinkWorkItem?.cancel()
+        pendingShrinkWorkItem = nil
 
-        // When no processes, stop timer and disable mouse events
-        if count == 0 {
-            timer?.invalidate()
-            timer = nil
-            window?.ignoresMouseEvents = true
-            isMouseInNotch = false
-            notchRect = .zero
-            updateDebugOverlay()
+        hasActiveProcesses = !processes.isEmpty
+
+        // When no processes, delay cleanup to let animation finish
+        if processes.isEmpty {
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.timer?.invalidate()
+                self?.timer = nil
+                self?.window?.ignoresMouseEvents = true
+                self?.isMouseInNotch = false
+                self?.notchRect = .zero
+                self?.updateDebugOverlay()
+            }
+            pendingShrinkWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
             return
         }
 
@@ -78,41 +129,39 @@ final class NotchMouseTracker {
             startTracking()
         }
 
-        let settings = StyleSettings.shared
-        let notchInfo = NotchInfo.forScreen(targetScreen)
-        let horizontalOffset = settings.horizontalOffset
+        // Use shared calculation for exact match with NotchWindow
+        let newRect = NotchLayout.windowFrame(
+            for: processes,
+            style: StyleSettings.shared.notchStyle,
+            screen: screen,
+            settings: StyleSettings.shared
+        )
 
-        let width: CGFloat
-        let height: CGFloat
+        // Check if we're shrinking - need to wait for animation to complete
+        let isShrinking = newRect.height < notchRect.height || newRect.width < notchRect.width
 
-        switch settings.notchStyle {
-        case .minimal:
-            // Minimal mode: just the notch outline area
-            width = notchInfo.width + 20  // Small padding
-            height = notchInfo.height + 10
-
-        case .medium:
-            // Medium mode: notch width with smaller content
-            width = notchInfo.width
-            let contentHeight = CGFloat(count) * mediumLogoSize + CGFloat(count - 1) * mediumRowSpacing
-            let effectiveTopPadding = (settings.trimTopOnNotchDisplay && notchInfo.hasNotch) ||
-                                      (settings.trimTopOnExternalDisplay && !notchInfo.hasNotch) ? 8 : mediumTopPadding
-            height = effectiveTopPadding + contentHeight + 13
-
-        case .normal:
-            // Normal mode: full width with icons and progress bars
-            width = normalNotchWidth
-            let contentHeight = CGFloat(count) * normalLogoSize + CGFloat(count - 1) * normalRowSpacing
-            let effectiveTopPadding = (settings.trimTopOnNotchDisplay && notchInfo.hasNotch) ||
-                                      (settings.trimTopOnExternalDisplay && !notchInfo.hasNotch) ? 8 : normalTopPadding
-            height = effectiveTopPadding + contentHeight + 16
+        if isShrinking && notchRect != .zero {
+            // Delay shrinking to let the spring animation finish (~0.4s)
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self, let screen = self.targetScreen else { return }
+                // Recalculate in case things changed
+                self.notchRect = NotchLayout.windowFrame(
+                    for: processes,
+                    style: StyleSettings.shared.notchStyle,
+                    screen: screen,
+                    settings: StyleSettings.shared
+                )
+                print("🔴 RED: \(self.notchRect) style=\(StyleSettings.shared.notchStyle) processes=\(processes.count)")
+                self.updateDebugOverlay()
+            }
+            pendingShrinkWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem)
+        } else {
+            // Growing or same size - update immediately
+            notchRect = newRect
+            print("🔴 RED: \(notchRect) style=\(StyleSettings.shared.notchStyle) processes=\(processes.count)")
+            updateDebugOverlay()
         }
-
-        // Calculate position: center of screen + horizontal offset
-        let x = screenFrame.minX + (screenFrame.width - width) / 2 + horizontalOffset
-        let y = screenFrame.maxY - height
-        notchRect = NSRect(x: x, y: y, width: width, height: height)
-        updateDebugOverlay()
     }
 
     private func startTracking() {
@@ -182,24 +231,213 @@ final class NotchMouseTracker {
 }
 
 /// A borderless window that displays the notch indicator at the top of the screen
+/// Now sized to match content only - confetti is rendered in a separate ConfettiWindow
 final class NotchWindow: NSWindow {
 
     private let targetScreen: NSScreen
 
-    private var windowWidth: CGFloat {
-        targetScreen.frame.width
-    }
-    private var windowHeight: CGFloat {
-        targetScreen.frame.height
-    }
+    /// Dynamic window dimensions based on content
+    private var currentWindowWidth: CGFloat = 300
+    private var currentWindowHeight: CGFloat = 300
     let notchState = NotchState()
 
     private var mouseTracker: NotchMouseTracker?
+    private var styleObserver: NSObjectProtocol?
+
+    // Prevent window from being selected in screenshot window picker
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 
     init(screen: NSScreen) {
         self.targetScreen = screen
+        // Start with a reasonable default size - will be updated by updateWindowSize
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 120),
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 300),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        configureWindow()
+        // Skip positionOnScreen() - let updateWindowSize handle all sizing
+        setupContent()
+    }
+
+    // Debug mode to visualize window bounds
+    static var showDebugBackground = true
+
+    private func configureWindow() {
+        // Make it float above everything
+        level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)
+
+        // Debug: show window bounds with semi-transparent background
+        if NotchWindow.showDebugBackground {
+            backgroundColor = NSColor.blue.withAlphaComponent(0.2)
+        } else {
+            backgroundColor = .clear
+        }
+        isOpaque = false
+        hasShadow = false
+
+        // Don't show in mission control, don't take focus, don't appear in window picker
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
+        // Ignore mouse events by default - tracker will enable when cursor is in notch area
+        ignoresMouseEvents = true
+
+        // Exclude from window menus and lists
+        isExcludedFromWindowsMenu = true
+
+        // CRITICAL: Make window non-capturable by screenshot tools
+        sharingType = .none
+
+        // No title bar
+        titlebarAppearsTransparent = true
+        titleVisibility = .hidden
+    }
+
+    private func positionOnScreen() {
+        // Position window at top center of screen - start small, will resize when processes change
+        let horizontalOffset = StyleSettings.shared.horizontalOffset
+        let x = targetScreen.frame.origin.x + (targetScreen.frame.width - currentWindowWidth) / 2 + horizontalOffset
+        let frame = NSRect(
+            x: x,
+            y: targetScreen.frame.origin.y + targetScreen.frame.height - currentWindowHeight,
+            width: currentWindowWidth,
+            height: currentWindowHeight
+        )
+        setFrame(frame, display: true)
+    }
+
+    private func setupContent() {
+        // Hosting view matches window size exactly
+        let hostingView = NSHostingView(rootView:
+            NotchView(notchState: notchState, screenWidth: currentWindowWidth, screenHeight: currentWindowHeight, screen: targetScreen)
+        )
+        hostingView.frame = NSRect(x: 0, y: 0, width: currentWindowWidth, height: currentWindowHeight)
+        contentView = hostingView
+
+        // Setup mouse tracker for the notch area
+        mouseTracker = NotchMouseTracker(window: self)
+        mouseTracker?.setTargetScreen(targetScreen)
+
+        // Update mouse tracker and window size when processes change
+        notchState.onProcessesChanged = { [weak self] processes in
+            self?.mouseTracker?.updateForProcesses(processes)
+            // Also update window size (deferred to next run loop)
+            RunLoop.main.perform {
+                self?.updateWindowSize(for: processes)
+            }
+        }
+
+        // Observe style changes to resize window
+        styleObserver = NotificationCenter.default.addObserver(
+            forName: .notchStyleChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            let processes = self.notchState.activeProcesses
+            self.mouseTracker?.updateForProcesses(processes)
+            RunLoop.main.perform {
+                self.updateWindowSize(for: processes)
+            }
+        }
+    }
+
+    /// Update the active processes
+    func updateProcesses(_ processes: [ProcessType]) {
+        // Setting activeProcesses triggers didSet which calls onProcessesChanged
+        // onProcessesChanged updates both mouse tracker and window size
+        notchState.activeProcesses = processes
+    }
+
+    /// Resize window to fit content - uses shared NotchLayout.windowFrame for exact match with clickable area
+    private func updateWindowSize(for processes: [ProcessType]) {
+        // Hide window when no processes - prevents it from appearing in screenshot picker
+        guard !processes.isEmpty else {
+            // Delay hiding to let the collapse animation finish (0.3s easeOut)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                // Only hide if still empty (processes might have been added back)
+                if self?.notchState.activeProcesses.isEmpty == true {
+                    self?.orderOut(nil)
+                }
+            }
+            return
+        }
+
+        // Use shared calculation for exact match with clickable area
+        let newFrame = NotchLayout.windowFrame(
+            for: processes,
+            style: StyleSettings.shared.notchStyle,
+            screen: targetScreen,
+            settings: StyleSettings.shared
+        )
+
+        guard newFrame != .zero else {
+            orderOut(nil)
+            return
+        }
+
+        print("🔵 BLUE: \(newFrame) style=\(StyleSettings.shared.notchStyle) processes=\(processes.count)")
+
+        // Check if we're shrinking - need to wait for animation to complete
+        let isShrinking = newFrame.height < currentWindowHeight || newFrame.width < currentWindowWidth
+
+        if isShrinking {
+            // Delay shrinking to let the spring animation finish (~0.4s)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self = self else { return }
+                // Recalculate in case processes changed during the delay
+                let currentProcesses = self.notchState.activeProcesses
+                guard !currentProcesses.isEmpty else { return }
+
+                let finalFrame = NotchLayout.windowFrame(
+                    for: currentProcesses,
+                    style: StyleSettings.shared.notchStyle,
+                    screen: self.targetScreen,
+                    settings: StyleSettings.shared
+                )
+                guard finalFrame != .zero else { return }
+
+                self.currentWindowWidth = finalFrame.width
+                self.currentWindowHeight = finalFrame.height
+                self.setFrame(finalFrame, display: true, animate: false)
+
+                if let hostingView = self.contentView {
+                    hostingView.frame = NSRect(x: 0, y: 0, width: finalFrame.width, height: finalFrame.height)
+                }
+            }
+        } else {
+            // Growing or same size - update immediately
+            currentWindowWidth = newFrame.width
+            currentWindowHeight = newFrame.height
+            setFrame(newFrame, display: true, animate: false)
+
+            // Update hosting view to match new window size
+            if let hostingView = contentView {
+                hostingView.frame = NSRect(x: 0, y: 0, width: newFrame.width, height: newFrame.height)
+            }
+        }
+
+        // Show the window
+        orderFrontRegardless()
+    }
+}
+
+// MARK: - Confetti Window
+
+/// Separate window for confetti effects - large, transparent, completely non-interactive
+final class ConfettiWindow: NSWindow {
+    private let targetScreen: NSScreen
+
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+
+    init(screen: NSScreen) {
+        self.targetScreen = screen
+        // Full screen to allow confetti to spread anywhere
+        super.init(
+            contentRect: screen.frame,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -211,63 +449,100 @@ final class NotchWindow: NSWindow {
     }
 
     private func configureWindow() {
-        // Make it float above everything
+        // Same level as NotchWindow
         level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)
 
-        // Transparent background
+        // Completely transparent
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
 
-        // Don't show in mission control, don't take focus
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
-        // Ignore mouse events by default - tracker will enable when cursor is in notch area
+        // Same behavior as NotchWindow but always ignores mouse
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
         ignoresMouseEvents = true
+        isExcludedFromWindowsMenu = true
+        sharingType = .none
 
-        // No title bar
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
     }
 
     private func positionOnScreen() {
-        // Position window to cover the full screen
-        // The NotchView inside will center the notch content at the top
+        // Full screen coverage
         setFrame(targetScreen.frame, display: true)
     }
 
     private func setupContent() {
-        let width = windowWidth
-        let height = windowHeight
-        let hostingView = NSHostingView(rootView:
-            VStack(spacing: 0) {
-                NotchView(notchState: notchState, screenWidth: width, screenHeight: height, screen: targetScreen)
+        let hostingView = NSHostingView(rootView: ConfettiOverlayView())
+        hostingView.frame = NSRect(x: 0, y: 0, width: targetScreen.frame.width, height: targetScreen.frame.height)
+        contentView = hostingView
+    }
+}
+
+/// SwiftUI view that renders confetti emitters based on shared ConfettiState
+struct ConfettiOverlayView: View {
+    @ObservedObject private var confettiState = ConfettiState.shared
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.clear
+
+            // Confetti emitters positioned at top center
+            VStack {
+                ZStack {
+                    ConfettiEmitterView(trigger: $confettiState.claudeTrigger, color: ProcessType.claude.color)
+                    ConfettiEmitterView(trigger: $confettiState.xcodeTrigger, color: ProcessType.xcode.color)
+                    ConfettiEmitterView(trigger: $confettiState.androidTrigger, color: ProcessType.androidStudio.color)
+                    ConfettiEmitterView(trigger: $confettiState.finderTrigger, color: ProcessType.finder.color)
+                    ConfettiEmitterView(trigger: $confettiState.opencodeTrigger, color: ProcessType.opencode.color)
+                    ConfettiEmitterView(trigger: $confettiState.codexTrigger, color: ProcessType.codex.color)
+                    ConfettiEmitterView(trigger: $confettiState.dropboxTrigger, color: ProcessType.dropbox.color)
+                    ConfettiEmitterView(trigger: $confettiState.googleDriveTrigger, color: ProcessType.googleDrive.color)
+                    ConfettiEmitterView(trigger: $confettiState.oneDriveTrigger, color: ProcessType.oneDrive.color)
+                    ConfettiEmitterView(trigger: $confettiState.icloudTrigger, color: ProcessType.icloud.color)
+                    ConfettiEmitterView(trigger: $confettiState.installerTrigger, color: ProcessType.installer.color)
+                    ConfettiEmitterView(trigger: $confettiState.appStoreTrigger, color: ProcessType.appStore.color)
+                    ConfettiEmitterView(trigger: $confettiState.automatorTrigger, color: ProcessType.automator.color)
+                    ConfettiEmitterView(trigger: $confettiState.scriptEditorTrigger, color: ProcessType.scriptEditor.color)
+                    ConfettiEmitterView(trigger: $confettiState.downloadsTrigger, color: ProcessType.downloads.color)
+                    ConfettiEmitterView(trigger: $confettiState.davinciResolveTrigger, color: ProcessType.davinciResolve.color)
+                    ConfettiEmitterView(trigger: $confettiState.teamsTrigger, color: ProcessType.teams.color)
+                }
+                .padding(.top, 40)  // Position below the notch
+
                 Spacer()
             }
-            .frame(width: width, height: height, alignment: .top)
-        )
-        hostingView.frame = NSRect(x: 0, y: 0, width: width, height: height)
-        contentView = hostingView
-
-        // Setup mouse tracker for the notch area
-        mouseTracker = NotchMouseTracker(window: self)
-        mouseTracker?.setTargetScreen(targetScreen)
-
-        // Update mouse tracker when process count changes
-        notchState.onProcessCountChanged = { [weak self] count in
-            self?.mouseTracker?.updateForProcessCount(count)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
 
-    /// Update the active processes
-    func updateProcesses(_ processes: [ProcessType]) {
-        notchState.activeProcesses = processes
-        notchState.onProcessCountChanged?(processes.count)
+/// Individual confetti emitter view
+struct ConfettiEmitterView: View {
+    @Binding var trigger: Int
+    let color: Color
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 300, height: 50)
+            .confettiCannon(
+                counter: $trigger,
+                num: 40,
+                colors: [color],
+                confettiSize: 12,
+                rainHeight: 200,
+                openingAngle: Angle(degrees: 180),
+                closingAngle: Angle(degrees: 360),
+                radius: 300
+            )
     }
 }
 
 /// Controller to manage the notch window visibility
 final class NotchWindowController: ObservableObject {
     private var windows: [NSScreen: NotchWindow] = [:]
+    private var confettiWindows: [NSScreen: ConfettiWindow] = [:]
     private(set) var isShowing: Bool = false
     private var screenObserver: NSObjectProtocol?
     private var selectionObserver: NSObjectProtocol?
@@ -314,6 +589,8 @@ final class NotchWindowController: ObservableObject {
             if !screensToShow.contains(screen) {
                 windows[screen]?.close()
                 windows.removeValue(forKey: screen)
+                confettiWindows[screen]?.close()
+                confettiWindows.removeValue(forKey: screen)
             }
         }
 
@@ -321,17 +598,32 @@ final class NotchWindowController: ObservableObject {
         for screen in screensToShow {
             if windows[screen] == nil {
                 let window = NotchWindow(screen: screen)
-                window.orderFrontRegardless()
+                // Don't show window yet - updateWindowSize will show it when processes are set
+                // This prevents the window appearing at wrong position initially
                 windows[screen] = window
+
+                // Create confetti window for this screen
+                let confettiWindow = ConfettiWindow(screen: screen)
+                confettiWindow.orderFrontRegardless()
+                confettiWindows[screen] = confettiWindow
             }
         }
     }
 
     func update(with processes: [ProcessType]) {
         isShowing = !processes.isEmpty
+
         for window in windows.values {
             window.updateProcesses(processes)
-            window.orderFrontRegardless()
+        }
+
+        // Show/hide confetti windows based on whether there are processes
+        for confettiWindow in confettiWindows.values {
+            if processes.isEmpty {
+                confettiWindow.orderOut(nil)
+            } else {
+                confettiWindow.orderFrontRegardless()
+            }
         }
     }
 }

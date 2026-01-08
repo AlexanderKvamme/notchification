@@ -34,7 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 @main
 struct NotchificationApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @NSApplicationDelegateAdaptor(AppDelegate.self)
+    var appDelegate
     @StateObject private var appState = AppState()
     private let updaterDelegate = UpdaterDelegate()
     private var updaterController: SPUStandardUpdaterController
@@ -337,7 +338,10 @@ final class StyleSettings: ObservableObject {
 
     /// The display style for the notch indicator
     @Published var notchStyle: NotchStyle {
-        didSet { UserDefaults.standard.set(notchStyle.rawValue, forKey: "notchStyle") }
+        didSet {
+            UserDefaults.standard.set(notchStyle.rawValue, forKey: "notchStyle")
+            NotificationCenter.default.post(name: .notchStyleChanged, object: nil)
+        }
     }
 
     /// Convenience property for backward compatibility
@@ -430,6 +434,7 @@ final class StyleSettings: ObservableObject {
 
 extension Notification.Name {
     static let screenSelectionChanged = Notification.Name("screenSelectionChanged")
+    static let notchStyleChanged = Notification.Name("notchStyleChanged")
     static let showPositionPreview = Notification.Name("showPositionPreview")
     static let showSettingsPreview = Notification.Name("showSettingsPreview")
     static let hideSettingsPreview = Notification.Name("hideSettingsPreview")
@@ -496,6 +501,135 @@ struct NotchInfo {
     }
 }
 
+/// Shared layout calculations for NotchView and NotchWindow
+/// Uses the EXACT same calculations as NotchView to ensure perfect alignment
+struct NotchLayout {
+    // Normal mode dimensions (must match NotchView)
+    static let notchWidth: CGFloat = 300
+    static let logoSize: CGFloat = 24
+    static let rowSpacing: CGFloat = 8
+    static let topPadding: CGFloat = 38
+
+    // Medium mode dimensions (must match NotchView)
+    static let mediumLogoSize: CGFloat = 14
+    static let mediumRowSpacing: CGFloat = 3
+    static let mediumTopPaddingBase: CGFloat = 34
+
+    // Teams camera dimensions (must match NotchView)
+    static let cameraHeight: CGFloat = 150
+    static let cameraWidth: CGFloat = 280
+
+    // Teams hover scale: camera scales 1.8x on hover (anchor: .top)
+    // Extra height needed: 150 * 0.8 = 120 pixels
+    // Extra width needed: 280 * 0.8 = 224 pixels
+    static let teamsHoverExtraHeight: CGFloat = 120
+    static let teamsHoverExtraWidth: CGFloat = 224
+
+    /// Calculate effectiveTopPadding exactly as NotchView does
+    private static func effectiveTopPadding(notchInfo: NotchInfo, settings: StyleSettings) -> CGFloat {
+        if notchInfo.hasNotch {
+            if settings.trimTopOnNotchDisplay {
+                return notchInfo.height + 4
+            }
+        } else {
+            if settings.trimTopOnExternalDisplay {
+                return 8
+            }
+        }
+        return topPadding
+    }
+
+    /// Calculate effectiveMediumTopPadding exactly as NotchView does
+    private static func effectiveMediumTopPadding(notchInfo: NotchInfo, settings: StyleSettings) -> CGFloat {
+        if notchInfo.hasNotch {
+            if settings.trimTopOnNotchDisplay {
+                return notchInfo.height + 4
+            }
+        } else {
+            if settings.trimTopOnExternalDisplay {
+                return 8
+            }
+        }
+        return mediumTopPaddingBase
+    }
+
+    /// Calculate the exact window frame for the notch content
+    /// Uses the EXACT same formulas as NotchView's .frame() modifiers
+    static func windowFrame(
+        for processes: [ProcessType],
+        style: NotchStyle,
+        screen: NSScreen,
+        settings: StyleSettings
+    ) -> NSRect {
+        guard !processes.isEmpty else {
+            return .zero
+        }
+
+        let notchInfo = NotchInfo.forScreen(screen)
+        let horizontalOffset = settings.horizontalOffset
+        let hasTeams = processes.contains(.teams)
+        let teamsOnly = processes == [.teams]
+        let processCount = processes.count
+
+        let width: CGFloat
+        let height: CGFloat
+
+        // Extra space for Teams hover scaling (camera scales 1.8x on hover)
+        let teamsExtraHeight = hasTeams ? teamsHoverExtraHeight : 0
+        let teamsExtraWidth = hasTeams ? teamsHoverExtraWidth : 0
+
+        switch style {
+        case .minimal:
+            // From NotchView minimalModeView:
+            // .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: hasTeams ? notchInfo.height + 5 + cameraHeight + 16 : notchInfo.height)
+            width = hasTeams ? cameraWidth + 20 + teamsExtraWidth : notchInfo.width
+            height = hasTeams ? notchInfo.height + 5 + cameraHeight + 16 + teamsExtraHeight : notchInfo.height
+
+        case .medium:
+            // From NotchView mediumModeView:
+            // .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: mediumExpandedHeight)
+            width = hasTeams ? cameraWidth + 20 + teamsExtraWidth : notchInfo.width
+
+            // mediumExpandedHeight calculation from NotchView:
+            if teamsOnly {
+                height = notchInfo.height + 5 + cameraHeight + 16 + teamsExtraHeight
+            } else if hasTeams {
+                let otherCount = processCount - 1
+                let otherHeight = CGFloat(otherCount) * mediumLogoSize + CGFloat(max(0, otherCount - 1)) * mediumRowSpacing
+                height = notchInfo.height + 5 + cameraHeight + 8 + otherHeight + 13 + teamsExtraHeight
+            } else {
+                let contentHeight = CGFloat(processCount) * mediumLogoSize + CGFloat(processCount - 1) * mediumRowSpacing
+                height = effectiveMediumTopPadding(notchInfo: notchInfo, settings: settings) + contentHeight + 13
+            }
+
+        case .normal:
+            // From NotchView normalModeView:
+            // .frame(width: notchWidth, height: teamsExpandedHeight)
+            width = hasTeams ? notchWidth + teamsExtraWidth : notchWidth
+
+            // teamsExpandedHeight calculation from NotchView:
+            let effTopPadding = effectiveTopPadding(notchInfo: notchInfo, settings: settings)
+            if teamsOnly {
+                height = effTopPadding + cameraHeight + 16 + teamsExtraHeight
+            } else if hasTeams {
+                let otherCount = processCount - 1
+                let otherHeight = CGFloat(otherCount) * logoSize + CGFloat(max(0, otherCount - 1)) * rowSpacing
+                height = effTopPadding + cameraHeight + 8 + otherHeight + 16 + teamsExtraHeight
+            } else {
+                // expandedHeight calculation
+                let contentHeight = CGFloat(processCount) * logoSize + CGFloat(processCount - 1) * rowSpacing
+                height = effTopPadding + contentHeight + 16
+            }
+        }
+
+        // Calculate position: centered on screen with horizontal offset
+        let x = screen.frame.minX + (screen.frame.width - width) / 2 + horizontalOffset
+        let y = screen.frame.maxY - height
+
+        return NSRect(x: x, y: y, width: width, height: height)
+    }
+}
+
 /// Which process type to mock on launch
 enum MockProcessType: String, CaseIterable {
     case none = "None"
@@ -514,7 +648,7 @@ enum MockProcessType: String, CaseIterable {
     case teams = "Teams"
     case claudeAndFinder = "Claude + Finder"
     case threeProcesses = "Claude + Finder + Android"
-    case all = "All"
+    case randomFive = "5 Random"
 
     var processType: ProcessType? {
         switch self {
@@ -534,12 +668,14 @@ enum MockProcessType: String, CaseIterable {
         case .teams: return .teams
         case .claudeAndFinder: return nil // Handled specially
         case .threeProcesses: return nil // Handled specially
-        case .all: return nil // Handled specially
+        case .randomFive: return nil // Handled specially
         }
     }
 
-    var allProcessTypes: [ProcessType] {
-        [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore, .teams]
+    /// Returns 5 random process types for demo purposes
+    var fiveRandomProcessTypes: [ProcessType] {
+        let allTypes: [ProcessType] = [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
+        return Array(allTypes.shuffled().prefix(5))
     }
 }
 
@@ -799,9 +935,9 @@ final class AppState: ObservableObject {
 
     #if DEBUG
     private func runLaunchMock() {
-        // Handle "All" mock type specially
-        if mockOnLaunchType == .all {
-            runAllMock()
+        // Handle "5 Random" mock type specially
+        if mockOnLaunchType == .randomFive {
+            runRandomFiveMock()
             return
         }
 
@@ -898,36 +1034,30 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func runAllMock() {
+    private func runRandomFiveMock() {
         isMocking = true
-        let allTypes = mockOnLaunchType.allProcessTypes
+        let randomTypes = mockOnLaunchType.fiveRandomProcessTypes
 
-        // Start with all three processes
-        windowController.update(with: allTypes)
+        // Start with 5 random processes
+        windowController.update(with: randomTypes)
 
-        // Remove processes one by one with 1-second delays
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            // Remove first process (claude)
-            self?.windowController.update(with: [.androidStudio, .xcode])
-        }
+        // Remove processes one by one with delays
+        for index in 0..<randomTypes.count {
+            let remaining = Array(randomTypes.dropFirst(index + 1))
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(2 + index)) { [weak self] in
+                self?.windowController.update(with: remaining)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            // Remove second process (android)
-            self?.windowController.update(with: [.xcode])
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-            // Remove last process (xcode)
-            self?.windowController.update(with: [])
-
-            // If repeat is enabled, restart after a brief pause
-            if self?.mockRepeat == true {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                    self?.runAllMock()
+                // When all removed, handle repeat or cleanup
+                if remaining.isEmpty {
+                    if self?.mockRepeat == true {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                            self?.runRandomFiveMock()
+                        }
+                    } else {
+                        self?.isMocking = false
+                        self?.startMonitoring()
+                    }
                 }
-            } else {
-                self?.isMocking = false
-                self?.startMonitoring()
             }
         }
     }

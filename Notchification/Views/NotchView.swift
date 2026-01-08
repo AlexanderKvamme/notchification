@@ -31,24 +31,8 @@ struct NotchView: View {
     @State private var previousWaveIndex: Int = -1  // Previous color (shown as background while next animates)
     @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
 
-    // Separate confetti triggers for each process type
-    @State private var claudeConfettiTrigger: Int = 0
-    @State private var xcodeConfettiTrigger: Int = 0
-    @State private var androidConfettiTrigger: Int = 0
-    @State private var finderConfettiTrigger: Int = 0
-    @State private var opencodeConfettiTrigger: Int = 0
-    @State private var codexConfettiTrigger: Int = 0
-    @State private var dropboxConfettiTrigger: Int = 0
-    @State private var googleDriveConfettiTrigger: Int = 0
-    @State private var oneDriveConfettiTrigger: Int = 0
-    @State private var icloudConfettiTrigger: Int = 0
-    @State private var installerConfettiTrigger: Int = 0
-    @State private var appStoreConfettiTrigger: Int = 0
-    @State private var automatorConfettiTrigger: Int = 0
-    @State private var scriptEditorConfettiTrigger: Int = 0
-    @State private var downloadsConfettiTrigger: Int = 0
-    @State private var davinciResolveConfettiTrigger: Int = 0
-    @State private var teamsConfettiTrigger: Int = 0
+    // Confetti is now rendered in a separate ConfettiWindow
+    // Triggers are sent to ConfettiState.shared
 
     // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
@@ -199,8 +183,9 @@ struct NotchView: View {
                 normalModeView
             }
         }
-        .offset(x: styleSettings.horizontalOffset)
-        .frame(width: screenWidth, height: screenHeight, alignment: .top)
+        // Fill available space and center content horizontally
+        // This ensures scaled content (like Teams hover) stays centered in the larger window
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .drawingGroup()  // GPU acceleration for smoother animations
         .onChange(of: notchState.activeProcesses.isEmpty) { _, isEmpty in
             switch styleSettings.notchStyle {
@@ -251,46 +236,9 @@ struct NotchView: View {
                     continue
                 }
 
-                // Confetti (if enabled)
+                // Confetti (if enabled) - triggers in separate ConfettiWindow
                 if TrackingSettings.shared.confettiEnabled {
-                    switch removedProcess {
-                    case .claude:
-                        claudeConfettiTrigger += 1
-                    case .xcode:
-                        xcodeConfettiTrigger += 1
-                    case .androidStudio:
-                        androidConfettiTrigger += 1
-                    case .finder:
-                        finderConfettiTrigger += 1
-                    case .opencode:
-                        opencodeConfettiTrigger += 1
-                    case .codex:
-                        codexConfettiTrigger += 1
-                    case .dropbox:
-                        dropboxConfettiTrigger += 1
-                    case .googleDrive:
-                        googleDriveConfettiTrigger += 1
-                    case .oneDrive:
-                        oneDriveConfettiTrigger += 1
-                    case .icloud:
-                        icloudConfettiTrigger += 1
-                    case .installer:
-                        installerConfettiTrigger += 1
-                    case .appStore:
-                        appStoreConfettiTrigger += 1
-                    case .automator:
-                        automatorConfettiTrigger += 1
-                    case .scriptEditor:
-                        scriptEditorConfettiTrigger += 1
-                    case .downloads:
-                        downloadsConfettiTrigger += 1
-                    case .davinciResolve:
-                        davinciResolveConfettiTrigger += 1
-                    case .teams:
-                        teamsConfettiTrigger += 1
-                    case .preview:
-                        break  // No confetti for preview
-                    }
+                    ConfettiState.shared.trigger(for: removedProcess)
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
 
@@ -421,7 +369,6 @@ struct NotchView: View {
         }
         .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: hasTeams ? notchInfo.height + 5 + cameraHeight + 16 : notchInfo.height)
         .opacity(isExpanded ? 1 : 0)
-        .overlay(alignment: .top) { confettiEmitters }
     }
 
     /// Medium mode: Notch-width with smaller icons and progress bars
@@ -437,8 +384,7 @@ struct NotchView: View {
             .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: mediumExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: mediumExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
-            .overlay(alignment: .top) { confettiEmitters }
-
+    
         if !notchState.activeProcesses.isEmpty {
             VStack(alignment: .center, spacing: mediumRowSpacing) {
                 // Show camera preview if Teams is active
@@ -509,8 +455,7 @@ struct NotchView: View {
             .frame(width: notchWidth, height: teamsExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: teamsExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
-            .overlay(alignment: .top) { confettiEmitters }
-
+    
         if !notchState.activeProcesses.isEmpty {
             VStack(alignment: .center, spacing: rowSpacing) {
                 // Show camera preview if Teams is active
@@ -557,32 +502,6 @@ struct NotchView: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
         }
     }
-
-    /// Shared confetti emitters for all modes
-    @ViewBuilder
-    private var confettiEmitters: some View {
-        ZStack {
-            ConfettiEmitter(trigger: $claudeConfettiTrigger, color: ProcessType.claude.color)
-            ConfettiEmitter(trigger: $xcodeConfettiTrigger, color: ProcessType.xcode.color)
-            ConfettiEmitter(trigger: $androidConfettiTrigger, color: ProcessType.androidStudio.color)
-            ConfettiEmitter(trigger: $finderConfettiTrigger, color: ProcessType.finder.color)
-            ConfettiEmitter(trigger: $opencodeConfettiTrigger, color: ProcessType.opencode.color)
-            ConfettiEmitter(trigger: $codexConfettiTrigger, color: ProcessType.codex.color)
-            ConfettiEmitter(trigger: $dropboxConfettiTrigger, color: ProcessType.dropbox.color)
-            ConfettiEmitter(trigger: $googleDriveConfettiTrigger, color: ProcessType.googleDrive.color)
-            ConfettiEmitter(trigger: $oneDriveConfettiTrigger, color: ProcessType.oneDrive.color)
-            ConfettiEmitter(trigger: $icloudConfettiTrigger, color: ProcessType.icloud.color)
-            ConfettiEmitter(trigger: $installerConfettiTrigger, color: ProcessType.installer.color)
-            ConfettiEmitter(trigger: $appStoreConfettiTrigger, color: ProcessType.appStore.color)
-            ConfettiEmitter(trigger: $automatorConfettiTrigger, color: ProcessType.automator.color)
-            ConfettiEmitter(trigger: $scriptEditorConfettiTrigger, color: ProcessType.scriptEditor.color)
-            ConfettiEmitter(trigger: $downloadsConfettiTrigger, color: ProcessType.downloads.color)
-            ConfettiEmitter(trigger: $davinciResolveConfettiTrigger, color: ProcessType.davinciResolve.color)
-            ConfettiEmitter(trigger: $teamsConfettiTrigger, color: ProcessType.teams.color)
-        }
-        .allowsHitTesting(false)
-    }
-
     /// Starts the highlight animation that cycles through active process colors
     /// - Single process: highlight sweeps and fades out (like AnimatedProgressBar)
     /// - Multiple processes: each color sweeps around fully, then next color starts
@@ -694,7 +613,7 @@ struct ProcessRow: View {
                         .aspectRatio(contentMode: .fit)
                         .fontWeight(.bold)
                         .foregroundColor(process.color)
-                        .padding(4)
+                        .padding(1)
                 } else {
                     ProcessLogo(processType: process)
                 }
@@ -1518,28 +1437,7 @@ struct ClaudeLogoShape: Shape {
     }
 }
 
-// MARK: - Confetti Emitter
-
-struct ConfettiEmitter: View {
-    @Binding var trigger: Int
-    let color: Color
-
-    var body: some View {
-        Rectangle()
-            .fill(Color.clear)
-            .frame(width: 300, height: 50)
-            .confettiCannon(
-                counter: $trigger,
-                num: 40,  // Reduced from 100 for smoother performance
-                colors: [color],
-                confettiSize: 12,
-                rainHeight: 200,
-                openingAngle: Angle(degrees: 180),
-                closingAngle: Angle(degrees: 360),
-                radius: 300
-            )
-    }
-}
+// MARK: - Previews
 
 #Preview("Single Process") {
     let state = NotchState()
