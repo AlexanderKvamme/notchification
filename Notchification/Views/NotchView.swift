@@ -17,6 +17,7 @@ struct NotchView: View {
     @ObservedObject var notchState: NotchState
     @ObservedObject var licenseManager = LicenseManager.shared
     @ObservedObject var styleSettings = StyleSettings.shared
+    @ObservedObject var cameraManager = CameraManager.shared  // For checking hasFirstFrame
     var screenWidth: CGFloat = 1440
     var screenHeight: CGFloat = 900
     var screen: NSScreen? = nil  // The screen this view is displayed on
@@ -315,17 +316,22 @@ struct NotchView: View {
                     .frame(width: cameraWidth + 20, height: notchInfo.height + 5 + cameraHeight + 16)
                     .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
 
-                // Camera preview - positioned below the notch
-                CameraPreviewView(onDismiss: {
-                    ProcessMonitor.shared.dismissProcess(.teams)
-                    notchState.recentlyDismissed.insert(.teams)
-                    notchState.activeProcesses.removeAll { $0 == .teams }
-                    CameraManager.shared.stopSession()
-                })
-                .frame(width: cameraWidth, height: cameraHeight)
-                .offset(y: notchInfo.height + 5)
-                .opacity(isExpanded ? 1 : 0)
-                .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+                // Camera preview - positioned below the notch (only show when first frame ready)
+                if cameraManager.hasFirstFrame {
+                    CameraPreviewView(onDismiss: {
+                        ProcessMonitor.shared.dismissProcess(.teams)
+                        notchState.recentlyDismissed.insert(.teams)
+                        notchState.activeProcesses.removeAll { $0 == .teams }
+                        CameraManager.shared.stopSession()
+                        #if DEBUG
+                        NotificationCenter.default.post(name: .teamsMockDismissed, object: nil)
+                        #endif
+                    })
+                    .frame(width: cameraWidth, height: cameraHeight)
+                    .offset(y: notchInfo.height + 5)
+                    .opacity(isExpanded ? 1 : 0)
+                    .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+                }
             } else {
                 // Normal minimal mode - just stroke
                 MinimalNotchShape(cornerRadius: 8)
@@ -387,13 +393,16 @@ struct NotchView: View {
     
         if !notchState.activeProcesses.isEmpty {
             VStack(alignment: .center, spacing: mediumRowSpacing) {
-                // Show camera preview if Teams is active
-                if hasTeams {
+                // Show camera preview if Teams is active (only when first frame ready)
+                if hasTeams && cameraManager.hasFirstFrame {
                     CameraPreviewView(onDismiss: {
                         ProcessMonitor.shared.dismissProcess(.teams)
                         notchState.recentlyDismissed.insert(.teams)
                         notchState.activeProcesses.removeAll { $0 == .teams }
                         CameraManager.shared.stopSession()
+                        #if DEBUG
+                        NotificationCenter.default.post(name: .teamsMockDismissed, object: nil)
+                        #endif
                     })
                     .frame(width: cameraWidth, height: cameraHeight)
                     .padding(.bottom, teamsOnly ? 0 : 8)
@@ -458,13 +467,16 @@ struct NotchView: View {
     
         if !notchState.activeProcesses.isEmpty {
             VStack(alignment: .center, spacing: rowSpacing) {
-                // Show camera preview if Teams is active
-                if hasTeams {
+                // Show camera preview if Teams is active (only when first frame ready)
+                if hasTeams && cameraManager.hasFirstFrame {
                     CameraPreviewView(onDismiss: {
                         ProcessMonitor.shared.dismissProcess(.teams)
                         notchState.recentlyDismissed.insert(.teams)
                         notchState.activeProcesses.removeAll { $0 == .teams }
                         CameraManager.shared.stopSession()
+                        #if DEBUG
+                        NotificationCenter.default.post(name: .teamsMockDismissed, object: nil)
+                        #endif
                     })
                     .frame(width: cameraWidth, height: cameraHeight)
                     .padding(.bottom, teamsOnly ? 0 : 8)  // Only add padding if other bars below

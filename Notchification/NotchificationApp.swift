@@ -438,6 +438,7 @@ extension Notification.Name {
     static let showPositionPreview = Notification.Name("showPositionPreview")
     static let showSettingsPreview = Notification.Name("showSettingsPreview")
     static let hideSettingsPreview = Notification.Name("hideSettingsPreview")
+    static let teamsMockDismissed = Notification.Name("teamsMockDismissed")
 }
 
 /// Information about the physical notch on the current screen
@@ -853,10 +854,19 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] processes in
                 guard let self = self else { return }
+                print("📡 App received activeProcesses update: \(processes.map { $0.displayName })")
                 #if DEBUG
-                guard !self.isMocking else { return }
-                #endif
+                // If mocking with a timed mock, skip real updates entirely
+                guard !self.isMocking else {
+                    print("📡 Skipping update - isMocking is true")
+                    return
+                }
+                // Combine mock processes (like Teams) with real processes
+                let combined = Array(Set(processes + self.mockProcesses)).sorted { $0.rawValue < $1.rawValue }
+                self.windowController.update(with: combined)
+                #else
                 self.windowController.update(with: processes)
+                #endif
             }
             .store(in: &cancellables)
 
@@ -885,6 +895,17 @@ final class AppState: ObservableObject {
         ) { [weak self] _ in
             self?.hideSettingsPreview()
         }
+
+        #if DEBUG
+        // Listen for Teams mock dismissal to clean up mockProcesses
+        NotificationCenter.default.addObserver(
+            forName: .teamsMockDismissed,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.mockProcesses.removeAll { $0 == .teams }
+        }
+        #endif
     }
 
     private var isShowingSettingsPreview = false
@@ -973,6 +994,12 @@ final class AppState: ObservableObject {
 
         // Teams is dismissed via hover interaction, not timeout
         if processType == .teams {
+            // Add to mockProcesses so binding combines it with real processes
+            if !mockProcesses.contains(processType) {
+                mockProcesses.append(processType)
+            }
+            // Reset isMocking so real process updates work alongside Teams mock
+            isMocking = false
             // Start monitoring in background so other detectors work
             startMonitoring()
             return
@@ -1106,14 +1133,15 @@ final class AppState: ObservableObject {
         let combined = Array(Set(realProcesses + mockProcesses)).sorted { $0.rawValue < $1.rawValue }
         windowController.update(with: combined)
 
-        #if DEBUG
-        isMocking = true
-        #endif
-
         // Teams is dismissed via hover interaction, not timeout
+        // Don't set isMocking for Teams - real process updates should still work alongside
         if process == .teams {
             return
         }
+
+        #if DEBUG
+        isMocking = true
+        #endif
 
         // Remove this specific process after 5 seconds (non-Teams)
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in

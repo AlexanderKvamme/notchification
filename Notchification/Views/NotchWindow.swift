@@ -325,6 +325,7 @@ final class NotchWindow: NSWindow {
 
         // Update mouse tracker and window size when processes change
         notchState.onProcessesChanged = { [weak self] processes in
+            print("🪟 onProcessesChanged triggered with \(processes.count) processes")
             self?.mouseTracker?.updateForProcesses(processes)
             // Also update window size (deferred to next run loop)
             RunLoop.main.perform {
@@ -356,6 +357,8 @@ final class NotchWindow: NSWindow {
 
     /// Resize window to fit content - uses shared NotchLayout.windowFrame for exact match with clickable area
     private func updateWindowSize(for processes: [ProcessType]) {
+        print("🪟 updateWindowSize called with \(processes.count) processes: \(processes.map { $0.displayName })")
+
         // Hide window when no processes - prevents it from appearing in screenshot picker
         guard !processes.isEmpty else {
             // Delay hiding to let the collapse animation finish (0.3s easeOut)
@@ -423,6 +426,7 @@ final class NotchWindow: NSWindow {
         }
 
         // Show the window and mark as shown
+        print("🪟 Calling orderFrontRegardless() for window, frame: \(self.frame)")
         orderFrontRegardless()
         hasBeenShown = true
     }
@@ -615,6 +619,7 @@ final class NotchWindowController: ObservableObject {
     }
 
     func update(with processes: [ProcessType]) {
+        print("🎛️ WindowController.update called with: \(processes.map { $0.displayName })")
         isShowing = !processes.isEmpty
 
         for window in windows.values {

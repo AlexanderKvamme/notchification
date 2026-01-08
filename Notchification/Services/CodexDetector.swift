@@ -106,15 +106,30 @@ final class CodexDetector: ObservableObject, Detector {
         let debug = DebugSettings.shared.debugCodex
         let sessions = scanner.parseSessions(from: output)
 
-        for session in sessions {
+        if debug {
+            print("🤖 Checking \(sessions.count) sessions...")
+        }
+
+        for (sessionIdx, session) in sessions.enumerated() {
+            if debug {
+                print("🤖 Session \(sessionIdx + 1) - \(session.lastLines.count) lines:")
+                for (i, line) in session.lastLines.enumerated() {
+                    print("🤖   [\(i+1)] \(line.prefix(100))")
+                }
+            }
+
             for line in session.lastLines {
                 if line.contains("Working") && line.contains("esc to interrupt") {
                     if debug {
-                        print("🤖 MATCH: \(line.prefix(80))")
+                        print("🤖 MATCH: \(line.prefix(100))")
                     }
                     return true
                 }
             }
+        }
+
+        if debug {
+            print("🤖 No match found")
         }
 
         return false

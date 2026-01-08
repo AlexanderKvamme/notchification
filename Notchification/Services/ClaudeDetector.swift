@@ -41,8 +41,31 @@ final class ClaudeDetector: ObservableObject, Detector {
         set { checkLock.lock(); defer { checkLock.unlock() }; _isCheckInProgress = newValue }
     }
 
-    // Search pattern built at runtime to avoid false positives when source code is shown in terminal
-    private let escPattern = ["esc", "to", "interrupt"].joined(separator: " ")
+    // Claude-specific patterns (to distinguish from Codex)
+    // Claude shows: "✢ Dilly-dallying… (esc to interrupt · thinking)"
+    // Codex shows: "• Working (1s • esc to interrupt)"
+    //
+    // Key difference: Claude uses fancy Unicode spinners, Codex uses bullet •
+
+    // Claude's spinner symbols (all possible spinner characters)
+    // Includes flower/star glyphs, braille dots, and other spinners
+    private let claudeSpinners: Set<Character> = [
+        // Flower/star glyphs (confirmed Claude spinners)
+        "✶", "✸", "✹", "✺", "✻", "✼", "✽", "✾", "✿",
+        "❀", "❁", "❂", "❃", "❄", "❅", "❆", "❇",
+        "✦", "✧", "✱", "✲", "✳", "✴", "✵", "✷",
+        "✢", "✣", "✤", "✥",
+        // Half circles
+        "◐", "◓", "◑", "◒",
+        // Braille dots (common CLI spinners)
+        "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
+        "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷",
+        // Middle dot (Claude also uses this)
+        "·"
+    ]
+
+    // Codex uses bullet point - NOT a Claude spinner
+    private let codexBullet: Character = "•"
 
     init() {
         logger.info("🔶 ClaudeDetector init")
@@ -98,11 +121,10 @@ final class ClaudeDetector: ObservableObject, Detector {
     /// Check if Claude Code is working by scanning terminal apps
     private func isClaudeWorking() -> Bool {
         let debug = DebugSettings.shared.debugClaude
-        let scanAll = DebugSettings.shared.claudeScanAllSessions
 
         let scanner = TerminalScanner(
             lineCount: 20,
-            scanAllSessions: scanAll,
+            scanAllSessions: true,  // Check all sessions (Claude may be in background tab)
             useiTermContents: false  // Use 'text' (visible screen) - faster
         )
 
@@ -137,33 +159,53 @@ final class ClaudeDetector: ObservableObject, Detector {
         return false
     }
 
-    /// Check if "esc to interrupt" appears in the last 5 lines of any session
+    /// Check if Claude-specific patterns appear in the last lines of any session
+    /// Claude shows: "✢ Dilly-dallying… (esc to interrupt · thinking)"
+    /// Codex shows: "• Working (1s • esc to interrupt)"
     private func hasClaudePattern(in output: String, scanner: TerminalScanner) -> Bool {
         let debug = DebugSettings.shared.debugClaude
         let sessions = scanner.parseSessions(from: output)
-        let lineCount = 7
-        
-        for session in sessions {
-            let last5 = Array(session.lastLines.suffix(7))
+        let checkLineCount = 7
 
-            // DEBUG: Print last 5 lines (helps diagnose detection issues)
+        for session in sessions {
+            let lastLines = Array(session.lastLines.suffix(checkLineCount))
+
             if debug {
-                print("🔶 Last \(lineCount) lines:")
-                for (i, line) in last5.enumerated() {
-                    print("🔶   [\(i+1)] \(line.prefix(80))")
+                print("🔶 Last \(checkLineCount) non-empty lines:")
+                for (i, line) in lastLines.enumerated() {
+                    print("🔶   [\(i+1)] \(line.prefix(100))")
                 }
             }
 
-            for line in last5 {
-                // Skip lines that look like Codex (has "Working" + "esc to interrupt")
-                if line.contains("Working") {
+            for line in lastLines {
+                // Must have "esc" somewhere in the line
+                guard line.contains("esc") else { continue }
+
+                // Check the first few characters for a spinner symbol
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                let prefix = String(trimmed.prefix(5))  // Check first 5 chars
+
+                if debug {
+                    let chars = prefix.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
+                    print("🔶 Checking line prefix: '\(prefix)' [\(chars)]")
+                }
+
+                // Skip if line starts with Codex bullet
+                if trimmed.hasPrefix(String(codexBullet)) {
+                    if debug {
+                        print("🔶 SKIP (Codex bullet): \(line.prefix(100))")
+                    }
                     continue
                 }
-                if line.contains(escPattern) {
-                    if debug {
-                        print("🔶 MATCH: \(line.prefix(80))")
+
+                // Match if any Claude spinner appears at the start
+                for spinner in claudeSpinners {
+                    if trimmed.hasPrefix(String(spinner)) {
+                        if debug {
+                            print("🔶 MATCH (spinner '\(spinner)'): \(line.prefix(100))")
+                        }
+                        return true
                     }
-                    return true
                 }
             }
         }
