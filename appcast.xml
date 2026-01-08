@@ -3,6 +3,28 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.21</title>
+            <pubDate>Wed, 08 Jan 2026 08:00:00 +0100</pubDate>
+            <sparkle:version>21</sparkle:version>
+            <sparkle:shortVersionString>1.0.21</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.21.zip"
+                sparkle:edSignature="3sUcboxLtr3qIv/6qaVHnc1UVralp23xGl4CV2BkBwqErUbkoICe5zT1f1kBSqKEUaiCw0BPn0DAbkWhw+pJAQ=="
+                length="1819204"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.21</h2>
+                <ul>
+                    <li>DaVinci Resolve: Shows actual render percentage in all display modes</li>
+                    <li>Minimal mode: Stroke fills based on real progress for determinate processes</li>
+                    <li>Fixed: Switching display modes now preserves active processes</li>
+                    <li>Fixed: Mock/demo processes no longer interfere with real processes</li>
+                    <li>Improved settings preview indicator</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.20</title>
             <pubDate>Tue, 07 Jan 2026 06:29:00 +0100</pubDate>
             <sparkle:version>20</sparkle:version>
