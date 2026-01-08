@@ -75,6 +75,7 @@ final class NotchMouseTracker {
     private var notchRect: NSRect = .zero
     private var isMouseInNotch = false
     private var hasActiveProcesses = false  // Only capture mouse when processes are visible
+    private var hasBeenUpdated = false  // Track if we've set the rect before (for delayed shrinking)
     private var pendingShrinkWorkItem: DispatchWorkItem?  // For delayed shrinking
 
     private var screenFrame: NSRect = .zero
@@ -82,7 +83,7 @@ final class NotchMouseTracker {
 
     // Debug overlay window
     private var debugWindow: NSWindow?
-    static var showDebugOverlay = true  // Set to true to debug click area
+    static var showDebugOverlay = false  // Set to true to debug click area
 
     init(window: NSWindow) {
         self.window = window
@@ -138,9 +139,11 @@ final class NotchMouseTracker {
         )
 
         // Check if we're shrinking - need to wait for animation to complete
+        // But only delay if we've updated before (no animation on first update)
         let isShrinking = newRect.height < notchRect.height || newRect.width < notchRect.width
+        let shouldDelayShrink = isShrinking && hasBeenUpdated && notchRect != .zero
 
-        if isShrinking && notchRect != .zero {
+        if shouldDelayShrink {
             // Delay shrinking to let the spring animation finish (~0.4s)
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self, let screen = self.targetScreen else { return }
@@ -151,16 +154,15 @@ final class NotchMouseTracker {
                     screen: screen,
                     settings: StyleSettings.shared
                 )
-                print("🔴 RED: \(self.notchRect) style=\(StyleSettings.shared.notchStyle) processes=\(processes.count)")
                 self.updateDebugOverlay()
             }
             pendingShrinkWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem)
         } else {
-            // Growing or same size - update immediately
+            // Growing, same size, or first update - update immediately
             notchRect = newRect
-            print("🔴 RED: \(notchRect) style=\(StyleSettings.shared.notchStyle) processes=\(processes.count)")
             updateDebugOverlay()
+            hasBeenUpdated = true
         }
     }
 
@@ -239,6 +241,7 @@ final class NotchWindow: NSWindow {
     /// Dynamic window dimensions based on content
     private var currentWindowWidth: CGFloat = 300
     private var currentWindowHeight: CGFloat = 300
+    private var hasBeenShown: Bool = false  // Track if window has been shown yet
     let notchState = NotchState()
 
     private var mouseTracker: NotchMouseTracker?
@@ -264,7 +267,7 @@ final class NotchWindow: NSWindow {
     }
 
     // Debug mode to visualize window bounds
-    static var showDebugBackground = true
+    static var showDebugBackground = false
 
     private func configureWindow() {
         // Make it float above everything
@@ -378,12 +381,12 @@ final class NotchWindow: NSWindow {
             return
         }
 
-        print("🔵 BLUE: \(newFrame) style=\(StyleSettings.shared.notchStyle) processes=\(processes.count)")
-
         // Check if we're shrinking - need to wait for animation to complete
+        // But only delay if window has been shown before (no animation on first show)
         let isShrinking = newFrame.height < currentWindowHeight || newFrame.width < currentWindowWidth
+        let shouldDelayShrink = isShrinking && hasBeenShown
 
-        if isShrinking {
+        if shouldDelayShrink {
             // Delay shrinking to let the spring animation finish (~0.4s)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 guard let self = self else { return }
@@ -408,7 +411,7 @@ final class NotchWindow: NSWindow {
                 }
             }
         } else {
-            // Growing or same size - update immediately
+            // Growing, same size, or first show - update immediately
             currentWindowWidth = newFrame.width
             currentWindowHeight = newFrame.height
             setFrame(newFrame, display: true, animate: false)
@@ -419,8 +422,9 @@ final class NotchWindow: NSWindow {
             }
         }
 
-        // Show the window
+        // Show the window and mark as shown
         orderFrontRegardless()
+        hasBeenShown = true
     }
 }
 
