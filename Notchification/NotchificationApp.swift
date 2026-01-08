@@ -763,16 +763,15 @@ final class AppState: ObservableObject {
         // Cancel any existing timer
         previewTimer?.invalidate()
 
-        // Show a mock process
-        windowController.update(with: [.claude])
+        // Only show mock if no real processes are active
+        if processMonitor.activeProcesses.isEmpty {
+            windowController.update(with: [.preview])
+        }
 
-        // Hide after 1.5 seconds of no changes
+        // Hide mock after 1.5 seconds (only if no real processes)
         previewTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
-            // Only hide if there are no real active processes
             if self?.processMonitor.activeProcesses.isEmpty == true {
                 self?.windowController.update(with: [])
-            } else {
-                self?.windowController.update(with: self?.processMonitor.activeProcesses ?? [])
             }
         }
     }
@@ -781,7 +780,10 @@ final class AppState: ObservableObject {
     private func showSettingsPreviewPersistent() {
         isShowingSettingsPreview = true
         previewTimer?.invalidate()
-        windowController.update(with: [.claude])
+        // Only show mock if no real processes are active
+        if processMonitor.activeProcesses.isEmpty {
+            windowController.update(with: [.preview])
+        }
     }
 
     /// Hide preview when Display settings tab closes
@@ -969,7 +971,10 @@ final class AppState: ObservableObject {
             mockProcesses.append(process)
         }
 
-        windowController.update(with: mockProcesses)
+        // Combine mock processes with real active processes
+        let realProcesses = ProcessMonitor.shared.activeProcesses
+        let combined = Array(Set(realProcesses + mockProcesses)).sorted { $0.rawValue < $1.rawValue }
+        windowController.update(with: combined)
 
         #if DEBUG
         isMocking = true
@@ -983,7 +988,10 @@ final class AppState: ObservableObject {
         // Remove this specific process after 5 seconds (non-Teams)
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             self?.mockProcesses.removeAll { $0 == process }
-            self?.windowController.update(with: self?.mockProcesses ?? [])
+            // Combine remaining mocks with real active processes
+            let realProcesses = ProcessMonitor.shared.activeProcesses
+            let combined = Array(Set(realProcesses + (self?.mockProcesses ?? []))).sorted { $0.rawValue < $1.rawValue }
+            self?.windowController.update(with: combined)
 
             #if DEBUG
             if self?.mockProcesses.isEmpty == true {

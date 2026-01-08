@@ -23,8 +23,14 @@ enum ProcessType: String, CaseIterable, Identifiable {
     case downloads = "downloads"
     case davinciResolve = "davinciresolve"
     case teams = "teams"
+    case preview = "preview"  // Settings preview - not a real process
 
     var id: String { rawValue }
+
+    /// All real process types (excludes preview)
+    static var realCases: [ProcessType] {
+        allCases.filter { $0 != .preview }
+    }
 
     var displayName: String {
         switch self {
@@ -45,6 +51,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .downloads: return "Downloads"
         case .davinciResolve: return "DaVinci Resolve"
         case .teams: return "Teams"
+        case .preview: return "Preview"
         }
     }
 
@@ -67,6 +74,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .downloads: return Color(red: 0.757, green: 0.765, blue: 1.0) // #c1c3ff Light purple
         case .davinciResolve: return Color(red: 0.176, green: 0.294, blue: 0.416) // #2d4b6a DaVinci blue
         case .teams: return Color(red: 0.384, green: 0.392, blue: 0.655) // #6264A7 Teams purple
+        case .preview: return .gray // Neutral gray for preview
         }
     }
 
@@ -89,6 +97,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .downloads: return Color(red: 0.85, green: 0.86, blue: 1.0) // Lighter purple
         case .davinciResolve: return Color(red: 0.35, green: 0.5, blue: 0.7) // Lighter DaVinci blue
         case .teams: return Color(red: 0.55, green: 0.56, blue: 0.8) // Lighter Teams purple
+        case .preview: return Color(white: 0.7) // Lighter gray for preview
         }
     }
 
@@ -111,6 +120,7 @@ enum ProcessType: String, CaseIterable, Identifiable {
         case .downloads: return .solid
         case .davinciResolve: return .solid
         case .teams: return .solid
+        case .preview: return .solid
         }
     }
 }

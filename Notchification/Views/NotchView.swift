@@ -165,6 +165,16 @@ struct NotchView: View {
         notchState.activeProcesses.count == 1
     }
 
+    /// Determinate progress from any active process (0.0-1.0), or nil if all are indeterminate
+    private var determinateProgress: Double? {
+        for process in notchState.activeProcesses {
+            if let progress = ProcessMonitor.shared.progress(for: process) {
+                return progress
+            }
+        }
+        return nil
+    }
+
     /// Previous highlight color (background layer for multiple processes)
     private var previousHighlightColor: Color {
         let processes = notchState.activeProcesses
@@ -278,6 +288,8 @@ struct NotchView: View {
                         davinciResolveConfettiTrigger += 1
                     case .teams:
                         teamsConfettiTrigger += 1
+                    case .preview:
+                        break  // No confetti for preview
                     }
                     print("🎉 Confetti triggered for \(removedProcess)")
                 }
@@ -291,6 +303,28 @@ struct NotchView: View {
             }
 
             previousProcesses = newSet
+        }
+        .onChange(of: styleSettings.notchStyle) { _, newStyle in
+            // Reinitialize animation state when switching modes
+            guard !notchState.activeProcesses.isEmpty else { return }
+
+            switch newStyle {
+            case .minimal:
+                // Initialize minimal mode animation
+                isExpanded = true
+                strokeProgress = 1  // Start with full stroke for determinate, or animate for indeterminate
+                waveProgress = 0
+                waveOpacity = 1.0
+                currentWaveIndex = 0
+                previousWaveIndex = -1
+                // Start wave animation if indeterminate
+                if determinateProgress == nil || notchState.activeProcesses.count > 1 {
+                    startWaveAnimation()
+                }
+            case .medium, .normal:
+                // Initialize medium/normal mode
+                isExpanded = true
+            }
         }
         .onAppear {
             previousProcesses = Set(notchState.activeProcesses)
@@ -352,22 +386,32 @@ struct NotchView: View {
 
             // Stroke animation (only show when no Teams, or show around expanded shape)
             if !hasTeams {
-                if showBaseStroke {
+                // Check for determinate progress (single process with known progress)
+                if let progress = determinateProgress, notchState.activeProcesses.count == 1 {
+                    // Determinate mode: draw stroke at actual progress level
                     MinimalNotchShape(cornerRadius: 13)
-                        .trim(from: 1 - strokeProgress, to: 1)
+                        .trim(from: 1 - progress, to: 1)
                         .stroke(baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-                }
+                        .animation(.easeInOut(duration: 0.5), value: progress)
+                } else {
+                    // Indeterminate mode: animated stroke
+                    if showBaseStroke {
+                        MinimalNotchShape(cornerRadius: 13)
+                            .trim(from: 1 - strokeProgress, to: 1)
+                            .stroke(baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                    }
 
-                if !showBaseStroke && previousWaveIndex >= 0 {
-                    MinimalNotchShape(cornerRadius: 13)
-                        .stroke(previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-                }
+                    if !showBaseStroke && previousWaveIndex >= 0 {
+                        MinimalNotchShape(cornerRadius: 13)
+                            .stroke(previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                    }
 
-                if !notchState.activeProcesses.isEmpty {
-                    MinimalNotchShape(cornerRadius: 13)
-                        .trim(from: 1 - waveProgress, to: 1)
-                        .stroke(currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-                        .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+                    if !notchState.activeProcesses.isEmpty {
+                        MinimalNotchShape(cornerRadius: 13)
+                            .trim(from: 1 - waveProgress, to: 1)
+                            .stroke(currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                            .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+                    }
                 }
 
                 Rectangle()
@@ -422,10 +466,12 @@ struct NotchView: View {
                             notchState.activeProcesses.removeAll { $0 == dismissedProcess }
                         }
                     )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(.horizontal, 8)
             .padding(.top, hasTeams ? 0 : 4)
+            .padding(.bottom, 8)
             .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width)
             .offset(y: hasTeams ? notchInfo.height + 5 : effectiveMediumTopPadding)
             .opacity(isExpanded ? 1 : 0)
@@ -630,10 +676,16 @@ struct ProcessRow: View {
     let progressBarHeight: CGFloat
     var onDismiss: ((ProcessType) -> Void)?
 
+    @ObservedObject private var processMonitor = ProcessMonitor.shared
     @State private var isHovering: Bool = false
 
+    /// Get progress for processes that support it (reactive via processMonitor observation)
+    private var progress: Double? {
+        processMonitor.progress(for: process)
+    }
+
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 6) {
             // Show X icon on hover, otherwise show logo
             ZStack {
                 if isHovering {
@@ -649,12 +701,33 @@ struct ProcessRow: View {
             }
             .frame(width: logoSize, height: logoSize)
 
-            AnimatedProgressBar(
-                isActive: isExpanded,
-                baseColor: process.color,
-                waveColor: process.waveColor
-            )
-            .frame(height: progressBarHeight)
+            // Show percentage text first (fixed width) so progress bar can fill to it
+            if let progress = progress {
+                let displayPercent = min(99, Int(progress * 100))
+
+                HStack(spacing: 2) {
+                    AnimatedProgressBar(
+                        isActive: isExpanded,
+                        baseColor: process.color,
+                        waveColor: process.waveColor,
+                        progress: progress
+                    )
+                    .frame(height: progressBarHeight)
+
+                    Text("\(displayPercent)")
+                        .font(.system(size: max(11, progressBarHeight * 1.8), weight: .bold, design: .monospaced))
+                        .foregroundColor(process.color)
+                        .fixedSize()
+                }
+            } else {
+                AnimatedProgressBar(
+                    isActive: isExpanded,
+                    baseColor: process.color,
+                    waveColor: process.waveColor,
+                    progress: progress
+                )
+                .frame(height: progressBarHeight)
+            }
         }
         .contentShape(Rectangle())  // Make entire row tappable
         .onTapGesture {
@@ -710,7 +783,22 @@ struct ProcessLogo: View {
             DaVinciResolveLogo()
         case .teams:
             TeamsLogo()
+        case .preview:
+            PreviewLogo()
         }
+    }
+}
+
+// MARK: - Preview Logo (Settings preview 'X')
+
+struct PreviewLogo: View {
+    var body: some View {
+        Image(systemName: "xmark")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .fontWeight(.bold)
+            .foregroundColor(.gray)
+            .padding(2)
     }
 }
 
@@ -1116,6 +1204,8 @@ struct AnimatedProgressBar: View {
     let isActive: Bool
     var baseColor: Color = Color(red: 0.85, green: 0.47, blue: 0.34)
     var waveColor: Color = Color(red: 0.95, green: 0.60, blue: 0.48)
+    /// Optional determinate progress (0.0 to 1.0). If nil, shows indeterminate animation.
+    var progress: Double? = nil
 
     @State private var baseWidth: CGFloat = 0
     @State private var waveWidth: CGFloat = 0
@@ -1126,32 +1216,57 @@ struct AnimatedProgressBar: View {
     var body: some View {
         GeometryReader { geometry in
             let height = geometry.size.height
-            ZStack(alignment: .leading) {
-                // Base layer (solid, stays filled)
-                Capsule()
-                    .fill(baseColor)
-                    .frame(width: baseWidth, height: height)
+            let totalWidth = geometry.size.width
 
-                // Wave layer (sweeps across and fades out)
-                Capsule()
-                    .fill(waveColor)
-                    .frame(width: waveWidth, height: height)
-                    .opacity(waveOpacity)
-            }
-            .onChange(of: isActive) { _, active in
-                if active {
-                    startAnimation(width: geometry.size.width)
-                } else {
-                    stopAnimation()
-                }
-            }
-            .onAppear {
-                if isActive {
-                    startAnimation(width: geometry.size.width)
-                }
+            if let progress = progress {
+                // Determinate progress bar with percentage label
+                determinateProgressView(progress: progress, width: totalWidth, height: height)
+            } else {
+                // Indeterminate animated progress bar
+                indeterminateProgressView(width: totalWidth, height: height)
+                    .clipShape(Capsule())
             }
         }
-        .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private func determinateProgressView(progress: Double, width: CGFloat, height: CGFloat) -> some View {
+        let fillWidth = max(height, min(width, width * progress))
+
+        // Simple progress fill bar (text is rendered separately in ProcessRow)
+        Capsule()
+            .fill(baseColor)
+            .frame(width: fillWidth, height: height)
+            .animation(.easeInOut(duration: 0.5), value: progress)
+            .frame(width: width, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func indeterminateProgressView(width: CGFloat, height: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            // Base layer (solid, stays filled)
+            Capsule()
+                .fill(baseColor)
+                .frame(width: baseWidth, height: height)
+
+            // Wave layer (sweeps across and fades out)
+            Capsule()
+                .fill(waveColor)
+                .frame(width: waveWidth, height: height)
+                .opacity(waveOpacity)
+        }
+        .onChange(of: isActive) { _, active in
+            if active {
+                startAnimation(width: width)
+            } else {
+                stopAnimation()
+            }
+        }
+        .onAppear {
+            if isActive {
+                startAnimation(width: width)
+            }
+        }
     }
 
     private func startAnimation(width: CGFloat) {
@@ -1172,7 +1287,7 @@ struct AnimatedProgressBar: View {
     }
 
     private func startWaveLoop(width: CGFloat) {
-        guard isActive else { return }
+        guard isActive, progress == nil else { return }
 
         // Reset wave instantly (no animation)
         var transaction = Transaction()
@@ -1184,7 +1299,7 @@ struct AnimatedProgressBar: View {
 
         // Small delay to let reset apply, then animate
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            guard self.isActive else { return }
+            guard self.isActive, self.progress == nil else { return }
 
             // Animate wave: sweep across while fading out
             withAnimation(.easeInOut(duration: self.animationDuration)) {

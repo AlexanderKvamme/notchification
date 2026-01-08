@@ -103,6 +103,16 @@ final class ProcessMonitor: ObservableObject {
         updateActiveProcesses()
     }
 
+    /// Get the current progress for a process type (0.0-1.0), or nil if indeterminate
+    func progress(for processType: ProcessType) -> Double? {
+        switch processType {
+        case .davinciResolve:
+            return davinciResolveDetector.progress
+        default:
+            return nil  // Other detectors don't support progress yet
+        }
+    }
+
     func startMonitoring() {
         guard timer == nil else { return }
 
@@ -278,6 +288,12 @@ final class ProcessMonitor: ObservableObject {
         davinciResolveDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        // Forward progress changes to trigger UI updates
+        davinciResolveDetector.$progress
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
         teamsDetector.$isActive
