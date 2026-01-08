@@ -31,10 +31,17 @@ final class SettingsWindowController {
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Notchification Settings"
         window.styleMask = [.titled, .closable]
-        window.center()
-        window.setFrameAutosaveName("SettingsWindow")
         window.isReleasedWhenClosed = false
         window.level = .floating  // Ensure it appears above other windows
+
+        // Center on screen
+        if let screen = NSScreen.main {
+            let screenFrame = screen.visibleFrame
+            let windowSize = window.frame.size
+            let x = screenFrame.midX - windowSize.width / 2
+            let y = screenFrame.midY - windowSize.height / 2
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        }
 
         self.window = window
 

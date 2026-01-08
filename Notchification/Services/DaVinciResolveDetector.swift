@@ -124,7 +124,14 @@ final class DaVinciResolveDetector: ObservableObject, Detector {
             }
         }
 
-        return (false, dockProgress)
+        // If dock shows progress, rendering is happening even if we can't see the window
+        // (e.g., DaVinci is on a different Space/desktop)
+        if let progress = dockProgress, progress > 0 && progress < 1 {
+            if debug { print("🎬 Dock progress detected on different Space: \(progress)") }
+            return (true, progress)
+        }
+
+        return (false, nil)
     }
 
     /// Try to read progress from the Dock icon

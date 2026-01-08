@@ -139,9 +139,28 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         return nil
     }
 
+    /// Bundle identifiers for different Android Studio variants
+    /// - Stable: com.google.android.studio
+    /// - Beta/RC: com.google.android.studio.beta
+    /// - Canary: com.google.android.studio.canary
+    /// - Dev: com.google.android.studio.dev
+    private let androidStudioBundleIds = [
+        "com.google.android.studio",
+        "com.google.android.studio.beta",
+        "com.google.android.studio.canary",
+        "com.google.android.studio.dev"
+    ]
+
     /// Check if Android Studio is running (cheap check using NSWorkspace)
     private var isAndroidStudioRunning: Bool {
-        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.google.android.studio" }
+        let found = NSWorkspace.shared.runningApplications.first { app in
+            guard let bundleId = app.bundleIdentifier else { return false }
+            return androidStudioBundleIds.contains(bundleId)
+        }
+        if debug, let app = found {
+            print("🤖 Android Studio running: \(app.bundleIdentifier ?? "unknown")")
+        }
+        return found != nil
     }
 
     func poll() {

@@ -13,18 +13,26 @@ struct MinimalNotchShape: Shape {
         var path = Path()
 
         // Simple rounded rectangle - top corners are square (flush with screen top)
-        // Only bottom corners are rounded
+        // Only bottom corners are rounded with proper arcs
         path.move(to: CGPoint(x: 0, y: 0))
         path.addLine(to: CGPoint(x: width, y: 0))
         path.addLine(to: CGPoint(x: width, y: height - r))
-        path.addQuadCurve(
-            to: CGPoint(x: width - r, y: height),
-            control: CGPoint(x: width, y: height)
+        // Bottom-right corner arc
+        path.addArc(
+            center: CGPoint(x: width - r, y: height - r),
+            radius: r,
+            startAngle: .degrees(0),
+            endAngle: .degrees(90),
+            clockwise: false
         )
         path.addLine(to: CGPoint(x: r, y: height))
-        path.addQuadCurve(
-            to: CGPoint(x: 0, y: height - r),
-            control: CGPoint(x: 0, y: height)
+        // Bottom-left corner arc
+        path.addArc(
+            center: CGPoint(x: r, y: height - r),
+            radius: r,
+            startAngle: .degrees(90),
+            endAngle: .degrees(180),
+            clockwise: false
         )
         path.addLine(to: CGPoint(x: 0, y: 0))
         path.closeSubpath()

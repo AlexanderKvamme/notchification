@@ -18,6 +18,7 @@ struct NotchView: View {
     @ObservedObject var licenseManager = LicenseManager.shared
     @ObservedObject var styleSettings = StyleSettings.shared
     @ObservedObject var cameraManager = CameraManager.shared  // For checking hasFirstFrame
+    @ObservedObject var debugSettings = DebugSettings.shared
     var screenWidth: CGFloat = 1440
     var screenHeight: CGFloat = 900
     var screen: NSScreen? = nil  // The screen this view is displayed on
@@ -92,8 +93,8 @@ struct NotchView: View {
         return mediumTopPaddingBase
     }
 
-    // Minimal mode stroke width
-    private let minimalStrokeWidth: CGFloat = 10
+    // Minimal mode stroke width (from settings)
+    private var minimalStrokeWidth: CGFloat { styleSettings.minimalStrokeWidth }
 
     // Dynamic height based on number of processes (normal mode)
     private var expandedHeight: CGFloat {
@@ -197,16 +198,20 @@ struct NotchView: View {
                     startWaveAnimation()
                 } else {
                     isPendingDismiss = false
-                    isExpanded = true
                     currentWaveIndex = 0
                     previousWaveIndex = -1
                     waveProgress = 0
                     waveOpacity = 1.0
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        strokeProgress = 1
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        startWaveAnimation()
+                    strokeProgress = 0
+                    // Small delay to let layout stabilize before animating
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
+                        isExpanded = true
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            strokeProgress = 1
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            startWaveAnimation()
+                        }
                     }
                 }
 
@@ -333,47 +338,61 @@ struct NotchView: View {
                     .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
                 }
             } else {
-                // Normal minimal mode - just stroke
-                MinimalNotchShape(cornerRadius: 8)
-                    .fill(notchBlack)
-            }
+                // Normal minimal mode - stroke border around notch
+                let cornerRadius: CGFloat = 8
+                let debugColors = debugSettings.debugViewColors
+                // Stroke extends strokeWidth/2 on each side, but top is at screen edge
+                let strokeOffset = minimalStrokeWidth / 2
 
-            // Stroke animation (only show when no Teams, or show around expanded shape)
-            if !hasTeams {
-                // Check for determinate progress (single process with known progress)
-                if let progress = determinateProgress, notchState.activeProcesses.count == 1 {
-                    // Determinate mode: draw stroke at actual progress level
-                    MinimalNotchShape(cornerRadius: 13)
-                        .trim(from: 1 - progress, to: 1)
-                        .stroke(baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-                        .animation(.easeInOut(duration: 0.5), value: progress)
-                } else {
-                    // Indeterminate mode: animated stroke
-                    if showBaseStroke {
-                        MinimalNotchShape(cornerRadius: 13)
-                            .trim(from: 1 - strokeProgress, to: 1)
-                            .stroke(baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                ZStack {
+                    // DEBUG: Outer frame indicator (green)
+                    if debugColors {
+                        Color.green.opacity(0.3)
                     }
 
-                    if !showBaseStroke && previousWaveIndex >= 0 {
-                        MinimalNotchShape(cornerRadius: 13)
-                            .stroke(previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-                    }
+                    // Fill - the black notch shape, positioned at top with padding for stroke on sides/bottom
+                    MinimalNotchShape(cornerRadius: cornerRadius)
+                        .fill(debugColors ? Color.red.opacity(0.5) : notchBlack)
+                        .frame(width: notchInfo.width, height: notchInfo.height)
+                        .position(x: notchInfo.width / 2 + strokeOffset, y: notchInfo.height / 2)
 
-                    if !notchState.activeProcesses.isEmpty {
-                        MinimalNotchShape(cornerRadius: 13)
-                            .trim(from: 1 - waveProgress, to: 1)
-                            .stroke(currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
-                            .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+                    // Stroke shapes - same position as fill
+                    Group {
+                        if let progress = determinateProgress, notchState.activeProcesses.count == 1 {
+                            // Determinate mode
+                            MinimalNotchShape(cornerRadius: cornerRadius)
+                                .trim(from: 1 - progress, to: 1)
+                                .stroke(debugColors ? Color.blue : baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                                .animation(.easeInOut(duration: 0.5), value: progress)
+                        } else {
+                            // Indeterminate mode
+                            if showBaseStroke {
+                                MinimalNotchShape(cornerRadius: cornerRadius)
+                                    .trim(from: 1 - strokeProgress, to: 1)
+                                    .stroke(debugColors ? Color.blue : baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                            }
+
+                            if !showBaseStroke && previousWaveIndex >= 0 {
+                                MinimalNotchShape(cornerRadius: cornerRadius)
+                                    .stroke(debugColors ? Color.cyan : previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                            }
+
+                            if !notchState.activeProcesses.isEmpty {
+                                MinimalNotchShape(cornerRadius: cornerRadius)
+                                    .trim(from: 1 - waveProgress, to: 1)
+                                    .stroke(debugColors ? Color.purple : currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                                    .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
+                            }
+                        }
                     }
+                    .frame(width: notchInfo.width, height: notchInfo.height)
+                    .position(x: notchInfo.width / 2 + strokeOffset, y: notchInfo.height / 2)
                 }
-
-                Rectangle()
-                    .fill(notchBlack)
-                    .frame(width: notchInfo.width - minimalStrokeWidth, height: minimalStrokeWidth)
+                .frame(width: notchInfo.width + minimalStrokeWidth, height: notchInfo.height + strokeOffset)
             }
         }
-        .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: hasTeams ? notchInfo.height + 5 + cameraHeight + 16 : notchInfo.height)
+        // Outer frame matches content exactly
+        .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width + minimalStrokeWidth, height: hasTeams ? notchInfo.height + 5 + cameraHeight + 16 : notchInfo.height + minimalStrokeWidth / 2)
         .opacity(isExpanded ? 1 : 0)
     }
 
@@ -384,9 +403,10 @@ struct NotchView: View {
         let teamsOnly = notchState.activeProcesses == [.teams]
         let cameraHeight: CGFloat = 150
         let cameraWidth: CGFloat = 280  // Same as normal mode
+        let debugColors = debugSettings.debugViewColors
 
         MinimalNotchShape(cornerRadius: 16)
-            .fill(notchBlack)
+            .fill(debugColors ? Color.red.opacity(0.5) : notchBlack)
             .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: mediumExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: mediumExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
@@ -444,6 +464,7 @@ struct NotchView: View {
         let hasTeams = notchState.activeProcesses.contains(.teams)
         let cameraHeight: CGFloat = 150
         let cameraWidth: CGFloat = notchWidth - 20  // Fill notch width with small padding
+        let debugColors = debugSettings.debugViewColors
 
         // Calculate height: if teams is active, include camera height
         let teamsExpandedHeight: CGFloat = {
@@ -460,7 +481,7 @@ struct NotchView: View {
         }()
 
         NotchShape()
-            .fill(notchBlack)
+            .fill(debugColors ? Color.red.opacity(0.5) : notchBlack)
             .frame(width: notchWidth, height: teamsExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: teamsExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)

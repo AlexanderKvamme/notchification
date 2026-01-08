@@ -32,6 +32,14 @@ struct SettingsView: View {
                 }
         }
         .frame(width: 450, height: 380)
+        .onAppear {
+            // Show preview when settings window opens (any tab)
+            NotificationCenter.default.post(name: .showSettingsPreview, object: nil)
+        }
+        .onDisappear {
+            // Hide preview when settings window closes
+            NotificationCenter.default.post(name: .hideSettingsPreview, object: nil)
+        }
     }
 }
 
@@ -73,6 +81,14 @@ struct DisplaySettingsTab: View {
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
+
+                // Stroke width stepper for minimal style
+                if styleSettings.notchStyle == .minimal {
+                    Stepper("Stroke Width: \(Int(styleSettings.minimalStrokeWidth))px",
+                            value: $styleSettings.minimalStrokeWidth,
+                            in: 2...10,
+                            step: 1)
+                }
             }
 
             Section {
@@ -115,12 +131,6 @@ struct DisplaySettingsTab: View {
         }
         .formStyle(.grouped)
         .padding()
-        .onAppear {
-            NotificationCenter.default.post(name: .showSettingsPreview, object: nil)
-        }
-        .onDisappear {
-            NotificationCenter.default.post(name: .hideSettingsPreview, object: nil)
-        }
     }
 }
 
@@ -137,6 +147,8 @@ struct SmartFeaturesTab: View {
                     .onChange(of: trackingSettings.trackTeams) { _, enabled in
                         if enabled {
                             handleCameraPermission()
+                            // Show Teams preview so user can try hovering to dismiss
+                            NotificationCenter.default.post(name: .showTeamsPreview, object: nil)
                         }
                     }
                 Text("Show a camera preview when Microsoft Teams launches, so you can check your appearance before joining a meeting. Hover to enlarge, move mouse away to dismiss.")

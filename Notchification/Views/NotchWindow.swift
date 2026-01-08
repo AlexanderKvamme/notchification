@@ -111,7 +111,9 @@ final class NotchMouseTracker {
         hasActiveProcesses = !processes.isEmpty
 
         // When no processes, delay cleanup to let animation finish
+        // Minimal mode needs longer (1.0s wave + 0.3s fade = 1.3s)
         if processes.isEmpty {
+            let cleanupDelay: Double = StyleSettings.shared.notchStyle == .minimal ? 1.5 : 0.35
             let workItem = DispatchWorkItem { [weak self] in
                 self?.timer?.invalidate()
                 self?.timer = nil
@@ -121,7 +123,7 @@ final class NotchMouseTracker {
                 self?.updateDebugOverlay()
             }
             pendingShrinkWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + cleanupDelay, execute: workItem)
             return
         }
 
@@ -290,8 +292,8 @@ final class NotchWindow: NSWindow {
         // Exclude from window menus and lists
         isExcludedFromWindowsMenu = true
 
-        // CRITICAL: Make window non-capturable by screenshot tools
-        sharingType = .none
+        // Allow screenshots
+        sharingType = .readOnly
 
         // No title bar
         titlebarAppearsTransparent = true
@@ -361,8 +363,11 @@ final class NotchWindow: NSWindow {
 
         // Hide window when no processes - prevents it from appearing in screenshot picker
         guard !processes.isEmpty else {
-            // Delay hiding to let the collapse animation finish (0.3s easeOut)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            // Delay hiding to let the collapse animation finish
+            // Minimal mode needs longer (1.0s wave + 0.3s fade = 1.3s)
+            // Normal/Medium mode needs 0.35s
+            let hideDelay: Double = StyleSettings.shared.notchStyle == .minimal ? 1.5 : 0.35
+            DispatchQueue.main.asyncAfter(deadline: .now() + hideDelay) { [weak self] in
                 // Only hide if still empty (processes might have been added back)
                 if self?.notchState.activeProcesses.isEmpty == true {
                     self?.orderOut(nil)
@@ -469,7 +474,7 @@ final class ConfettiWindow: NSWindow {
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
         ignoresMouseEvents = true
         isExcludedFromWindowsMenu = true
-        sharingType = .none
+        sharingType = .readOnly
 
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
@@ -559,6 +564,7 @@ final class NotchWindowController: ObservableObject {
     private(set) var isShowing: Bool = false
     private var screenObserver: NSObjectProtocol?
     private var selectionObserver: NSObjectProtocol?
+    private var lastProcesses: [ProcessType] = []  // Track last processes to restore after screen changes
 
     init() {
         setupWindows()
@@ -621,10 +627,18 @@ final class NotchWindowController: ObservableObject {
                 confettiWindows[screen] = confettiWindow
             }
         }
+
+        // Restore processes to newly created windows (fixes collapse on screen change)
+        if !lastProcesses.isEmpty {
+            for window in windows.values {
+                window.updateProcesses(lastProcesses)
+            }
+        }
     }
 
     func update(with processes: [ProcessType]) {
         print("🎛️ WindowController.update called with: \(processes.map { $0.displayName })")
+        lastProcesses = processes  // Store for restoring after screen changes
         isShowing = !processes.isEmpty
 
         for window in windows.values {

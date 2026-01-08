@@ -97,6 +97,11 @@ struct DebugMenuView: View {
 
             Divider()
 
+            Text("View Debug").font(.caption).foregroundColor(.secondary)
+            Toggle("Show View Colors", isOn: $debugSettings.debugViewColors)
+
+            Divider()
+
             Text("License").font(.caption).foregroundColor(.secondary)
             Button("Reset Trial") { licenseManager.resetTrial() }
             Button("Expire Trial") { licenseManager.expireTrial() }
@@ -152,6 +157,10 @@ final class DebugSettings: ObservableObject {
     @Published var claudeScanAllSessions: Bool {
         didSet { UserDefaults.standard.set(claudeScanAllSessions, forKey: "claudeScanAllSessions") }
     }
+    /// Show debug colors on views (red=fill, blue=stroke, green=frame)
+    @Published var debugViewColors: Bool {
+        didSet { UserDefaults.standard.set(debugViewColors, forKey: "debugViewColors") }
+    }
 
     private init() {
         self.debugClaude = UserDefaults.standard.object(forKey: "debugClaude") as? Bool ?? false
@@ -165,6 +174,7 @@ final class DebugSettings: ObservableObject {
         self.debugDaVinciResolve = UserDefaults.standard.object(forKey: "debugDaVinciResolve") as? Bool ?? false
         self.debugTeams = UserDefaults.standard.object(forKey: "debugTeams") as? Bool ?? false
         self.claudeScanAllSessions = UserDefaults.standard.object(forKey: "claudeScanAllSessions") as? Bool ?? false
+        self.debugViewColors = UserDefaults.standard.object(forKey: "debugViewColors") as? Bool ?? false
     }
 }
 
@@ -372,6 +382,11 @@ final class StyleSettings: ObservableObject {
         didSet { UserDefaults.standard.set(horizontalOffset, forKey: "horizontalOffset") }
     }
 
+    /// Stroke width for minimal style (default 4)
+    @Published var minimalStrokeWidth: CGFloat {
+        didSet { UserDefaults.standard.set(minimalStrokeWidth, forKey: "minimalStrokeWidth") }
+    }
+
     private init() {
         // Migrate from old minimalStyle boolean if needed
         if let styleString = UserDefaults.standard.string(forKey: "notchStyle"),
@@ -391,6 +406,7 @@ final class StyleSettings: ObservableObject {
         self.trimTopOnExternalDisplay = UserDefaults.standard.object(forKey: "trimTopOnExternalDisplay") as? Bool ?? true
         self.trimTopOnNotchDisplay = UserDefaults.standard.object(forKey: "trimTopOnNotchDisplay") as? Bool ?? false
         self.horizontalOffset = UserDefaults.standard.object(forKey: "horizontalOffset") as? CGFloat ?? 0
+        self.minimalStrokeWidth = UserDefaults.standard.object(forKey: "minimalStrokeWidth") as? CGFloat ?? 4
     }
 
     /// Get the built-in (MacBook) display
@@ -439,6 +455,7 @@ extension Notification.Name {
     static let showSettingsPreview = Notification.Name("showSettingsPreview")
     static let hideSettingsPreview = Notification.Name("hideSettingsPreview")
     static let teamsMockDismissed = Notification.Name("teamsMockDismissed")
+    static let showTeamsPreview = Notification.Name("showTeamsPreview")
 }
 
 /// Information about the physical notch on the current screen
@@ -579,16 +596,20 @@ struct NotchLayout {
         let teamsExtraHeight = hasTeams ? teamsHoverExtraHeight : 0
         let teamsExtraWidth = hasTeams ? teamsHoverExtraWidth : 0
 
+        // Minimal stroke width from settings
+        let minimalStrokeWidth = settings.minimalStrokeWidth
+
         switch style {
         case .minimal:
             // From NotchView minimalModeView:
-            // .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: hasTeams ? notchInfo.height + 5 + cameraHeight + 16 : notchInfo.height)
-            width = hasTeams ? cameraWidth + 20 + teamsExtraWidth : notchInfo.width
-            height = hasTeams ? notchInfo.height + 5 + cameraHeight + 16 + teamsExtraHeight : notchInfo.height
+            // Stroke extends strokeWidth/2 on each side
+            width = hasTeams ? cameraWidth + 20 + teamsExtraWidth : notchInfo.width + minimalStrokeWidth
+            height = hasTeams ? notchInfo.height + 5 + cameraHeight + 16 + teamsExtraHeight : notchInfo.height + minimalStrokeWidth / 2
 
         case .medium:
             // From NotchView mediumModeView:
             // .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: mediumExpandedHeight)
+            // Medium mode uses MinimalNotchShape (no ears)
             width = hasTeams ? cameraWidth + 20 + teamsExtraWidth : notchInfo.width
 
             // mediumExpandedHeight calculation from NotchView:
@@ -606,7 +627,9 @@ struct NotchLayout {
         case .normal:
             // From NotchView normalModeView:
             // .frame(width: notchWidth, height: teamsExpandedHeight)
-            width = hasTeams ? notchWidth + teamsExtraWidth : notchWidth
+            // Add 60 for ears (cornerRadius 30 on each side)
+            let normalEarSpace: CGFloat = 60
+            width = hasTeams ? notchWidth + teamsExtraWidth + normalEarSpace : notchWidth + normalEarSpace
 
             // teamsExpandedHeight calculation from NotchView:
             let effTopPadding = effectiveTopPadding(notchInfo: notchInfo, settings: settings)
@@ -896,6 +919,15 @@ final class AppState: ObservableObject {
             self?.hideSettingsPreview()
         }
 
+        // Listen for style changes to reset preview animation
+        NotificationCenter.default.addObserver(
+            forName: .notchStyleChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.resetSettingsPreview()
+        }
+
         #if DEBUG
         // Listen for Teams mock dismissal to clean up mockProcesses
         NotificationCenter.default.addObserver(
@@ -906,6 +938,36 @@ final class AppState: ObservableObject {
             self?.mockProcesses.removeAll { $0 == .teams }
         }
         #endif
+
+        // Listen for Teams preview request from Smart Features settings
+        NotificationCenter.default.addObserver(
+            forName: .showTeamsPreview,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showTeamsPreview()
+        }
+    }
+
+    /// Show Teams camera preview (triggered from Smart Features settings)
+    private func showTeamsPreview() {
+        CameraManager.shared.startSession()
+
+        #if DEBUG
+        // Add to mockProcesses so it persists
+        if !mockProcesses.contains(.teams) {
+            mockProcesses.append(.teams)
+        }
+        #endif
+
+        // Combine with any existing processes
+        let realProcesses = processMonitor.activeProcesses
+        var combined = Array(Set(realProcesses))
+        if !combined.contains(.teams) {
+            combined.append(.teams)
+        }
+        combined.sort { $0.rawValue < $1.rawValue }
+        windowController.update(with: combined)
     }
 
     private var isShowingSettingsPreview = false
@@ -933,13 +995,22 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Show preview while Display settings tab is open
+    /// Show preview while settings are open
     private func showSettingsPreviewPersistent() {
         isShowingSettingsPreview = true
         previewTimer?.invalidate()
-        // Only show mock if no real processes are active
-        if processMonitor.activeProcesses.isEmpty {
-            windowController.update(with: [.preview])
+        // Always show preview when settings are open
+        windowController.update(with: [.preview])
+    }
+
+    /// Reset and re-show preview (for style changes)
+    private func resetSettingsPreview() {
+        guard isShowingSettingsPreview else { return }
+        // Clear first, then show fresh to restart animation
+        windowController.update(with: [])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard self?.isShowingSettingsPreview == true else { return }
+            self?.windowController.update(with: [.preview])
         }
     }
 
