@@ -341,22 +341,19 @@ struct NotchView: View {
                 // Normal minimal mode - stroke border around notch
                 let cornerRadius: CGFloat = 8
                 let debugColors = debugSettings.debugViewColors
-                // Stroke extends strokeWidth/2 on each side, but top is at screen edge
-                let strokeOffset = minimalStrokeWidth / 2
 
-                ZStack {
+                ZStack(alignment: .top) {
                     // DEBUG: Outer frame indicator (green)
                     if debugColors {
                         Color.green.opacity(0.3)
                     }
 
-                    // Fill - the black notch shape, positioned at top with padding for stroke on sides/bottom
+                    // Fill - the black notch shape
                     MinimalNotchShape(cornerRadius: cornerRadius)
                         .fill(debugColors ? Color.red.opacity(0.5) : notchBlack)
                         .frame(width: notchInfo.width, height: notchInfo.height)
-                        .position(x: notchInfo.width / 2 + strokeOffset, y: notchInfo.height / 2)
 
-                    // Stroke shapes - same position as fill
+                    // Stroke shapes - SAME frame as fill, stroke extends outward naturally
                     Group {
                         if let progress = determinateProgress, notchState.activeProcesses.count == 1 {
                             // Determinate mode
@@ -385,13 +382,12 @@ struct NotchView: View {
                             }
                         }
                     }
+                    // Same frame as fill - stroke naturally extends strokeWidth/2 beyond
                     .frame(width: notchInfo.width, height: notchInfo.height)
-                    .position(x: notchInfo.width / 2 + strokeOffset, y: notchInfo.height / 2)
                 }
-                .frame(width: notchInfo.width + minimalStrokeWidth, height: notchInfo.height + strokeOffset)
             }
         }
-        // Outer frame matches content exactly
+        // Frame sized to content - stroke extends strokeWidth/2 on each side
         .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width + minimalStrokeWidth, height: hasTeams ? notchInfo.height + 5 + cameraHeight + 16 : notchInfo.height + minimalStrokeWidth / 2)
         .opacity(isExpanded ? 1 : 0)
     }
@@ -444,7 +440,8 @@ struct NotchView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
             .padding(.top, hasTeams ? 0 : 4)
             .padding(.bottom, 8)
             .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width)
