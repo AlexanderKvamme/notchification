@@ -101,7 +101,18 @@ final class CodexDetector: ObservableObject, Detector {
         return false
     }
 
-    /// Check if "Working" + "esc to interrupt" appears in the last 10 lines of any session
+    /// Codex bullet point - used to identify Codex vs Claude
+    private let codexBullet: Character = "•"
+
+    /// Regex to match Codex timing pattern: (1s •, (9s •, (54s •, etc.
+    private let timingPattern = try! NSRegularExpression(pattern: #"\(\d+s •"#)
+
+    /// Check if Codex pattern appears in terminal output
+    /// Codex shows: "• [action] (Xs • esc to interrupt)"
+    /// Examples:
+    ///   • Working (1s • esc to interrupt)
+    ///   • Searching for pattern detection (9s • esc to interrupt)
+    ///   • Analyzing terminal output parsing issues (54s • esc to interrupt)
     private func hasCodexPattern(in output: String, scanner: TerminalScanner) -> Bool {
         let debug = DebugSettings.shared.debugCodex
         let sessions = scanner.parseSessions(from: output)
@@ -119,7 +130,16 @@ final class CodexDetector: ObservableObject, Detector {
             }
 
             for line in session.lastLines {
-                if line.contains("Working") && line.contains("esc to interrupt") {
+                // Must have "esc to interrupt" somewhere in the line
+                guard line.contains("esc to interrupt") else { continue }
+
+                // Check if line starts with Codex bullet •
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard trimmed.hasPrefix(String(codexBullet)) else { continue }
+
+                // Check for timing pattern (Xs •
+                let range = NSRange(line.startIndex..., in: line)
+                if timingPattern.firstMatch(in: line, range: range) != nil {
                     if debug {
                         print("🤖 MATCH: \(line.prefix(100))")
                     }

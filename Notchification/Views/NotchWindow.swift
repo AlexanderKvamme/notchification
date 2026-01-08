@@ -493,7 +493,12 @@ struct ConfettiOverlayView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
+            // DEBUG: Subtle background to visualize confetti window visibility
+            #if DEBUG
+            Color.blue.opacity(0.05)
+            #else
             Color.clear
+            #endif
 
             // Confetti emitters positioned at top center
             VStack {
@@ -629,7 +634,13 @@ final class NotchWindowController: ObservableObject {
         // Show/hide confetti windows based on whether there are processes
         for confettiWindow in confettiWindows.values {
             if processes.isEmpty {
-                confettiWindow.orderOut(nil)
+                // Delay hiding confetti window to let the confetti animation play (~3 seconds)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                    // Only hide if still no processes (a new one might have started)
+                    if self?.isShowing == false {
+                        confettiWindow.orderOut(nil)
+                    }
+                }
             } else {
                 confettiWindow.orderFrontRegardless()
             }
