@@ -27,60 +27,103 @@ Download the latest release from [Releases](https://github.com/AlexanderKvamme/n
 
 ## Releasing a New Version
 
-### 1. Update version number
+Releases are hosted on featurefest.dev and delivered via Sparkle auto-update.
 
-In Xcode: Project → Target → General → Version and Build
+### 1. Update version numbers
 
-### 2. Archive and Export (Notarized)
-
-1. **Archive**: Product → Archive
-2. **Export**: Distribute App → Direct Distribution → Upload (auto-notarizes)
-3. Wait for notarization (1-5 minutes)
-4. Click "Export Notarized App" and save to Desktop
-
-### 3. Create zip
-
-Right-click the exported `Notchification.app` → Compress
-
-Rename to include version:
-```bash
-mv ~/Desktop/Notchification.zip ~/Desktop/Notchification-1.0.X.zip
-```
-
-### 4. Create GitHub Release
+Update both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.pbxproj`:
 
 ```bash
-gh release create v1.0.X ~/Desktop/Notchification-1.0.X.zip \
-  --title "v1.0.X" \
-  --notes "Release notes here"
+# Example: bumping to 1.0.24
+sed -i '' 's/MARKETING_VERSION = 1.0.23/MARKETING_VERSION = 1.0.24/g' Notchification.xcodeproj/project.pbxproj
+sed -i '' 's/CURRENT_PROJECT_VERSION = 23/CURRENT_PROJECT_VERSION = 24/g' Notchification.xcodeproj/project.pbxproj
 ```
 
-### 5. Update appcast.xml
+**Important:** The `CURRENT_PROJECT_VERSION` (build number) must match the `sparkle:version` in the appcast.
 
-Update `appcast.xml` with the new version:
-```xml
-<sparkle:version>X</sparkle:version>
-<sparkle:shortVersionString>1.0.X</sparkle:shortVersionString>
-<link>https://github.com/AlexanderKvamme/notchification/releases/tag/v1.0.X</link>
-```
-
-### 6. Push changes
+### 2. Commit the version bump
 
 ```bash
-git add appcast.xml
-git commit -m "Update appcast for v1.0.X"
+git add -A && git commit -m "Release v1.0.X"
+```
+
+### 3. Archive and export
+
+```bash
+# Archive
+xcodebuild -scheme Notchification -configuration Release \
+  -archivePath /tmp/Notchification.xcarchive archive
+
+# Export
+xcodebuild -exportArchive \
+  -archivePath /tmp/Notchification.xcarchive \
+  -exportPath /tmp/NotchificationExport \
+  -exportOptionsPlist /dev/stdin << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>mac-application</string>
+</dict>
+</plist>
+EOF
+```
+
+### 4. Create and sign the zip
+
+```bash
+# Create zip
+cd /tmp/NotchificationExport
+zip -r Notchification-1.0.X.zip Notchification.app
+
+# Sign with Sparkle (outputs edSignature and length)
+~/Library/Developer/Xcode/DerivedData/Notchification-*/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update \
+  Notchification-1.0.X.zip
+```
+
+Save the `edSignature` and `length` from the output.
+
+### 5. Copy to featurefest
+
+```bash
+cp /tmp/NotchificationExport/Notchification-1.0.X.zip \
+  ~/Documents/workspaces/code/web/featurefest/notchification/
+```
+
+### 6. Update appcast.xml
+
+Edit `~/Documents/workspaces/code/web/featurefest/notchification/appcast.xml`:
+
+Add a new `<item>` at the top with:
+- `sparkle:version` = build number (e.g., 24)
+- `sparkle:shortVersionString` = marketing version (e.g., 1.0.24)
+- `sparkle:edSignature` = signature from step 4
+- `length` = file size from step 4
+
+### 7. Push and deploy
+
+```bash
+# Push Notchification repo
 git push
+
+# Commit and push featurefest
+cd ~/Documents/workspaces/code/web/featurefest
+git add notchification/appcast.xml
+git commit -m "Release Notchification v1.0.X"
+git push
+
+# Deploy to Firebase
+firebase deploy --only hosting
 ```
 
 ## How Updates Work
 
-The app uses Sparkle for update notifications, but with a simplified "informational-only" approach:
+The app uses Sparkle for automatic updates:
 
-1. Sparkle checks `appcast.xml` for new versions
-2. If a newer version is found, it opens the GitHub releases page
-3. Users download and install manually (no auto-install)
-
-This avoids complexities with code signing and macOS Gatekeeper while still providing update notifications.
+1. Sparkle checks `https://featurefest.dev/notchification/appcast.xml` for new versions
+2. Compares the `sparkle:version` (build number) with the installed version
+3. If newer, downloads and installs the update automatically
 
 ## License
 
