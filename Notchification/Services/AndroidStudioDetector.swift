@@ -11,6 +11,9 @@
 import Foundation
 import Combine
 import AppKit
+import os.log
+
+private let logger = OSLog(subsystem: "com.notchification", category: "AndroidStudio")
 
 /// Detects if Android Studio is actively building
 final class AndroidStudioDetector: ObservableObject, Detector {
@@ -18,6 +21,8 @@ final class AndroidStudioDetector: ObservableObject, Detector {
 
     let processType: ProcessType = .androidStudio
     private var gradlePath: String?
+    private var detectedBundleId: String?
+    private var lastLoggedStatus: String?
 
     // Consecutive readings required
     private let requiredToShow: Int = 1
@@ -30,23 +35,71 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     // Serial queue ensures checks don't overlap
     private let checkQueue = DispatchQueue(label: "com.notchification.android-check", qos: .utility)
 
-    private var debug: Bool { DebugSettings.shared.debugAndroid }
+    // Debug logging is ALWAYS enabled for Android Studio (users need Console.app to see it)
+    private var debug: Bool { true }
+
+    private func log(_ message: String) {
+        os_log("[Notchification] 🤖 %{public}@", log: logger, type: .info, message)
+    }
 
     init() {
+        log("========== AndroidStudioDetector initializing ==========")
+
+        // Log environment
+        if let gradleUserHome = ProcessInfo.processInfo.environment["GRADLE_USER_HOME"] {
+            log("GRADLE_USER_HOME env: \(gradleUserHome)")
+        } else {
+            log("GRADLE_USER_HOME env: not set (will use ~/.gradle)")
+        }
+
+        if let javaHomeEnv = ProcessInfo.processInfo.environment["JAVA_HOME"] {
+            log("JAVA_HOME env: \(javaHomeEnv)")
+        } else {
+            log("JAVA_HOME env: not set")
+        }
+
+        // Find and log gradle path
         findGradlePath()
-        if debug {
-            if let path = gradlePath {
-                print("🤖 AndroidStudioDetector init - gradle found: \(path)")
+        if let path = gradlePath {
+            log("✅ Gradle found at: \(path)")
+            // Check if executable
+            if FileManager.default.isExecutableFile(atPath: path) {
+                log("✅ Gradle is executable")
             } else {
-                print("🤖 AndroidStudioDetector init - NO GRADLE FOUND")
+                log("⚠️ Gradle file exists but is NOT executable!")
+            }
+        } else {
+            log("❌ NO GRADLE FOUND - Android Studio detection will not work!")
+            log("   Searched: /opt/homebrew/bin/gradle")
+            log("   Searched: /usr/local/bin/gradle")
+            log("   Searched: ~/.gradle/wrapper/dists/*/bin/gradle")
+        }
+
+        // Log Java home status (found via java_home utility or Android Studio JBR)
+        if let javaHome = findJavaHome() {
+            log("✅ Java found at: \(javaHome)")
+        } else {
+            log("⚠️ No Java found via /usr/libexec/java_home or Android Studio JBR")
+        }
+
+        // Log currently running Google apps (helps debug bundle ID issues)
+        let googleApps = NSWorkspace.shared.runningApplications.filter {
+            $0.bundleIdentifier?.contains("google") == true || $0.bundleIdentifier?.contains("android") == true
+        }
+        if googleApps.isEmpty {
+            log("No Google/Android apps currently running")
+        } else {
+            log("Currently running Google/Android apps:")
+            for app in googleApps {
+                log("   - \(app.bundleIdentifier ?? "unknown") (\(app.localizedName ?? "?"))")
             }
         }
+
+        log("========== AndroidStudioDetector ready ==========")
     }
 
     /// Find the gradle executable path
     private func findGradlePath() {
-        let debug = DebugSettings.shared.debugAndroid
-
         // Check common Homebrew locations first
         let homebrewPaths = [
             "/opt/homebrew/bin/gradle",
@@ -55,20 +108,20 @@ final class AndroidStudioDetector: ObservableObject, Detector {
 
         for path in homebrewPaths {
             if FileManager.default.fileExists(atPath: path) {
-                if debug { print("🤖 Found gradle at Homebrew path: \(path)") }
+                log("Found gradle at Homebrew path: \(path)")
                 gradlePath = path
                 return
             }
         }
 
-        if debug { print("🤖 No Homebrew gradle, searching ~/.gradle/wrapper/dists...") }
+        log("No Homebrew gradle found, searching ~/.gradle/wrapper/dists...")
 
         // Search for any gradle wrapper version dynamically
         // Check GRADLE_USER_HOME first, fall back to ~/.gradle
         let gradleHome = ProcessInfo.processInfo.environment["GRADLE_USER_HOME"]
             ?? NSString(string: "~/.gradle").expandingTildeInPath
 
-        if debug { print("🤖 Searching for gradle in: \(gradleHome)/wrapper/dists") }
+        log("Searching for gradle wrapper in: \(gradleHome)/wrapper/dists")
 
         let pipe = Pipe()
         let task = Process()
@@ -83,13 +136,13 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !path.isEmpty {
-                if debug { print("🤖 Found gradle wrapper: \(path)") }
+                log("Found gradle wrapper: \(path)")
                 gradlePath = path
             } else {
-                if debug { print("🤖 No gradle wrapper found in ~/.gradle/wrapper/dists") }
+                log("No gradle wrapper found in \(gradleHome)/wrapper/dists")
             }
         } catch {
-            if debug { print("🤖 Error searching for gradle: \(error)") }
+            log("Error searching for gradle: \(error)")
         }
     }
 
@@ -139,26 +192,23 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         return nil
     }
 
-    /// Bundle identifiers for different Android Studio variants
+    /// Check if Android Studio is running (cheap check using NSWorkspace)
+    /// Matches any bundle ID starting with "com.google.android.studio" to cover all variants:
     /// - Stable: com.google.android.studio
     /// - Beta/RC: com.google.android.studio.beta
     /// - Canary: com.google.android.studio.canary
     /// - Dev: com.google.android.studio.dev
-    private let androidStudioBundleIds = [
-        "com.google.android.studio",
-        "com.google.android.studio.beta",
-        "com.google.android.studio.canary",
-        "com.google.android.studio.dev"
-    ]
-
-    /// Check if Android Studio is running (cheap check using NSWorkspace)
     private var isAndroidStudioRunning: Bool {
         let found = NSWorkspace.shared.runningApplications.first { app in
             guard let bundleId = app.bundleIdentifier else { return false }
-            return androidStudioBundleIds.contains(bundleId)
+            return bundleId.hasPrefix("com.google.android.studio")
         }
-        if debug, let app = found {
-            print("🤖 Android Studio running: \(app.bundleIdentifier ?? "unknown")")
+        if let app = found, let bundleId = app.bundleIdentifier {
+            // Only log if bundle ID changed (avoid spam)
+            if detectedBundleId != bundleId {
+                detectedBundleId = bundleId
+                log("Android Studio detected - bundle ID: \(bundleId)")
+            }
         }
         return found != nil
     }
@@ -177,26 +227,27 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             guard let self = self else { return }
 
             let (building, details) = self.isGradleBusy()
-            let debug = DebugSettings.shared.debugAndroid
 
             DispatchQueue.main.async {
-                // NOTE: Keep debug logs - helps diagnose detection issues
-                if debug {
-                    print("🤖 Android building=\(building) | \(details)")
+                // Only log when status changes to avoid spam
+                let statusKey = "\(building)-\(details)"
+                if self.lastLoggedStatus != statusKey {
+                    self.lastLoggedStatus = statusKey
+                    self.log("Gradle status: building=\(building) | \(details)")
                 }
 
                 if building {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0
                     if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
-                        if debug { print("🤖 >>> SHOWING ANDROID INDICATOR") }
+                        self.log("✅ SHOWING Android Studio indicator")
                         self.isActive = true
                     }
                 } else {
                     self.consecutiveInactiveReadings += 1
                     self.consecutiveActiveReadings = 0
                     if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
-                        if debug { print("🤖 >>> HIDING ANDROID INDICATOR") }
+                        self.log("⏹️ HIDING Android Studio indicator")
                         self.isActive = false
                     }
                 }
@@ -207,7 +258,7 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     /// Check if gradle daemon is BUSY using gradle --status
     private func isGradleBusy() -> (Bool, String) {
         guard let gradle = gradlePath else {
-            return (false, "no gradle path")
+            return (false, "⚠️ no gradle path configured")
         }
 
         let outPipe = Pipe()
@@ -222,7 +273,8 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         if env["JAVA_HOME"] == nil {
             if let javaHome = findJavaHome() {
                 env["JAVA_HOME"] = javaHome
-                if debug { print("🤖 Using JAVA_HOME: \(javaHome)") }
+            } else {
+                log("⚠️ JAVA_HOME not set and could not find Java automatically")
             }
         }
         task.environment = env
@@ -244,9 +296,11 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             timeoutWork.cancel()
         } catch {
             timeoutWork.cancel()
+            log("❌ gradle --status failed to run: \(error)")
             return (false, "gradle error: \(error)")
         }
 
+        let exitCode = task.terminationStatus
         let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
         let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
         let output = String(data: outData, encoding: .utf8) ?? ""
@@ -254,8 +308,14 @@ final class AndroidStudioDetector: ObservableObject, Detector {
 
         let combined = output + errOutput
 
-        if DebugSettings.shared.debugAndroid && !combined.isEmpty && !combined.contains("Only Daemons for the current Gradle version") {
-            print("🤖 gradle output: \(combined.prefix(200))")
+        // Log exit code if non-zero
+        if exitCode != 0 {
+            log("⚠️ gradle --status exit code: \(exitCode)")
+        }
+
+        // Log gradle output if it contains useful info (not just the default message)
+        if !combined.isEmpty && !combined.contains("Only Daemons for the current Gradle version") {
+            log("gradle --status output: \(String(combined.prefix(300)))")
         }
 
         if combined.contains("BUSY") {
@@ -266,6 +326,11 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             return (false, "daemon IDLE")
         }
 
-        return (false, combined.isEmpty ? "no output" : "no daemon status")
+        // Log unexpected output for debugging
+        if !combined.isEmpty {
+            log("⚠️ Unexpected gradle output (no BUSY/IDLE): \(String(combined.prefix(200)))")
+        }
+
+        return (false, combined.isEmpty ? "no output from gradle" : "no BUSY/IDLE in output")
     }
 }
