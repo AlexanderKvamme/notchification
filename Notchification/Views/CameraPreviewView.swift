@@ -17,12 +17,35 @@ private let notchBlack = Color(nsColor: .black)
 /// Hover to enlarge, move mouse away to dismiss
 struct CameraPreviewView: View {
     var onDismiss: (() -> Void)?
+    @Binding var isHoveredExternal: Bool  // Expose hover state to parent for frame expansion
 
     @ObservedObject private var cameraManager = CameraManager.shared
-    @State private var isHovered = false
     @State private var hasBeenHovered = false  // Track if user has hovered at least once
 
+    static let scaleFactor: CGFloat = 1.8
+
     var body: some View {
+        // Parent controls frame size - we just fill it and detect hover
+        cameraContent
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    isHoveredExternal = true
+                    hasBeenHovered = true
+                } else {
+                    isHoveredExternal = false
+                    if hasBeenHovered {
+                        onDismiss?()
+                    }
+                }
+            }
+            // Bring camera to front when hovered so progress bars don't draw over it
+            .zIndex(isHoveredExternal ? 100 : 0)
+        // Note: Camera session is managed by TeamsDetector for pre-warming
+    }
+
+    @ViewBuilder
+    private var cameraContent: some View {
         ZStack {
             // Solid black background to prevent anything showing through
             notchBlack
@@ -66,22 +89,6 @@ struct CameraPreviewView: View {
                     .scaleEffect(0.8)
             }
         }
-        .scaleEffect(isHovered ? 1.8 : 1.0, anchor: .top)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .onHover { hovering in
-            if hovering {
-                isHovered = true
-                hasBeenHovered = true
-            } else {
-                isHovered = false
-                // Dismiss when mouse leaves (only if they've hovered at least once)
-                if hasBeenHovered {
-                    onDismiss?()
-                }
-            }
-        }
-        .contentShape(Rectangle())
-        // Note: Camera session is managed by TeamsDetector for pre-warming
     }
 }
 
@@ -93,6 +100,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var authorizationDenied: Bool = false
     @Published var currentFrame: NSImage?
     @Published var hasFirstFrame: Bool = false  // True once we have video
+    @Published var noCameraAvailable: Bool = false  // True if no camera device found
 
     private let captureSession = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
@@ -155,6 +163,9 @@ final class CameraManager: NSObject, ObservableObject {
             guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
                   ?? AVCaptureDevice.default(for: .video) else {
                 print("Camera: no video device found")
+                DispatchQueue.main.async {
+                    self.noCameraAvailable = true
+                }
                 self.captureSession.commitConfiguration()
                 return
             }
@@ -227,7 +238,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 }
 
 #Preview {
-    CameraPreviewView()
+    CameraPreviewView(isHoveredExternal: .constant(false))
         .frame(width: 200, height: 150)
         .background(notchBlack)
 }

@@ -32,6 +32,7 @@ struct NotchView: View {
     @State private var currentWaveIndex: Int = 0  // Which process wave is currently animating
     @State private var previousWaveIndex: Int = -1  // Previous color (shown as background while next animates)
     @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
+    @State private var isCameraHovered: Bool = false  // Track camera hover for frame expansion
 
     // Confetti is now rendered in a separate ConfettiWindow
     // Triggers are sent to ConfettiState.shared
@@ -322,17 +323,22 @@ struct NotchView: View {
                     .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
 
                 // Camera preview - positioned below the notch (only show when first frame ready)
-                if cameraManager.hasFirstFrame {
+                if cameraManager.hasFirstFrame && !cameraManager.noCameraAvailable {
                     CameraPreviewView(onDismiss: {
                         ProcessMonitor.shared.dismissProcess(.teams)
                         notchState.recentlyDismissed.insert(.teams)
                         notchState.activeProcesses.removeAll { $0 == .teams }
                         CameraManager.shared.stopSession()
+                        isCameraHovered = false
                         #if DEBUG
                         NotificationCenter.default.post(name: .teamsMockDismissed, object: nil)
                         #endif
-                    })
-                    .frame(width: cameraWidth, height: cameraHeight)
+                    }, isHoveredExternal: $isCameraHovered)
+                    .frame(
+                        width: isCameraHovered ? cameraWidth * CameraPreviewView.scaleFactor : cameraWidth,
+                        height: isCameraHovered ? cameraHeight * CameraPreviewView.scaleFactor : cameraHeight
+                    )
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCameraHovered)
                     .offset(y: notchInfo.height + 5)
                     .opacity(isExpanded ? 1 : 0)
                     .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
@@ -343,14 +349,15 @@ struct NotchView: View {
                 let debugColors = debugSettings.debugViewColors
 
                 ZStack(alignment: .top) {
-                    // DEBUG: Outer frame indicator (green)
+                    // DEBUG: Outer frame indicator (bright green) - MUST have frame to avoid filling screen
                     if debugColors {
-                        Color.green.opacity(0.3)
+                        Color.green
+                            .frame(width: notchInfo.width + minimalStrokeWidth + 8, height: notchInfo.height + minimalStrokeWidth + 8)
                     }
 
                     // Fill - the black notch shape
                     MinimalNotchShape(cornerRadius: cornerRadius)
-                        .fill(debugColors ? Color.red.opacity(0.5) : notchBlack)
+                        .fill(debugColors ? Color.red : notchBlack)
                         .frame(width: notchInfo.width, height: notchInfo.height)
 
                     // Stroke shapes - SAME frame as fill, stroke extends outward naturally
@@ -359,25 +366,25 @@ struct NotchView: View {
                             // Determinate mode
                             MinimalNotchShape(cornerRadius: cornerRadius)
                                 .trim(from: 1 - progress, to: 1)
-                                .stroke(debugColors ? Color.blue : baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                                .stroke(debugColors ? Color.yellow : baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
                                 .animation(.easeInOut(duration: 0.5), value: progress)
                         } else {
                             // Indeterminate mode
                             if showBaseStroke {
                                 MinimalNotchShape(cornerRadius: cornerRadius)
                                     .trim(from: 1 - strokeProgress, to: 1)
-                                    .stroke(debugColors ? Color.blue : baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                                    .stroke(debugColors ? Color.yellow : baseStrokeColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
                             }
 
                             if !showBaseStroke && previousWaveIndex >= 0 {
                                 MinimalNotchShape(cornerRadius: cornerRadius)
-                                    .stroke(debugColors ? Color.cyan : previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                                    .stroke(debugColors ? Color.orange : previousHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
                             }
 
                             if !notchState.activeProcesses.isEmpty {
                                 MinimalNotchShape(cornerRadius: cornerRadius)
                                     .trim(from: 1 - waveProgress, to: 1)
-                                    .stroke(debugColors ? Color.purple : currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
+                                    .stroke(debugColors ? Color.pink : currentHighlightColor, style: StrokeStyle(lineWidth: minimalStrokeWidth, lineCap: .round))
                                     .opacity(showBaseStroke ? (strokeProgress >= 1 ? waveOpacity : 0) : 1)
                             }
                         }
@@ -400,51 +407,71 @@ struct NotchView: View {
         let cameraHeight: CGFloat = 150
         let cameraWidth: CGFloat = 280  // Same as normal mode
         let debugColors = debugSettings.debugViewColors
+        // Calculate expanded dimensions when camera is hovered
+        let scaledCameraWidth = cameraWidth * CameraPreviewView.scaleFactor
+        let scaledCameraHeight = cameraHeight * CameraPreviewView.scaleFactor
+        let expandedWidth = scaledCameraWidth + 20
 
         MinimalNotchShape(cornerRadius: 16)
-            .fill(debugColors ? Color.red.opacity(0.5) : notchBlack)
+            .fill(debugColors ? Color.red : notchBlack)
             .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width, height: mediumExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: mediumExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
-    
+
         if !notchState.activeProcesses.isEmpty {
-            VStack(alignment: .center, spacing: mediumRowSpacing) {
-                // Show camera preview if Teams is active (only when first frame ready)
-                if hasTeams && cameraManager.hasFirstFrame {
+            // Use ZStack so camera can float above progress bars when hovered
+            ZStack(alignment: .top) {
+                // Progress bars layer
+                VStack(alignment: .center, spacing: mediumRowSpacing) {
+                    // Spacer for camera area when Teams is active
+                    if hasTeams && cameraManager.hasFirstFrame && !cameraManager.noCameraAvailable {
+                        Color.clear
+                            .frame(width: cameraWidth, height: cameraHeight)
+                            .padding(.bottom, teamsOnly ? 0 : 8)
+                    }
+
+                    // Show other processes (not Teams)
+                    ForEach(notchState.activeProcesses.filter { $0 != .teams }) { process in
+                        ProcessRow(
+                            process: process,
+                            isExpanded: isExpanded,
+                            logoSize: mediumLogoSize,
+                            progressBarHeight: mediumProgressBarHeight,
+                            onDismiss: { dismissedProcess in
+                                ProcessMonitor.shared.dismissProcess(dismissedProcess)
+                                notchState.recentlyDismissed.insert(dismissedProcess)
+                                notchState.activeProcesses.removeAll { $0 == dismissedProcess }
+                            }
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, 12)
+                .padding(.top, hasTeams ? 0 : 4)
+                .padding(.bottom, 8)
+
+                // Camera layer (on top) - frame expands when hovered
+                if hasTeams && cameraManager.hasFirstFrame && !cameraManager.noCameraAvailable {
                     CameraPreviewView(onDismiss: {
                         ProcessMonitor.shared.dismissProcess(.teams)
                         notchState.recentlyDismissed.insert(.teams)
                         notchState.activeProcesses.removeAll { $0 == .teams }
                         CameraManager.shared.stopSession()
+                        isCameraHovered = false
                         #if DEBUG
                         NotificationCenter.default.post(name: .teamsMockDismissed, object: nil)
                         #endif
-                    })
-                    .frame(width: cameraWidth, height: cameraHeight)
-                    .padding(.bottom, teamsOnly ? 0 : 8)
-                }
-
-                // Show other processes (not Teams)
-                ForEach(notchState.activeProcesses.filter { $0 != .teams }) { process in
-                    ProcessRow(
-                        process: process,
-                        isExpanded: isExpanded,
-                        logoSize: mediumLogoSize,
-                        progressBarHeight: mediumProgressBarHeight,
-                        onDismiss: { dismissedProcess in
-                            ProcessMonitor.shared.dismissProcess(dismissedProcess)
-                            notchState.recentlyDismissed.insert(dismissedProcess)
-                            notchState.activeProcesses.removeAll { $0 == dismissedProcess }
-                        }
+                    }, isHoveredExternal: $isCameraHovered)
+                    .frame(
+                        width: isCameraHovered ? scaledCameraWidth : cameraWidth,
+                        height: isCameraHovered ? scaledCameraHeight : cameraHeight
                     )
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCameraHovered)
                 }
             }
-            .padding(.leading, 8)
-            .padding(.trailing, 12)
-            .padding(.top, hasTeams ? 0 : 4)
-            .padding(.bottom, 8)
-            .frame(width: hasTeams ? cameraWidth + 20 : notchInfo.width)
+            .frame(width: hasTeams ? (isCameraHovered ? expandedWidth : cameraWidth + 20) : notchInfo.width)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCameraHovered)
             .offset(y: hasTeams ? notchInfo.height + 5 : effectiveMediumTopPadding)
             .opacity(isExpanded ? 1 : 0)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
@@ -462,6 +489,10 @@ struct NotchView: View {
         let cameraHeight: CGFloat = 150
         let cameraWidth: CGFloat = notchWidth - 20  // Fill notch width with small padding
         let debugColors = debugSettings.debugViewColors
+        // Calculate expanded dimensions when camera is hovered
+        let scaledCameraWidth = cameraWidth * CameraPreviewView.scaleFactor
+        let scaledCameraHeight = cameraHeight * CameraPreviewView.scaleFactor
+        let expandedWidth = scaledCameraWidth + 20
 
         // Calculate height: if teams is active, include camera height
         let teamsExpandedHeight: CGFloat = {
@@ -478,54 +509,70 @@ struct NotchView: View {
         }()
 
         NotchShape()
-            .fill(debugColors ? Color.red.opacity(0.5) : notchBlack)
+            .fill(debugColors ? Color.red : notchBlack)
             .frame(width: notchWidth, height: teamsExpandedHeight)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: teamsExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
-    
+
         if !notchState.activeProcesses.isEmpty {
-            VStack(alignment: .center, spacing: rowSpacing) {
-                // Show camera preview if Teams is active (only when first frame ready)
-                if hasTeams && cameraManager.hasFirstFrame {
+            // Use ZStack so camera can float above progress bars when hovered
+            ZStack(alignment: .top) {
+                // Progress bars layer
+                VStack(alignment: .center, spacing: rowSpacing) {
+                    // Spacer for camera area when Teams is active
+                    if hasTeams && cameraManager.hasFirstFrame && !cameraManager.noCameraAvailable {
+                        Color.clear
+                            .frame(width: cameraWidth, height: cameraHeight)
+                            .padding(.bottom, teamsOnly ? 0 : 8)
+                    }
+
+                    // Show other processes (not Teams)
+                    ForEach(notchState.activeProcesses.filter { $0 != .teams }) { process in
+                        ProcessRow(
+                            process: process,
+                            isExpanded: isExpanded,
+                            logoSize: logoSize,
+                            progressBarHeight: progressBarHeight,
+                            onDismiss: { dismissedProcess in
+                                ProcessMonitor.shared.dismissProcess(dismissedProcess)
+                                notchState.recentlyDismissed.insert(dismissedProcess)
+                                notchState.activeProcesses.removeAll { $0 == dismissedProcess }
+                            }
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if licenseManager.state == .expired {
+                        Text("Thanks for trying! Please upgrade")
+                            .font(.system(size: 10))
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 4)
+                    }
+                }
+
+                // Camera layer (on top) - frame expands when hovered
+                if hasTeams && cameraManager.hasFirstFrame && !cameraManager.noCameraAvailable {
                     CameraPreviewView(onDismiss: {
                         ProcessMonitor.shared.dismissProcess(.teams)
                         notchState.recentlyDismissed.insert(.teams)
                         notchState.activeProcesses.removeAll { $0 == .teams }
                         CameraManager.shared.stopSession()
+                        isCameraHovered = false
                         #if DEBUG
                         NotificationCenter.default.post(name: .teamsMockDismissed, object: nil)
                         #endif
-                    })
-                    .frame(width: cameraWidth, height: cameraHeight)
-                    .padding(.bottom, teamsOnly ? 0 : 8)  // Only add padding if other bars below
-                }
-
-                // Show other processes (not Teams)
-                ForEach(notchState.activeProcesses.filter { $0 != .teams }) { process in
-                    ProcessRow(
-                        process: process,
-                        isExpanded: isExpanded,
-                        logoSize: logoSize,
-                        progressBarHeight: progressBarHeight,
-                        onDismiss: { dismissedProcess in
-                            ProcessMonitor.shared.dismissProcess(dismissedProcess)
-                            notchState.recentlyDismissed.insert(dismissedProcess)
-                            notchState.activeProcesses.removeAll { $0 == dismissedProcess }
-                        }
+                    }, isHoveredExternal: $isCameraHovered)
+                    .frame(
+                        width: isCameraHovered ? scaledCameraWidth : cameraWidth,
+                        height: isCameraHovered ? scaledCameraHeight : cameraHeight
                     )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if licenseManager.state == .expired {
-                    Text("Thanks for trying! Please upgrade")
-                        .font(.system(size: 10))
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 4)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCameraHovered)
                 }
             }
             .padding(.horizontal, horizontalPadding)
-            .frame(width: notchWidth)
+            .frame(width: hasTeams ? (isCameraHovered ? expandedWidth : notchWidth) : notchWidth)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCameraHovered)
             .offset(y: effectiveTopPadding)
             .opacity(isExpanded ? 1 : 0)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
