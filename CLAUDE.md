@@ -48,6 +48,7 @@ Every detector MUST have a corresponding debug toggle in `DebugSettings` (in `No
 - `debugOpencode` - Opencode CLI detection
 - `debugCodex` - Codex CLI detection
 - `debugAutomator` - Automator workflow detection
+- `debugCalendar` - Calendar event detection (📅)
 
 ## Adding a New Detector Checklist
 
@@ -81,6 +82,48 @@ The detector:
 - The pattern is built at runtime to avoid false positives when source code is visible in terminal
 - Has a 2-second timeout on osascript calls
 - Uses a serial queue to prevent overlapping checks
+
+## CalendarService Architecture
+
+The calendar feature uses EventKit to show meeting reminders at user-selected intervals:
+- **Location**: `Services/CalendarService.swift`
+- **Settings**: `Models/CalendarSettings.swift`
+- **Color**: #007AFF (Calendar blue)
+
+### How it works:
+1. Uses `EKEventStore` to query upcoming calendar events
+2. User selects which reminder intervals to show (1 hour, 30 min, 15 min, 10 min, 5 min, 1 min)
+3. Notch appears when current time matches a selected interval before a meeting
+4. Shows countdown time (e.g., "15m", "30m") with animated progress bar
+5. Respects user-selected calendars (or all calendars if none selected)
+
+### Files:
+- `Services/CalendarService.swift` - EventKit integration, event fetching
+- `Models/CalendarSettings.swift` - User preferences (reminder intervals, calendar selection)
+- Settings UI in `Views/SettingsView.swift` (SmartFeaturesTab)
+
+### Settings:
+- Checkbox for each reminder interval (1 hour, 30 min, 15 min, 10 min, 5 min, 1 min)
+- Calendar picker to select which calendars to monitor
+- Requires `NSCalendarsUsageDescription` in Info.plist
+- Works with any calendar synced to macOS Calendar.app (Outlook, iCloud, Google, etc.)
+
+### Debugging Calendar:
+1. Enable `debugCalendar` in settings (📅 emoji prefix in logs)
+2. Check that calendar access is granted in System Settings > Privacy > Calendars
+3. Verify events exist in the look-ahead window
+4. Check Console.app for "📅 Calendar" logs
+
+### Morning Overview Feature:
+The morning overview shows a larger calendar view with today's events:
+- **All-day events** displayed at the top
+- **Timed meetings** listed below with time, title, and meeting room
+- **Debug flag**: Enable "Show Morning Overview" in Debug menu to test
+
+Files:
+- `Views/MorningOverviewView.swift` - The expanded calendar view
+- `Services/CalendarService.swift` - `getMorningOverviewData()` fetches today's events
+- Data types: `MorningEvent`, `MorningOverviewData`
 
 ## Debugging Checklist
 

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import EventKit
 
 struct SettingsView: View {
     var body: some View {
@@ -138,10 +139,90 @@ struct DisplaySettingsTab: View {
 
 struct SmartFeaturesTab: View {
     @ObservedObject var trackingSettings = TrackingSettings.shared
+    @ObservedObject var calendarSettings = CalendarSettings.shared
     @State private var cameraStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    @State private var calendarStatus: CalendarAuthStatus = CalendarSettings.shared.authorizationStatus
+    @State private var availableCalendars: [EKCalendar] = []
+    private let eventStore = EKEventStore()
 
     var body: some View {
         Form {
+            Section("Calendar Reminders") {
+                Toggle("Enable", isOn: $trackingSettings.trackCalendar)
+                    .onChange(of: trackingSettings.trackCalendar) { _, enabled in
+                        if enabled {
+                            handleCalendarPermission()
+                        }
+                    }
+                Text("Show a reminder in the notch before meetings start. Reads from macOS Calendar.app (syncs with Outlook, iCloud, Google, etc).")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if calendarStatus == .denied || calendarStatus == .restricted {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text("Calendar access denied")
+                            .font(.caption)
+                        Spacer()
+                        Button("Open Settings") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .font(.caption)
+                    }
+                }
+
+                if trackingSettings.trackCalendar && calendarStatus == .authorized {
+                    Text("Remind me:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    // Reminder interval checkboxes
+                    ForEach(ReminderInterval.allCases.sorted()) { interval in
+                        Toggle(interval.displayName + " before", isOn: Binding(
+                            get: { calendarSettings.enabledIntervals.contains(interval) },
+                            set: { enabled in
+                                if enabled {
+                                    calendarSettings.enabledIntervals.insert(interval)
+                                } else {
+                                    calendarSettings.enabledIntervals.remove(interval)
+                                }
+                            }
+                        ))
+                    }
+
+                    if calendarSettings.enabledIntervals.isEmpty {
+                        Text("Select at least one reminder interval")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+
+                    if !availableCalendars.isEmpty {
+                        DisclosureGroup("Select Calendars") {
+                            ForEach(availableCalendars, id: \.calendarIdentifier) { calendar in
+                                Toggle(calendar.title, isOn: Binding(
+                                    get: { calendarSettings.selectedCalendarIdentifiers.contains(calendar.calendarIdentifier) },
+                                    set: { selected in
+                                        if selected {
+                                            calendarSettings.selectedCalendarIdentifiers.insert(calendar.calendarIdentifier)
+                                        } else {
+                                            calendarSettings.selectedCalendarIdentifiers.remove(calendar.calendarIdentifier)
+                                        }
+                                    }
+                                ))
+                            }
+                            if calendarSettings.selectedCalendarIdentifiers.isEmpty {
+                                Text("All calendars will be used when none are selected")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+
             Section("Teams Camera Preview") {
                 Toggle("Enable", isOn: $trackingSettings.trackTeams)
                     .onChange(of: trackingSettings.trackTeams) { _, enabled in
@@ -176,6 +257,44 @@ struct SmartFeaturesTab: View {
         .padding()
         .onAppear {
             cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            calendarStatus = calendarSettings.authorizationStatus
+            loadCalendars()
+        }
+    }
+
+    private func loadCalendars() {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if status == .fullAccess {
+            availableCalendars = eventStore.calendars(for: .event)
+        }
+    }
+
+    private func handleCalendarPermission() {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        calendarStatus = CalendarAuthStatus.from(status)
+
+        if status == .notDetermined {
+            Task {
+                do {
+                    let granted = try await eventStore.requestFullAccessToEvents()
+                    await MainActor.run {
+                        calendarStatus = granted ? .authorized : .denied
+                        calendarSettings.updateAuthorizationStatus()
+                        if granted {
+                            loadCalendars()
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        calendarStatus = .denied
+                        calendarSettings.updateAuthorizationStatus()
+                    }
+                }
+            }
+        } else if status == .denied || status == .restricted {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                NSWorkspace.shared.open(url)
+            }
         }
     }
 

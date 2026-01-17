@@ -94,11 +94,13 @@ struct DebugMenuView: View {
             Toggle("Downloads", isOn: $debugSettings.debugDownloads)
             Toggle("DaVinci Resolve", isOn: $debugSettings.debugDaVinciResolve)
             Toggle("Teams", isOn: $debugSettings.debugTeams)
+            Toggle("Calendar", isOn: $debugSettings.debugCalendar)
 
             Divider()
 
             Text("View Debug").font(.caption).foregroundColor(.secondary)
             Toggle("Show View Colors", isOn: $debugSettings.debugViewColors)
+            Toggle("Show Morning Overview", isOn: $debugSettings.showMorningOverview)
 
             Divider()
 
@@ -153,6 +155,13 @@ final class DebugSettings: ObservableObject {
     @Published var debugTeams: Bool {
         didSet { UserDefaults.standard.set(debugTeams, forKey: "debugTeams") }
     }
+    @Published var debugCalendar: Bool {
+        didSet { UserDefaults.standard.set(debugCalendar, forKey: "debugCalendar") }
+    }
+    /// When true, shows the morning overview calendar view for testing
+    @Published var showMorningOverview: Bool {
+        didSet { UserDefaults.standard.set(showMorningOverview, forKey: "showMorningOverview") }
+    }
     /// When true, scans all terminal sessions. When false (default), only scans frontmost session (faster).
     @Published var claudeScanAllSessions: Bool {
         didSet { UserDefaults.standard.set(claudeScanAllSessions, forKey: "claudeScanAllSessions") }
@@ -173,6 +182,8 @@ final class DebugSettings: ObservableObject {
         self.debugDownloads = UserDefaults.standard.object(forKey: "debugDownloads") as? Bool ?? false
         self.debugDaVinciResolve = UserDefaults.standard.object(forKey: "debugDaVinciResolve") as? Bool ?? false
         self.debugTeams = UserDefaults.standard.object(forKey: "debugTeams") as? Bool ?? false
+        self.debugCalendar = UserDefaults.standard.object(forKey: "debugCalendar") as? Bool ?? false
+        self.showMorningOverview = UserDefaults.standard.object(forKey: "showMorningOverview") as? Bool ?? false
         self.claudeScanAllSessions = UserDefaults.standard.object(forKey: "claudeScanAllSessions") as? Bool ?? false
         self.debugViewColors = UserDefaults.standard.object(forKey: "debugViewColors") as? Bool ?? false
     }
@@ -233,6 +244,9 @@ final class TrackingSettings: ObservableObject {
     @Published var trackTeams: Bool {
         didSet { UserDefaults.standard.set(trackTeams, forKey: "trackTeams") }
     }
+    @Published var trackCalendar: Bool {
+        didSet { UserDefaults.standard.set(trackCalendar, forKey: "trackCalendar") }
+    }
     @Published var confettiEnabled: Bool {
         didSet { UserDefaults.standard.set(confettiEnabled, forKey: "confettiEnabled") }
     }
@@ -258,6 +272,7 @@ final class TrackingSettings: ObservableObject {
         self.trackDownloads = UserDefaults.standard.object(forKey: "trackDownloads") as? Bool ?? false
         self.trackDaVinciResolve = UserDefaults.standard.object(forKey: "trackDaVinciResolve") as? Bool ?? false
         self.trackTeams = UserDefaults.standard.object(forKey: "trackTeams") as? Bool ?? false
+        self.trackCalendar = UserDefaults.standard.object(forKey: "trackCalendar") as? Bool ?? false
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
     }
@@ -587,6 +602,8 @@ struct NotchLayout {
         let horizontalOffset = settings.horizontalOffset
         let hasTeams = processes.contains(.teams)
         let teamsOnly = processes == [.teams]
+        let hasCalendar = processes.contains(.calendar)
+        let calendarOnly = processes == [.calendar]
         let processCount = processes.count
 
         let width: CGFloat
@@ -596,8 +613,34 @@ struct NotchLayout {
         let teamsExtraHeight = hasTeams ? teamsHoverExtraHeight : 0
         let teamsExtraWidth = hasTeams ? teamsHoverExtraWidth : 0
 
+        // Check if morning overview is showing (calendar in expanded view mode)
+        let isMorningOverview = calendarOnly && DebugSettings.shared.showMorningOverview
+
         // Minimal stroke width from settings
         let minimalStrokeWidth = settings.minimalStrokeWidth
+
+        // Special case: Calendar morning overview needs a larger window
+        if isMorningOverview {
+            let normalEarSpace: CGFloat = 60
+            width = notchWidth + normalEarSpace
+
+            // Calculate calendar content height (must match NotchView calculation)
+            let effTopPadding = effectiveTopPadding(notchInfo: notchInfo, settings: settings)
+            // Estimate: 1 all-day + 3 timed events in mock data
+            let allDayHeight: CGFloat = 16
+            let timedHeight: CGFloat = 32 * 3
+            let timedSpacing: CGFloat = 14 * 2
+            let separatorHeight: CGFloat = 12
+            let bottomPadding: CGFloat = 40  // Spacious bottom padding
+            let contentHeight = allDayHeight + separatorHeight + timedHeight + timedSpacing + bottomPadding
+            // Add small buffer for hover scaling (1.02x)
+            let hoverExtra: CGFloat = 10
+            height = effTopPadding + contentHeight + hoverExtra
+
+            let x = screen.frame.minX + (screen.frame.width - width) / 2 + horizontalOffset
+            let y = screen.frame.maxY - height
+            return NSRect(x: x, y: y, width: width, height: height)
+        }
 
         switch style {
         case .minimal:
@@ -670,6 +713,7 @@ enum MockProcessType: String, CaseIterable {
     case installer = "Installer"
     case appStore = "App Store"
     case teams = "Teams"
+    case calendar = "Calendar"
     case claudeAndFinder = "Claude + Finder"
     case threeProcesses = "Claude + Finder + Android"
     case randomFive = "5 Random"
@@ -690,6 +734,7 @@ enum MockProcessType: String, CaseIterable {
         case .installer: return .installer
         case .appStore: return .appStore
         case .teams: return .teams
+        case .calendar: return nil // Handled specially - shows morning overview
         case .claudeAndFinder: return nil // Handled specially
         case .threeProcesses: return nil // Handled specially
         case .randomFive: return nil // Handled specially
@@ -873,10 +918,30 @@ final class AppState: ObservableObject {
     private var previewTimer: Timer?
 
     private func setupBindings() {
+        // Observe morning overview debug flag
+        // Use dropFirst() to prevent firing on launch with the stored value
+        DebugSettings.shared.$showMorningOverview
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] showOverview in
+                guard let self = self else { return }
+                if showOverview {
+                    // Show window with calendar type to trigger morning overview
+                    self.windowController.update(with: [.calendar])
+                } else {
+                    // Restore normal state
+                    let processes = self.processMonitor.activeProcesses
+                    self.windowController.update(with: processes)
+                }
+            }
+            .store(in: &cancellables)
+
         processMonitor.$activeProcesses
             .receive(on: DispatchQueue.main)
             .sink { [weak self] processes in
                 guard let self = self else { return }
+                // Skip updates when morning overview is showing
+                guard !DebugSettings.shared.showMorningOverview else { return }
                 print("📡 App received activeProcesses update: \(processes.map { $0.displayName })")
                 #if DEBUG
                 // If mocking with a timed mock, skip real updates entirely
@@ -1045,6 +1110,12 @@ final class AppState: ObservableObject {
             return
         }
 
+        // Handle "Calendar" mock type - shows morning overview
+        if mockOnLaunchType == .calendar {
+            runCalendarMock()
+            return
+        }
+
         guard let processType = mockOnLaunchType.processType else {
             startMonitoring()
             return
@@ -1130,6 +1201,14 @@ final class AppState: ObservableObject {
                 self?.startMonitoring()
             }
         }
+    }
+
+    private func runCalendarMock() {
+        // Show morning overview by setting the debug flag
+        // It stays until user clicks to dismiss (no auto-dismiss)
+        DebugSettings.shared.showMorningOverview = true
+        // Start monitoring so other detectors still work
+        startMonitoring()
     }
 
     private func runRandomFiveMock() {
@@ -1353,6 +1432,13 @@ struct MenuBarView: View {
                 DemoableToggle(label: "Script Editor", isOn: $trackingSettings.trackScriptEditor, processType: .scriptEditor, appState: appState)
                 DemoableToggle(label: "Downloads", isOn: $trackingSettings.trackDownloads, processType: .downloads, appState: appState)
                 DemoableToggle(label: "DaVinci Resolve", isOn: $trackingSettings.trackDaVinciResolve, processType: .davinciResolve, appState: appState)
+                DemoableToggle(label: "Calendar", isOn: $trackingSettings.trackCalendar, processType: .calendar, appState: appState)
+
+                Divider()
+
+                Button("Show Today's Calendar") {
+                    DebugSettings.shared.showMorningOverview = true
+                }
 
                 Divider()
 

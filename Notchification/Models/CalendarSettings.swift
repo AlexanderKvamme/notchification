@@ -1,0 +1,119 @@
+//
+//  CalendarSettings.swift
+//  Notchification
+//
+//  User preferences for calendar reminder intervals
+//
+
+import Foundation
+import EventKit
+
+/// Available reminder intervals before meetings
+enum ReminderInterval: Int, CaseIterable, Identifiable, Comparable {
+    case oneHour = 60
+    case thirtyMinutes = 30
+    case fifteenMinutes = 15
+    case tenMinutes = 10
+    case fiveMinutes = 5
+    case oneMinute = 1
+
+    var id: Int { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .oneHour: return "1 hour"
+        case .thirtyMinutes: return "30 min"
+        case .fifteenMinutes: return "15 min"
+        case .tenMinutes: return "10 min"
+        case .fiveMinutes: return "5 min"
+        case .oneMinute: return "1 min"
+        }
+    }
+
+    static func < (lhs: ReminderInterval, rhs: ReminderInterval) -> Bool {
+        lhs.rawValue > rhs.rawValue  // Sort by time descending (1 hour first)
+    }
+}
+
+/// Calendar authorization status for UI display
+enum CalendarAuthStatus: Equatable {
+    case notDetermined
+    case authorized
+    case denied
+    case restricted
+
+    static func from(_ status: EKAuthorizationStatus) -> CalendarAuthStatus {
+        switch status {
+        case .notDetermined: return .notDetermined
+        case .fullAccess, .writeOnly: return .authorized
+        case .denied: return .denied
+        case .restricted: return .restricted
+        @unknown default: return .denied
+        }
+    }
+}
+
+/// Calendar settings for the calendar feature
+final class CalendarSettings: ObservableObject {
+    static let shared = CalendarSettings()
+
+    /// Identifiers of calendars to show events from
+    @Published var selectedCalendarIdentifiers: Set<String> {
+        didSet {
+            let array = Array(selectedCalendarIdentifiers)
+            UserDefaults.standard.set(array, forKey: "calendarSelectedIdentifiers")
+        }
+    }
+
+    /// Which reminder intervals are enabled
+    @Published var enabledIntervals: Set<ReminderInterval> {
+        didSet {
+            let rawValues = enabledIntervals.map { $0.rawValue }
+            UserDefaults.standard.set(rawValues, forKey: "calendarEnabledIntervals")
+        }
+    }
+
+    /// Current authorization status
+    @Published private(set) var authorizationStatus: CalendarAuthStatus = .notDetermined
+
+    private init() {
+        let savedIdentifiers = UserDefaults.standard.array(forKey: "calendarSelectedIdentifiers") as? [String] ?? []
+        self.selectedCalendarIdentifiers = Set(savedIdentifiers)
+
+        // Load enabled intervals, default to 15 min and 5 min
+        if let savedIntervals = UserDefaults.standard.array(forKey: "calendarEnabledIntervals") as? [Int] {
+            self.enabledIntervals = Set(savedIntervals.compactMap { ReminderInterval(rawValue: $0) })
+        } else {
+            self.enabledIntervals = [.fifteenMinutes, .fiveMinutes]
+        }
+
+        // Get initial auth status
+        let status = EKEventStore.authorizationStatus(for: .event)
+        self.authorizationStatus = CalendarAuthStatus.from(status)
+    }
+
+    /// Update authorization status (called after permission request)
+    func updateAuthorizationStatus() {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        DispatchQueue.main.async {
+            self.authorizationStatus = CalendarAuthStatus.from(status)
+        }
+    }
+
+    /// Get the maximum look-ahead time based on enabled intervals
+    var maxLookAheadMinutes: Int {
+        enabledIntervals.map { $0.rawValue }.max() ?? 15
+    }
+
+    /// Check if a given minutes-until-meeting matches any enabled interval (with tolerance)
+    func shouldShowReminder(minutesUntilMeeting: Double) -> Bool {
+        for interval in enabledIntervals {
+            let target = Double(interval.rawValue)
+            // Show if within 30 seconds of the interval
+            if abs(minutesUntilMeeting - target) < 0.5 {
+                return true
+            }
+        }
+        return false
+    }
+}

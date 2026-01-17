@@ -41,6 +41,7 @@ final class ProcessMonitor: ObservableObject {
     private let downloadDetector = DownloadDetector()
     private let davinciResolveDetector = DaVinciResolveDetector()
     private let teamsDetector = TeamsDetector()
+    private let calendarService = CalendarService()
 
     private let trackingSettings = TrackingSettings.shared
     private var cancellables = Set<AnyCancellable>()
@@ -113,6 +114,16 @@ final class ProcessMonitor: ObservableObject {
         }
     }
 
+    /// Get calendar event info for display
+    func calendarEventInfo() -> CalendarEventInfo? {
+        return calendarService.nextEvent
+    }
+
+    /// Get morning overview data for calendar display
+    func getMorningOverviewData() -> MorningOverviewData {
+        return calendarService.getMorningOverviewData()
+    }
+
     func startMonitoring() {
         guard timer == nil else { return }
 
@@ -149,6 +160,7 @@ final class ProcessMonitor: ObservableObject {
         downloadDetector.reset()
         davinciResolveDetector.reset()
         teamsDetector.reset()
+        calendarService.reset()
     }
 
     /// Central tick - polls all enabled detectors
@@ -205,6 +217,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackTeams {
             teamsDetector.poll()
+        }
+        if trackingSettings.trackCalendar {
+            calendarService.poll()
         }
     }
 
@@ -297,6 +312,11 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         teamsDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        calendarService.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -454,6 +474,15 @@ final class ProcessMonitor: ObservableObject {
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
+
+        trackingSettings.$trackCalendar
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.calendarService.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateActiveProcesses() {
@@ -513,6 +542,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackTeams && teamsDetector.isActive {
             currentlyActive.insert(.teams)
+        }
+        if trackingSettings.trackCalendar && calendarService.isActive {
+            currentlyActive.insert(.calendar)
         }
 
         // Clear dismissed flag for processes that have finished (were active, now inactive)

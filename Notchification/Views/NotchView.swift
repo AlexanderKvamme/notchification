@@ -172,18 +172,23 @@ struct NotchView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            switch styleSettings.notchStyle {
-            case .minimal:
-                // MINIMAL MODE: Base stroke + highlight pulses
-                minimalModeView
+            // Check for morning overview debug mode first
+            if debugSettings.showMorningOverview {
+                morningOverviewModeView
+            } else {
+                switch styleSettings.notchStyle {
+                case .minimal:
+                    // MINIMAL MODE: Base stroke + highlight pulses
+                    minimalModeView
 
-            case .medium:
-                // MEDIUM MODE: Notch-width with smaller icons and progress bars
-                mediumModeView
+                case .medium:
+                    // MEDIUM MODE: Notch-width with smaller icons and progress bars
+                    mediumModeView
 
-            case .normal:
-                // NORMAL MODE: Filled shape with icons and progress bars
-                normalModeView
+                case .normal:
+                    // NORMAL MODE: Filled shape with icons and progress bars
+                    normalModeView
+                }
             }
         }
         // Fill available space and center content horizontally
@@ -240,6 +245,11 @@ struct NotchView: View {
                 if wasDismissed {
                     print("🚫 Skipping confetti for dismissed process: \(removedProcess)")
                     notchState.recentlyDismissed.remove(removedProcess)  // Clear the flag
+                    continue
+                }
+
+                // Skip confetti/sound for calendar and preview (they're informational, not completions)
+                if removedProcess == .calendar || removedProcess == .preview {
                     continue
                 }
 
@@ -579,6 +589,54 @@ struct NotchView: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
         }
     }
+
+    // MARK: - Morning Overview Mode
+
+    /// Morning overview mode: Shows today's calendar with all-day events and meetings
+    /// Uses the same NotchShape as normal mode - just with different height
+    @ViewBuilder
+    private var morningOverviewModeView: some View {
+        let data = ProcessMonitor.shared.getMorningOverviewData()
+        let debugColors = debugSettings.debugViewColors
+
+        // Calculate height based on content
+        // All-day events: ~16pt each (single line)
+        // Timed events: ~32pt each (two lines: 14pt + 2pt spacing + 12pt)
+        // Spacing between items: 14pt
+        // Separator: 1pt + spacing
+        let allDayCount = data.allDayEvents.count
+        let timedCount = data.timedEvents.count
+
+        let allDayHeight = CGFloat(allDayCount) * 16
+        let timedHeight = CGFloat(timedCount) * 32
+        let allDaySpacing = allDayCount > 1 ? CGFloat(allDayCount - 1) * 14 : 0
+        let timedSpacing = timedCount > 1 ? CGFloat(timedCount - 1) * 14 : 0
+        let separatorHeight: CGFloat = (allDayCount > 0 && timedCount > 0) ? 12 : 0  // 1pt line + spacing
+        let emptyHeight: CGFloat = data.isEmpty ? 30 : 0  // "No events today" message
+        let bottomPadding: CGFloat = 40  // Bottom padding (spacious)
+        let contentHeight = allDayHeight + allDaySpacing + separatorHeight + timedHeight + timedSpacing + emptyHeight + bottomPadding
+        let calendarExpandedHeight = effectiveTopPadding + contentHeight
+
+        // NotchShape background - same width as normal mode, just taller
+        NotchShape()
+            .fill(debugColors ? Color.red : notchBlack)
+            .frame(width: notchWidth, height: calendarExpandedHeight)
+            .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+
+        // Content positioned below the physical notch
+        MorningOverviewContent(
+            data: data,
+            onDismiss: {
+                DebugSettings.shared.showMorningOverview = false
+            }
+        )
+        .frame(width: notchWidth - 40)  // Content width with padding
+        .padding(.horizontal, 20)
+        .offset(y: effectiveTopPadding)
+        .opacity(isExpanded ? 1 : 0)
+        .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+    }
+
     /// Starts the highlight animation that cycles through active process colors
     /// - Single process: highlight sweeps and fades out (like AnimatedProgressBar)
     /// - Multiple processes: each color sweeps around fully, then next color starts
@@ -680,8 +738,13 @@ struct ProcessRow: View {
         processMonitor.progress(for: process)
     }
 
+    /// Get calendar event info if this is a calendar process
+    private var calendarEvent: CalendarEventInfo? {
+        processMonitor.calendarEventInfo()
+    }
+
     var body: some View {
-        HStack(alignment: .center, spacing: 6) {
+        HStack(alignment: .center, spacing: 10) {
             // Show X icon on hover, otherwise show logo
             ZStack {
                 if isHovering {
@@ -697,8 +760,11 @@ struct ProcessRow: View {
             }
             .frame(width: logoSize, height: logoSize)
 
-            // Show percentage text first (fixed width) so progress bar can fill to it
-            if let progress = progress {
+            // Calendar gets special treatment - show event info
+            if process == .calendar {
+                calendarContent
+            } else if let progress = progress {
+                // Show percentage text for determinate progress
                 let displayPercent = min(99, Int(progress * 100))
 
                 HStack(spacing: 2) {
@@ -725,6 +791,7 @@ struct ProcessRow: View {
                 .frame(height: progressBarHeight)
             }
         }
+        .padding(.trailing, 4)
         .contentShape(Rectangle())  // Make entire row tappable
         .onTapGesture {
             onDismiss?(process)
@@ -735,6 +802,38 @@ struct ProcessRow: View {
             }
         }
         .transition(.opacity.combined(with: .scale(scale: 0.8)))
+    }
+
+    /// Calendar-specific content: shows countdown to meeting
+    @ViewBuilder
+    private var calendarContent: some View {
+        if let event = calendarEvent {
+            // Show countdown and animated progress bar
+            HStack(spacing: 4) {
+                AnimatedProgressBar(
+                    isActive: isExpanded,
+                    baseColor: process.color,
+                    waveColor: process.waveColor,
+                    progress: nil
+                )
+                .frame(height: progressBarHeight)
+
+                // Time countdown (e.g., "15m", "1h")
+                Text(event.formattedTimeUntil)
+                    .font(.system(size: max(11, progressBarHeight * 1.8), weight: .bold, design: .monospaced))
+                    .foregroundColor(process.color)
+                    .fixedSize()
+            }
+        } else {
+            // Fallback - just show animated progress bar
+            AnimatedProgressBar(
+                isActive: isExpanded,
+                baseColor: process.color,
+                waveColor: process.waveColor,
+                progress: nil
+            )
+            .frame(height: progressBarHeight)
+        }
     }
 }
 
@@ -779,9 +878,23 @@ struct ProcessLogo: View {
             DaVinciResolveLogo()
         case .teams:
             TeamsLogo()
+        case .calendar:
+            CalendarLogo()
         case .preview:
             PreviewLogo()
         }
+    }
+}
+
+// MARK: - Calendar Logo
+
+struct CalendarLogo: View {
+    var body: some View {
+        Image(systemName: "calendar")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .fontWeight(.medium)
+            .foregroundColor(ProcessType.calendar.color)
     }
 }
 

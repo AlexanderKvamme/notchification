@@ -10,5 +10,7 @@
 	<string>https://featurefest.dev/notchification/appcast.xml</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Notchification uses the camera to show a preview before your Teams meetings so you can check your appearance.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Notchification uses your calendar to show upcoming meeting reminders in the notch.</string>
 </dict>
 </plist>

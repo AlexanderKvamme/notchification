@@ -28,6 +28,7 @@ final class ConfettiState: ObservableObject {
     @Published var downloadsTrigger: Int = 0
     @Published var davinciResolveTrigger: Int = 0
     @Published var teamsTrigger: Int = 0
+    @Published var calendarTrigger: Int = 0
 
     func trigger(for process: ProcessType) {
         switch process {
@@ -48,6 +49,7 @@ final class ConfettiState: ObservableObject {
         case .downloads: downloadsTrigger += 1
         case .davinciResolve: davinciResolveTrigger += 1
         case .teams: teamsTrigger += 1
+        case .calendar: calendarTrigger += 1
         case .preview: break  // No confetti for preview
         }
     }
@@ -498,12 +500,7 @@ struct ConfettiOverlayView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // DEBUG: Subtle background to visualize confetti window visibility
-            #if DEBUG
-            Color.blue.opacity(0.05)
-            #else
             Color.clear
-            #endif
 
             // Confetti emitters positioned at top center
             VStack {
@@ -525,6 +522,7 @@ struct ConfettiOverlayView: View {
                     ConfettiEmitterView(trigger: $confettiState.downloadsTrigger, color: ProcessType.downloads.color)
                     ConfettiEmitterView(trigger: $confettiState.davinciResolveTrigger, color: ProcessType.davinciResolve.color)
                     ConfettiEmitterView(trigger: $confettiState.teamsTrigger, color: ProcessType.teams.color)
+                    ConfettiEmitterView(trigger: $confettiState.calendarTrigger, color: ProcessType.calendar.color)
                 }
                 .padding(.top, 40)  // Position below the notch
 
