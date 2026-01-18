@@ -161,6 +161,7 @@ final class ClaudeDetector: ObservableObject, Detector {
 
     /// Check if Claude-specific patterns appear in the last lines of any session
     /// Claude shows: "✢ Dilly-dallying… (esc to interrupt · thinking)"
+    /// Claude thinking shows: "✻ Frosting... (ctrl+c to interrupt • 1m 13s • ↓ 5.1k tokens)"
     /// Codex shows: "• Working (1s • esc to interrupt)"
     private func hasClaudePattern(in output: String, scanner: TerminalScanner) -> Bool {
         let debug = DebugSettings.shared.debugClaude
@@ -178,8 +179,10 @@ final class ClaudeDetector: ObservableObject, Detector {
             }
 
             for line in lastLines {
-                // Must have "esc" somewhere in the line
-                guard line.contains("esc") else { continue }
+                // Must have "esc" or "ctrl" somewhere in the line (different interrupt methods)
+                // Normal mode: "esc to interrupt"
+                // Thinking mode: "ctrl+c to interrupt"
+                guard line.contains("esc") || line.contains("ctrl") else { continue }
 
                 // Check the first few characters for a spinner symbol
                 let trimmed = line.trimmingCharacters(in: .whitespaces)

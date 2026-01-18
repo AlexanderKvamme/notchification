@@ -95,6 +95,20 @@ final class ProcessMonitor: ObservableObject {
     private func restartMonitoring() {
         stopMonitoring()
         startMonitoring()
+        checkMorningOverview()
+    }
+
+    /// Check if we should show the morning overview and trigger it
+    private func checkMorningOverview() {
+        let settings = CalendarSettings.shared
+
+        if settings.shouldShowMorningOverview() {
+            logger.info("📅 Morning overview: Conditions met, showing calendar")
+            settings.markMorningOverviewShown()
+            DispatchQueue.main.async {
+                DebugSettings.shared.showMorningOverview = true
+            }
+        }
     }
 
     /// Dismiss a process - removes it from view until it finishes and starts again

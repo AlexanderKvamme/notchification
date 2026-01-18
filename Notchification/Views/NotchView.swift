@@ -33,6 +33,7 @@ struct NotchView: View {
     @State private var previousWaveIndex: Int = -1  // Previous color (shown as background while next animates)
     @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
     @State private var isCameraHovered: Bool = false  // Track camera hover for frame expansion
+    @State private var morningOverviewMouseEntered: Bool = false  // Track if mouse entered morning overview
 
     // Confetti is now rendered in a separate ConfettiWindow
     // Triggers are sent to ConfettiState.shared
@@ -40,6 +41,8 @@ struct NotchView: View {
     // Dimensions (used for normal mode)
     private let notchWidth: CGFloat = 300
     private let notchFrameWidth: CGFloat = 380  // Extra 80 for outward curves
+    private let calendarWidth: CGFloat = 340  // Base calendar width
+    private let calendarWidthWithAllDay: CGFloat = 380  // Wider when showing "All day" events
 
     // Real notch dimensions from system APIs (for minimal mode)
     // Uses the screen this view is displayed on
@@ -600,27 +603,31 @@ struct NotchView: View {
         let debugColors = debugSettings.debugViewColors
 
         // Calculate height based on content
-        // All-day events: ~16pt each (single line)
+        // All-day events: ~20pt each (single line + padding)
         // Timed events: ~32pt each (two lines: 14pt + 2pt spacing + 12pt)
         // Spacing between items: 14pt
         // Separator: 1pt + spacing
         let allDayCount = data.allDayEvents.count
         let timedCount = data.timedEvents.count
+        let hasAllDay = allDayCount > 0
 
-        let allDayHeight = CGFloat(allDayCount) * 16
+        // Use wider width when there are all-day events (to fit "All day" label)
+        let effectiveCalendarWidth = hasAllDay ? calendarWidthWithAllDay : calendarWidth
+
+        let allDayHeight = CGFloat(allDayCount) * 20
         let timedHeight = CGFloat(timedCount) * 32
         let allDaySpacing = allDayCount > 1 ? CGFloat(allDayCount - 1) * 14 : 0
         let timedSpacing = timedCount > 1 ? CGFloat(timedCount - 1) * 14 : 0
         let separatorHeight: CGFloat = (allDayCount > 0 && timedCount > 0) ? 12 : 0  // 1pt line + spacing
         let emptyHeight: CGFloat = data.isEmpty ? 30 : 0  // "No events today" message
-        let bottomPadding: CGFloat = 40  // Bottom padding (spacious)
+        let bottomPadding: CGFloat = 30  // Bottom padding
         let contentHeight = allDayHeight + allDaySpacing + separatorHeight + timedHeight + timedSpacing + emptyHeight + bottomPadding
         let calendarExpandedHeight = effectiveTopPadding + contentHeight
 
-        // NotchShape background - same width as normal mode, just taller
+        // NotchShape background - wider when showing all-day events
         NotchShape()
             .fill(debugColors ? Color.red : notchBlack)
-            .frame(width: notchWidth, height: calendarExpandedHeight)
+            .frame(width: effectiveCalendarWidth, height: calendarExpandedHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
 
         // Content positioned below the physical notch
@@ -628,13 +635,27 @@ struct NotchView: View {
             data: data,
             onDismiss: {
                 DebugSettings.shared.showMorningOverview = false
+                DebugSettings.shared.useMockCalendarData = false
             }
         )
-        .frame(width: notchWidth - 40)  // Content width with padding
+        .frame(width: effectiveCalendarWidth - 40)  // Content width with padding
         .padding(.horizontal, 20)
         .offset(y: effectiveTopPadding)
         .opacity(isExpanded ? 1 : 0)
         .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+        .onHover { hovering in
+            if hovering {
+                // Mouse entered the calendar area
+                morningOverviewMouseEntered = true
+            } else if morningOverviewMouseEntered {
+                // Mouse left after having entered - dismiss
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    DebugSettings.shared.showMorningOverview = false
+                    DebugSettings.shared.useMockCalendarData = false
+                    morningOverviewMouseEntered = false
+                }
+            }
+        }
     }
 
     /// Starts the highlight animation that cycles through active process colors

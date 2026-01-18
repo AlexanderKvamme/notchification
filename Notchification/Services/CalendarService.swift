@@ -150,10 +150,10 @@ final class CalendarService: ObservableObject, Detector {
     }
 
     /// Get today's events for the morning overview
-    /// When showMorningOverview debug flag is on, returns mock data for testing
+    /// When useMockCalendarData debug flag is on, returns mock data for testing
     func getMorningOverviewData() -> MorningOverviewData {
-        // Return mock data when manually showing morning overview (for testing)
-        if DebugSettings.shared.showMorningOverview {
+        // Return mock data when using Mock Type picker (for testing)
+        if DebugSettings.shared.useMockCalendarData {
             return Self.mockMorningOverviewData()
         }
 

@@ -76,6 +76,36 @@ final class CalendarSettings: ObservableObject {
     /// Current authorization status
     @Published private(set) var authorizationStatus: CalendarAuthStatus = .notDetermined
 
+    // MARK: - Morning Overview Settings
+
+    /// Enable automatic morning overview on wake/unlock
+    @Published var enableMorningOverview: Bool {
+        didSet {
+            UserDefaults.standard.set(enableMorningOverview, forKey: "calendarEnableMorningOverview")
+        }
+    }
+
+    /// Start hour for "morning" (0-23, default 6 = 6 AM)
+    @Published var morningStartHour: Int {
+        didSet {
+            UserDefaults.standard.set(morningStartHour, forKey: "calendarMorningStartHour")
+        }
+    }
+
+    /// End hour for "morning" (0-23, default 10 = 10 AM)
+    @Published var morningEndHour: Int {
+        didSet {
+            UserDefaults.standard.set(morningEndHour, forKey: "calendarMorningEndHour")
+        }
+    }
+
+    /// Date when morning overview was last shown (to show only once per day)
+    private var lastMorningOverviewDate: Date? {
+        didSet {
+            UserDefaults.standard.set(lastMorningOverviewDate, forKey: "calendarLastMorningOverviewDate")
+        }
+    }
+
     private init() {
         let savedIdentifiers = UserDefaults.standard.array(forKey: "calendarSelectedIdentifiers") as? [String] ?? []
         self.selectedCalendarIdentifiers = Set(savedIdentifiers)
@@ -86,6 +116,12 @@ final class CalendarSettings: ObservableObject {
         } else {
             self.enabledIntervals = [.fifteenMinutes, .fiveMinutes]
         }
+
+        // Load morning overview settings
+        self.enableMorningOverview = UserDefaults.standard.object(forKey: "calendarEnableMorningOverview") as? Bool ?? true
+        self.morningStartHour = UserDefaults.standard.object(forKey: "calendarMorningStartHour") as? Int ?? 6
+        self.morningEndHour = UserDefaults.standard.object(forKey: "calendarMorningEndHour") as? Int ?? 10
+        self.lastMorningOverviewDate = UserDefaults.standard.object(forKey: "calendarLastMorningOverviewDate") as? Date
 
         // Get initial auth status
         let status = EKEventStore.authorizationStatus(for: .event)
@@ -115,5 +151,43 @@ final class CalendarSettings: ObservableObject {
             }
         }
         return false
+    }
+
+    // MARK: - Morning Overview Logic
+
+    /// Check if we should show the morning overview right now
+    /// Returns true if: enabled, authorized, within morning hours, and not shown today yet
+    func shouldShowMorningOverview() -> Bool {
+        // Must be enabled
+        guard enableMorningOverview else { return false }
+
+        // Must have calendar access
+        guard authorizationStatus == .authorized else { return false }
+
+        // Check if current time is within morning hours
+        let calendar = Calendar.current
+        let now = Date()
+        let hour = calendar.component(.hour, from: now)
+
+        guard hour >= morningStartHour && hour < morningEndHour else { return false }
+
+        // Check if we've already shown it today
+        if let lastShown = lastMorningOverviewDate {
+            if calendar.isDateInToday(lastShown) {
+                return false  // Already shown today
+            }
+        }
+
+        return true
+    }
+
+    /// Mark that we've shown the morning overview today
+    func markMorningOverviewShown() {
+        lastMorningOverviewDate = Date()
+    }
+
+    /// Reset the morning overview shown state (for testing)
+    func resetMorningOverviewShown() {
+        lastMorningOverviewDate = nil
     }
 }

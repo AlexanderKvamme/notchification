@@ -58,6 +58,15 @@ struct NotchificationApp: App {
             DebugMenuView(appState: appState)
                 .frame(width: 200)
                 .padding(8)
+                .onAppear {
+                    // Option-click on ladybug triggers calendar
+                    if NSEvent.modifierFlags.contains(.option) {
+                        DebugSettings.shared.showMorningOverview = true
+                        DispatchQueue.main.async {
+                            NSApp.keyWindow?.close()
+                        }
+                    }
+                }
         }
         .menuBarExtraStyle(.window)
         #endif
@@ -101,6 +110,17 @@ struct DebugMenuView: View {
             Text("View Debug").font(.caption).foregroundColor(.secondary)
             Toggle("Show View Colors", isOn: $debugSettings.debugViewColors)
             Toggle("Show Morning Overview", isOn: $debugSettings.showMorningOverview)
+
+            Divider()
+
+            Text("Calendar").font(.caption).foregroundColor(.secondary)
+            Button("Show Calendar Onboarding") {
+                CalendarOnboardingWindowController.shared.resetOnboarding()
+                CalendarOnboardingWindowController.shared.showOnboarding()
+            }
+            Button("Reset Morning Shown Today") {
+                CalendarSettings.shared.resetMorningOverviewShown()
+            }
 
             Divider()
 
@@ -162,6 +182,8 @@ final class DebugSettings: ObservableObject {
     @Published var showMorningOverview: Bool {
         didSet { UserDefaults.standard.set(showMorningOverview, forKey: "showMorningOverview") }
     }
+    /// When true, uses mock calendar data instead of real events (for Mock Type picker)
+    @Published var useMockCalendarData: Bool = false
     /// When true, scans all terminal sessions. When false (default), only scans frontmost session (faster).
     @Published var claudeScanAllSessions: Bool {
         didSet { UserDefaults.standard.set(claudeScanAllSessions, forKey: "claudeScanAllSessions") }
@@ -621,18 +643,28 @@ struct NotchLayout {
 
         // Special case: Calendar morning overview needs a larger window
         if isMorningOverview {
-            let normalEarSpace: CGFloat = 60
-            width = notchWidth + normalEarSpace
-
-            // Calculate calendar content height (must match NotchView calculation)
+            // Calculate calendar content height based on actual data
             let effTopPadding = effectiveTopPadding(notchInfo: notchInfo, settings: settings)
-            // Estimate: 1 all-day + 3 timed events in mock data
-            let allDayHeight: CGFloat = 16
-            let timedHeight: CGFloat = 32 * 3
-            let timedSpacing: CGFloat = 14 * 2
-            let separatorHeight: CGFloat = 12
-            let bottomPadding: CGFloat = 40  // Spacious bottom padding
-            let contentHeight = allDayHeight + separatorHeight + timedHeight + timedSpacing + bottomPadding
+            let data = ProcessMonitor.shared.getMorningOverviewData()
+            let allDayCount = data.allDayEvents.count
+            let timedCount = data.timedEvents.count
+            let hasAllDay = allDayCount > 0
+
+            // Use wider width when there are all-day events (to fit "All day" label)
+            let calendarWidth: CGFloat = 340
+            let calendarWidthWithAllDay: CGFloat = 380
+            let effectiveCalendarWidth = hasAllDay ? calendarWidthWithAllDay : calendarWidth
+            let normalEarSpace: CGFloat = 60
+            width = effectiveCalendarWidth + normalEarSpace
+
+            let allDayHeight = CGFloat(allDayCount) * 20  // Each all-day row ~20pt
+            let allDaySpacing = allDayCount > 1 ? CGFloat(allDayCount - 1) * 14 : 0
+            let timedHeight = CGFloat(timedCount) * 32  // Each timed row ~32pt (two lines)
+            let timedSpacing = timedCount > 1 ? CGFloat(timedCount - 1) * 14 : 0
+            let separatorHeight: CGFloat = (allDayCount > 0 && timedCount > 0) ? 12 : 0
+            let emptyHeight: CGFloat = data.isEmpty ? 30 : 0
+            let bottomPadding: CGFloat = 30  // Bottom padding
+            let contentHeight = allDayHeight + allDaySpacing + separatorHeight + timedHeight + timedSpacing + emptyHeight + bottomPadding
             // Add small buffer for hover scaling (1.02x)
             let hoverExtra: CGFloat = 10
             height = effTopPadding + contentHeight + hoverExtra
@@ -913,6 +945,11 @@ final class AppState: ObservableObject {
     private func startMonitoringIfLicensed() {
         // Always start monitoring - we show a nag message if expired
         startMonitoring()
+
+        // Show calendar onboarding if not yet set up
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            CalendarOnboardingWindowController.shared.showOnboarding()
+        }
     }
 
     private var previewTimer: Timer?
@@ -1204,8 +1241,9 @@ final class AppState: ObservableObject {
     }
 
     private func runCalendarMock() {
-        // Show morning overview by setting the debug flag
+        // Show morning overview with mock data
         // It stays until user clicks to dismiss (no auto-dismiss)
+        DebugSettings.shared.useMockCalendarData = true
         DebugSettings.shared.showMorningOverview = true
         // Start monitoring so other detectors still work
         startMonitoring()
@@ -1389,6 +1427,7 @@ struct MenuBarView: View {
     let updater: SPUUpdater
     @ObservedObject var trackingSettings = TrackingSettings.shared
     @ObservedObject var licenseManager = LicenseManager.shared
+    @ObservedObject var calendarSettings = CalendarSettings.shared
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -1438,6 +1477,38 @@ struct MenuBarView: View {
 
                 Button("Show Today's Calendar") {
                     DebugSettings.shared.showMorningOverview = true
+                }
+
+                Divider()
+
+                // Morning Overview settings
+                Toggle("Morning Overview", isOn: $calendarSettings.enableMorningOverview)
+                    .padding(.trailing, 8)
+
+                if calendarSettings.enableMorningOverview {
+                    HStack {
+                        Text("Show between")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Picker("", selection: $calendarSettings.morningStartHour) {
+                            ForEach(5..<12, id: \.self) { hour in
+                                Text("\(hour):00").tag(hour)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 60)
+                        Text("and")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Picker("", selection: $calendarSettings.morningEndHour) {
+                            ForEach(7..<14, id: \.self) { hour in
+                                Text("\(hour):00").tag(hour)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 60)
+                    }
+                    .padding(.leading, 8)
                 }
 
                 Divider()

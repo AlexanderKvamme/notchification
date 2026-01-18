@@ -22,6 +22,9 @@ final class XcodeDetector: ObservableObject, Detector {
     // CPU threshold - read from settings
     private var cpuThreshold: Double { ThresholdSettings.shared.xcodeThreshold }
 
+    // Debug logging toggle
+    private var debug: Bool { DebugSettings.shared.debugXcode }
+
     // Consecutive readings required
     private let requiredToShow: Int = 1
     private let requiredToHide: Int = 5
@@ -88,24 +91,28 @@ final class XcodeDetector: ObservableObject, Detector {
         // Check for swift-frontend processes (active compilation)
         let swiftCount = getProcessCount(name: "swift-frontend")
         if swiftCount > 0 {
+            if debug { print("🔨 Xcode: Detected \(swiftCount) swift-frontend processes") }
             return (true, "\(swiftCount) swift-frontend processes")
         }
 
         // Check for clang processes (C/ObjC compilation)
         let clangCount = getProcessCount(name: "clang")
         if clangCount > 0 {
+            if debug { print("🔨 Xcode: Detected \(clangCount) clang processes") }
             return (true, "\(clangCount) clang processes")
         }
 
         // Check XCBBuildService CPU as fallback
         if let pid = getProcessPID(name: "XCBBuildService") {
             let cpu = getCPUUsage(for: pid)
+            if debug { print("🔨 Xcode: XCBBuildService CPU: \(String(format: "%.1f", cpu))% (threshold: \(cpuThreshold)%)") }
             if cpu >= cpuThreshold {
                 return (true, "XCBBuildService CPU: \(String(format: "%.1f", cpu))%")
             }
             return (false, "XCBBuildService idle: \(String(format: "%.1f", cpu))%")
         }
 
+        if debug { print("🔨 Xcode: No build processes found") }
         return (false, "no build processes")
     }
 

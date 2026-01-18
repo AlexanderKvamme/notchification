@@ -10,7 +10,7 @@ import SwiftUI
 
 // Layout constants for grid alignment
 private enum Layout {
-    static let leftColumnWidth: CGFloat = 50  // Width for time/duration or "All day"
+    static let leftColumnWidth: CGFloat = 60  // Width for time/duration or "All day" (fits on one line)
     static let columnSpacing: CGFloat = 16    // Space between left and right columns
     static let rowSpacing: CGFloat = 14       // Space between event rows
     static let lineSpacing: CGFloat = 2       // Space between lines within a row
