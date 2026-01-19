@@ -3,6 +3,30 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.27</title>
+            <pubDate>Sun, 19 Jan 2026 19:00:00 +0100</pubDate>
+            <sparkle:version>27</sparkle:version>
+            <sparkle:shortVersionString>1.0.27</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.27.zip"
+                sparkle:edSignature="h5/qnsqPaDE0LddEgvFasUCYPT2pM2hJrFW6qSmgnAhShNGc40uh/19b5GHQI48YaJu72aye7PBJPxBQ1BXGDw=="
+                length="2048984"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.27</h2>
+                <ul>
+                    <li>Redesigned menu bar: cleaner layout with recently-used apps</li>
+                    <li>New 4-tab Settings window: Apps, Calendar, Appearance, Advanced</li>
+                    <li>Accessibility permission status shown in Settings</li>
+                    <li>Fixed: Xcode detection now uses only Accessibility API (more reliable)</li>
+                    <li>Fixed: Claude Code "Wrangling" state now detected correctly</li>
+                    <li>Permissions requested only when features are enabled, not at launch</li>
+                    <li>Show Today's Calendar button in menu (when calendar enabled)</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.21</title>
             <pubDate>Wed, 08 Jan 2026 08:00:00 +0100</pubDate>
             <sparkle:version>21</sparkle:version>
