@@ -586,6 +586,12 @@ final class ProcessMonitor: ObservableObject {
             currentlyActive.insert(.calendar)
         }
 
+        // Track newly active processes as recently used (for quick access in menu)
+        let newlyActive = currentlyActive.subtracting(previouslyActiveDetectors)
+        for newProcess in newlyActive {
+            trackingSettings.markAsRecentlyUsed(newProcess)
+        }
+
         // Clear dismissed flag for processes that have finished (were active, now inactive)
         let finishedProcesses = previouslyActiveDetectors.subtracting(currentlyActive)
         for finished in finishedProcesses {

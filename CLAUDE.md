@@ -1,5 +1,50 @@
 # Notchification - Claude Code Notes
 
+## CRITICAL: Detector Design Principles
+
+**DO NOT CHANGE** the core detection approach for any detector without explicit user approval. The detection methods have been carefully chosen for reliability.
+
+### Authoritative vs Heuristic Detection
+
+Always prefer **authoritative sources** over **heuristic approaches**:
+
+| Authoritative (GOOD) | Heuristic (BAD) |
+|---------------------|-----------------|
+| `gradle --status` → BUSY/IDLE | CPU monitoring via `ps` |
+| Accessibility API status text | Process count |
+| Daemon status commands | Memory usage |
+| CLI output patterns | Timing-based detection |
+
+**Why this matters:**
+- CPU monitoring is unreliable (threshold tuning, varies by machine, misses low-CPU operations)
+- Daemon/status commands give the actual state directly from the tool
+- AX API status text is what the user sees - it's authoritative
+
+### Current Detection Methods (DO NOT CHANGE)
+
+| Detector | Method | Why |
+|----------|--------|-----|
+| **Android Studio** | `gradle --status` → BUSY/IDLE | Direct daemon state, version-agnostic |
+| **Xcode** | AX API status text only | Status bar shows "Building...", "Compiling..." |
+| **Claude Code** | Terminal content scanning | Looks for spinner + "esc to interrupt" pattern |
+| **Claude App** | AX API status text | Looks for "Claude is thinking" in UI |
+
+### If You're Tempted to "Simplify" Detection
+
+**STOP.** The current approaches were chosen after testing alternatives:
+- CPU monitoring was tried and rejected - too unreliable
+- Process counting was tried and rejected - doesn't indicate active work
+- The current methods work because they query the actual tool's state
+
+If detection isn't working, the problem is likely:
+1. Missing permissions (Accessibility, Automation)
+2. Path/environment issues (JAVA_HOME, gradle path)
+3. Changed UI/output format in the target app
+
+**Fix the root cause, don't replace the detection method.**
+
+---
+
 ## IMPORTANT: Debug Output Rules
 
 **NEVER REMOVE debug statements** - they are essential for diagnosing detection issues.
@@ -74,6 +119,65 @@ When adding a new detector, you MUST complete ALL of these steps:
 7. **Add debug toggle** to DebugMenuView (ladybug menu)
 8. **Add logo** in NotchView.swift if using a custom icon
 
+## AndroidStudioDetector Architecture
+
+The detector uses `gradle --status` to check if Gradle daemons are BUSY or IDLE:
+- **Location**: `Services/AndroidStudioDetector.swift`
+- **Color**: #2BA160 (Android green)
+
+### Why `gradle --status` (not CPU monitoring)
+
+**`gradle --status` is authoritative** - it returns the actual daemon state:
+```
+PID   STATUS   INFO
+12345 BUSY     8.0
+12346 IDLE     8.0
+```
+
+CPU monitoring was tried and rejected because:
+- Threshold (e.g., >5% CPU) varies by machine and build type
+- Some builds don't spike CPU significantly
+- Idle daemons can occasionally show CPU activity
+- It's a heuristic, not the actual state
+
+### How it works:
+1. Check if Android Studio is running (NSWorkspace, cheap)
+2. Find gradle path (Homebrew or ~/.gradle/wrapper/dists)
+3. Run `gradle --status` with proper JAVA_HOME
+4. Parse output for "BUSY" or "IDLE"
+5. Use consecutive readings to debounce (1 to show, 3 to hide)
+
+### Debugging Android Studio:
+1. Check Console.app for "🤖" logs
+2. Verify gradle is found at startup
+3. Verify JAVA_HOME is set or auto-detected
+4. Run `gradle --status` manually to test
+
+---
+
+## CodexDetector Architecture
+
+The detector identifies OpenAI's Codex CLI by looking for its specific output pattern:
+- **Location**: `Services/CodexDetector.swift`
+- **Color**: #F9F9F9 (OpenAI light gray)
+
+### Pattern Matching (IMPORTANT)
+
+Codex output format: `• Working (5s • esc to interrupt)`
+
+The detector requires **BOTH**:
+1. Line starts with `•` bullet point
+2. Line contains timing pattern `(\d+s •` (e.g., "(1s •", "(9s •", "(54s •")
+
+**Why both checks are required:**
+- Claude CLI also uses "esc to interrupt" but WITHOUT the timing pattern
+- Just checking for `•` prefix would cause false positives with Claude
+- The `(Xs •` timing pattern is unique to Codex
+
+**DO NOT simplify this to just check for `•`** - it was tried and caused Claude/Codex confusion.
+
+---
+
 ## ClaudeDetector Architecture
 
 The detector:
@@ -124,6 +228,71 @@ Files:
 - `Views/MorningOverviewView.swift` - The expanded calendar view
 - `Services/CalendarService.swift` - `getMorningOverviewData()` fetches today's events
 - Data types: `MorningEvent`, `MorningOverviewData`
+
+## Permissions Architecture
+
+**Design Principle**: Permissions are requested when the user enables features, NOT at app launch.
+
+### Why:
+- Asking for multiple permissions on first launch is overwhelming
+- Users don't understand why permissions are needed without context
+- Requesting in context (when enabling a feature) has higher grant rates
+
+### Permission Summary
+
+| Permission | When Requested | Trigger Location |
+|------------|----------------|------------------|
+| **Calendar** | User enables "Calendar" toggle | `SettingsView.swift` → `handleCalendarPermission()` |
+| **Camera** | User enables "Microsoft Teams" toggle | `SettingsView.swift` → `handleCameraPermission()` |
+| **Accessibility** | Never prompted (read-only check) | User must manually grant in System Settings |
+| **Automation** | Only checked in DEBUG builds | `PermissionsChecker` (does not run in release) |
+| **Downloads folder** | Never (app not sandboxed) | N/A |
+
+### Entitlements (`Notchification.entitlements`)
+
+```xml
+<key>com.apple.security.app-sandbox</key>
+<false/>  <!-- App is NOT sandboxed - no file access prompts -->
+
+<key>com.apple.security.device.camera</key>
+<true/>   <!-- For Teams camera preview -->
+
+<key>com.apple.security.personal-information.calendars</key>
+<true/>   <!-- For calendar reminders -->
+```
+
+### Permission Request Flow
+
+1. **Calendar Permission**:
+   - User toggles "Enable" in Calendar settings tab
+   - `handleCalendarPermission()` checks `EKEventStore.authorizationStatus(for: .event)`
+   - If `.notDetermined`, calls `requestFullAccessToEvents()`
+   - If `.denied`, opens System Settings Privacy pane
+
+2. **Camera Permission**:
+   - User toggles "Microsoft Teams" in Apps settings tab
+   - `handleCameraPermission()` checks `AVCaptureDevice.authorizationStatus(for: .video)`
+   - If `.notDetermined`, calls `AVCaptureDevice.requestAccess(for: .video)`
+   - If `.denied`, opens System Settings Privacy pane
+
+3. **Accessibility Permission**:
+   - Checked with `AXIsProcessTrusted()` (read-only, no prompt)
+   - User must manually enable in System Settings > Privacy & Security > Accessibility
+   - Required for: Xcode status detection, Claude App detection, Finder detection
+
+4. **Automation Permission**:
+   - Required for terminal scanning (iTerm2, Terminal.app)
+   - macOS prompts automatically on first AppleScript execution
+   - Only explicitly checked in DEBUG builds via `PermissionsChecker`
+
+### DO NOT add permission requests at app launch
+
+If you're tempted to request permissions early "for convenience":
+- **DON'T** - it's bad UX to bombard users with permission dialogs on first launch
+- Permissions should only be requested when the user explicitly enables a feature
+- The current implementation follows Apple's guidelines for just-in-time permission requests
+
+---
 
 ## Debugging Checklist
 

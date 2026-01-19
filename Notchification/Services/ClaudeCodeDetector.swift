@@ -60,12 +60,19 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
         // Braille dots (common CLI spinners)
         "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
         "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷",
-        // Middle dot (Claude also uses this)
-        "·"
+        // Middle dot and bullet variants (Claude uses these for thinking/working states)
+        "·",  // U+00B7 Middle Dot
+        "•",  // U+2022 Bullet (also used by Claude, distinguished from Codex by timing pattern)
+        "∙",  // U+2219 Bullet Operator
+        "‧",  // U+2027 Hyphenation Point
+        "⋅",  // U+22C5 Dot Operator
+        "․"   // U+2024 One Dot Leader
     ]
 
-    // Codex uses bullet point - NOT a Claude spinner
+    // Codex uses bullet point with timing pattern like "(5s •"
+    // Claude can also use bullet in some states, so we need to check for Codex timing pattern
     private let codexBullet: Character = "•"
+    private let codexTimingPattern = try! NSRegularExpression(pattern: "\\(\\d+s\\s*•", options: [])
 
     // Debug logging toggle
     private var debug: Bool { DebugSettings.shared.debugClaudeCode }
@@ -162,7 +169,9 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
     /// Check if Claude-specific patterns appear in the last lines of any session
     /// Claude shows: "✢ Dilly-dallying… (esc to interrupt · thinking)"
     /// Claude thinking shows: "✻ Frosting... (ctrl+c to interrupt • 1m 13s • ↓ 5.1k tokens)"
-    /// Codex shows: "• Working (1s • esc to interrupt)"
+    /// Claude wrangling: "· Wrangling… (ctrl+c to interrupt · thought for...)"
+    /// Codex shows: "• Working (1s • esc to interrupt)" - note the timing pattern "(Xs •"
+    /// Key difference: Codex has timing pattern like "(5s •" while Claude doesn't
     private func hasClaudePattern(in output: String, scanner: TerminalScanner) -> Bool {
         let sessions = scanner.parseSessions(from: output)
         let checkLineCount = 7
@@ -192,12 +201,16 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
                     print("🔶 Checking line prefix: '\(prefix)' [\(chars)]")
                 }
 
-                // Skip if line starts with Codex bullet
+                // Skip if line looks like Codex (bullet + timing pattern like "(5s •")
                 if trimmed.hasPrefix(String(codexBullet)) {
-                    if debug {
-                        print("🔶 SKIP (Codex bullet): \(line.prefix(100))")
+                    let range = NSRange(line.startIndex..<line.endIndex, in: line)
+                    if codexTimingPattern.firstMatch(in: line, options: [], range: range) != nil {
+                        if debug {
+                            print("🔶 SKIP (Codex pattern): \(line.prefix(100))")
+                        }
+                        continue
                     }
-                    continue
+                    // Bullet without Codex timing pattern - could be Claude, so continue checking
                 }
 
                 // Match if any Claude spinner appears at the start

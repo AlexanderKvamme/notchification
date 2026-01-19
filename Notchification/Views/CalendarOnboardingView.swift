@@ -34,7 +34,7 @@ struct CalendarOnboardingView: View {
             VStack(alignment: .leading, spacing: 12) {
                 FeatureRow(
                     icon: "sunrise",
-                    text: "See your day's meetings when you open your Mac each morning"
+                    text: "See your day's meetings each morning (6am - 10am)"
                 )
                 FeatureRow(
                     icon: "bell.badge",
@@ -46,29 +46,6 @@ struct CalendarOnboardingView: View {
                 )
             }
             .padding(.horizontal)
-
-            // Time setting
-            HStack {
-                Text("Show between")
-                    .foregroundColor(.secondary)
-                Picker("", selection: $calendarSettings.morningStartHour) {
-                    ForEach(5..<12, id: \.self) { hour in
-                        Text("\(hour):00").tag(hour)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 70)
-                Text("and")
-                    .foregroundColor(.secondary)
-                Picker("", selection: $calendarSettings.morningEndHour) {
-                    ForEach(7..<14, id: \.self) { hour in
-                        Text("\(hour):00").tag(hour)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 70)
-            }
-            .font(.custom("FiraCode-Regular", size: 12))
 
             Spacer()
 

@@ -3,8 +3,12 @@
 //  Notchification
 //
 //  Color: #2BA160 (Android green)
-//  Detects Android Studio builds by monitoring GradleDaemon CPU usage.
-//  Version-agnostic - works with any Gradle version.
+//  Detects Android Studio builds using `gradle --status` command
+//  which shows BUSY when a Gradle daemon is building.
+//  Works with any Gradle version - searches dynamically.
+//
+//  DESIGN NOTE: Uses `gradle --status` (authoritative daemon status) instead of
+//  CPU monitoring. See CLAUDE.md "Detector Design Principles" for rationale.
 //
 
 import Foundation
@@ -19,6 +23,7 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
     let processType: ProcessType = .androidStudio
+    private var gradlePath: String?
     private var detectedBundleId: String?
     private var lastLoggedStatus: String?
 
@@ -33,13 +38,52 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     // Serial queue ensures checks don't overlap
     private let checkQueue = DispatchQueue(label: "com.notchification.android-check", qos: .utility)
 
+    // Debug logging is ALWAYS enabled for Android Studio (users need Console.app to see it)
+    private var debug: Bool { true }
+
     private func log(_ message: String) {
         os_log("[Notchification] 🤖 %{public}@", log: logger, type: .info, message)
     }
 
     init() {
         log("========== AndroidStudioDetector initializing ==========")
-        log("Detection method: CPU monitoring of GradleDaemon processes (version-agnostic)")
+
+        // Log environment
+        if let gradleUserHome = ProcessInfo.processInfo.environment["GRADLE_USER_HOME"] {
+            log("GRADLE_USER_HOME env: \(gradleUserHome)")
+        } else {
+            log("GRADLE_USER_HOME env: not set (will use ~/.gradle)")
+        }
+
+        if let javaHomeEnv = ProcessInfo.processInfo.environment["JAVA_HOME"] {
+            log("JAVA_HOME env: \(javaHomeEnv)")
+        } else {
+            log("JAVA_HOME env: not set")
+        }
+
+        // Find and log gradle path
+        findGradlePath()
+        if let path = gradlePath {
+            log("✅ Gradle found at: \(path)")
+            // Check if executable
+            if FileManager.default.isExecutableFile(atPath: path) {
+                log("✅ Gradle is executable")
+            } else {
+                log("⚠️ Gradle file exists but is NOT executable!")
+            }
+        } else {
+            log("❌ NO GRADLE FOUND - Android Studio detection will not work!")
+            log("   Searched: /opt/homebrew/bin/gradle")
+            log("   Searched: /usr/local/bin/gradle")
+            log("   Searched: ~/.gradle/wrapper/dists/*/bin/gradle")
+        }
+
+        // Log Java home status (found via java_home utility or Android Studio JBR)
+        if let javaHome = findJavaHome() {
+            log("✅ Java found at: \(javaHome)")
+        } else {
+            log("⚠️ No Java found via /usr/libexec/java_home or Android Studio JBR")
+        }
 
         // Log currently running Google apps (helps debug bundle ID issues)
         let googleApps = NSWorkspace.shared.runningApplications.filter {
@@ -57,10 +101,98 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         log("========== AndroidStudioDetector ready ==========")
     }
 
+    /// Find the gradle executable path
+    private func findGradlePath() {
+        // Check common Homebrew locations first
+        let homebrewPaths = [
+            "/opt/homebrew/bin/gradle",
+            "/usr/local/bin/gradle"
+        ]
+
+        for path in homebrewPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                log("Found gradle at Homebrew path: \(path)")
+                gradlePath = path
+                return
+            }
+        }
+
+        log("No Homebrew gradle found, searching ~/.gradle/wrapper/dists...")
+
+        // Search for any gradle wrapper version dynamically
+        // Check GRADLE_USER_HOME first, fall back to ~/.gradle
+        let gradleHome = ProcessInfo.processInfo.environment["GRADLE_USER_HOME"]
+            ?? NSString(string: "~/.gradle").expandingTildeInPath
+
+        log("Searching for gradle wrapper in: \(gradleHome)/wrapper/dists")
+
+        let pipe = Pipe()
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.arguments = ["-c", "find '\(gradleHome)/wrapper/dists' -name 'gradle' -type f -path '*/bin/*' 2>/dev/null | head -1"]
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !path.isEmpty {
+                log("Found gradle wrapper: \(path)")
+                gradlePath = path
+            } else {
+                log("No gradle wrapper found in \(gradleHome)/wrapper/dists")
+            }
+        } catch {
+            log("Error searching for gradle: \(error)")
+        }
+    }
+
     func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
         isActive = false
+    }
+
+    /// Find Java home using macOS java_home utility, fallback to Android Studio's bundled JBR
+    private func findJavaHome() -> String? {
+        // Try macOS built-in java_home utility first
+        let pipe = Pipe()
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/libexec/java_home")
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            if task.terminationStatus == 0 {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !path.isEmpty {
+                    return path
+                }
+            }
+        } catch {
+            // java_home not available or failed
+        }
+
+        // Fallback: Search for any Android Studio variant's bundled JBR
+        let appDirs = ["/Applications", NSString(string: "~/Applications").expandingTildeInPath]
+
+        for appDir in appDirs {
+            if let contents = try? FileManager.default.contentsOfDirectory(atPath: appDir) {
+                for app in contents where app.hasPrefix("Android Studio") && app.hasSuffix(".app") {
+                    let jbrPath = "\(appDir)/\(app)/Contents/jbr/Contents/Home"
+                    if FileManager.default.fileExists(atPath: jbrPath) {
+                        return jbrPath
+                    }
+                }
+            }
+        }
+
+        return nil
     }
 
     /// Check if Android Studio is running (cheap check using NSWorkspace)
@@ -126,25 +258,40 @@ final class AndroidStudioDetector: ObservableObject, Detector {
         }
     }
 
-    /// Check if any gradle daemon is BUSY by monitoring CPU usage
-    /// This is version-agnostic - works regardless of which gradle version is installed
+    /// Check if gradle daemon is BUSY using gradle --status
     private func isGradleBusy() -> (Bool, String) {
-        // Use ps to find GradleDaemon processes and their CPU usage
-        // A daemon with >5% CPU is likely building
-        let pipe = Pipe()
+        guard let gradle = gradlePath else {
+            return (false, "⚠️ no gradle path configured")
+        }
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
         let task = Process()
 
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
-        // Get PID, CPU%, and command for GradleDaemon processes
-        task.arguments = ["-c", "ps -eo pid,%cpu,comm | grep -i 'GradleDaemon\\|gradle' | grep -v grep"]
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
+        task.arguments = ["-c", "\(gradle) --status 2>&1"]
 
-        // Timeout after 1 second
-        let timeoutWork = DispatchWorkItem { [weak task] in
-            if task?.isRunning == true { task?.terminate() }
+        // Set JAVA_HOME if not already set
+        var env = ProcessInfo.processInfo.environment
+        if env["JAVA_HOME"] == nil {
+            if let javaHome = findJavaHome() {
+                env["JAVA_HOME"] = javaHome
+            } else {
+                log("⚠️ JAVA_HOME not set and could not find Java automatically")
+            }
         }
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1.0, execute: timeoutWork)
+        task.environment = env
+
+        task.standardOutput = outPipe
+        task.standardError = errPipe
+
+        // Timeout after 2 seconds
+        let timeoutWork = DispatchWorkItem { [weak task] in
+            if task?.isRunning == true {
+                task?.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0, execute: timeoutWork)
 
         do {
             try task.run()
@@ -152,43 +299,41 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             timeoutWork.cancel()
         } catch {
             timeoutWork.cancel()
-            return (false, "ps error: \(error)")
+            log("❌ gradle --status failed to run: \(error)")
+            return (false, "gradle error: \(error)")
         }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
+        let exitCode = task.terminationStatus
+        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: outData, encoding: .utf8) ?? ""
+        let errOutput = String(data: errData, encoding: .utf8) ?? ""
 
-        if output.isEmpty {
-            return (false, "no GradleDaemon processes")
+        let combined = output + errOutput
+
+        // Log exit code if non-zero
+        if exitCode != 0 {
+            log("⚠️ gradle --status exit code: \(exitCode)")
         }
 
-        // Parse ps output - look for any daemon using significant CPU
-        var maxCpu: Double = 0
-        var daemonCount = 0
-
-        for line in output.components(separatedBy: "\n") where !line.isEmpty {
-            let parts = line.trimmingCharacters(in: .whitespaces)
-                .components(separatedBy: .whitespaces)
-                .filter { !$0.isEmpty }
-
-            if parts.count >= 2 {
-                daemonCount += 1
-                if let cpu = Double(parts[1]) {
-                    maxCpu = max(maxCpu, cpu)
-                }
-            }
+        // Log gradle output if it contains useful info (not just the default message)
+        if !combined.isEmpty && !combined.contains("Only Daemons for the current Gradle version") {
+            log("gradle --status output: \(String(combined.prefix(300)))")
         }
 
-        // Consider daemon "busy" if CPU > 5%
-        // Idle daemons typically use 0% CPU
-        let isBusy = maxCpu > 5.0
-
-        if isBusy {
-            let detail = "GradleDaemon active (CPU: \(String(format: "%.1f", maxCpu))%)"
-            log("✅ \(detail)")
-            return (true, detail)
+        if combined.contains("BUSY") {
+            return (true, "daemon BUSY")
         }
 
-        return (false, "\(daemonCount) daemon(s) idle (CPU: \(String(format: "%.1f", maxCpu))%)")
+        if combined.contains("IDLE") {
+            return (false, "daemon IDLE")
+        }
+
+        // Log unexpected output for debugging
+        if !combined.isEmpty {
+            log("⚠️ Unexpected gradle output (no BUSY/IDLE): \(String(combined.prefix(200)))")
+        }
+
+        return (false, combined.isEmpty ? "no output from gradle" : "no BUSY/IDLE in output")
     }
 }

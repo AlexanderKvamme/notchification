@@ -45,7 +45,7 @@ struct NotchificationApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Notchification", systemImage: "bell.badge") {
+        MenuBarExtra("Notchification", image: "MenuBarIcon") {
             MenuBarView(appState: appState, updater: updaterController.updater)
                 .frame(width: 200)
                 .padding(.vertical, 8)
@@ -284,6 +284,53 @@ final class TrackingSettings: ObservableObject {
         didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
     }
 
+    /// Recently used apps for quick access in menu (max 4)
+    @Published var recentlyUsedApps: [ProcessType] = [] {
+        didSet {
+            let rawValues = recentlyUsedApps.map { $0.rawValue }
+            UserDefaults.standard.set(rawValues, forKey: "recentlyUsedApps")
+        }
+    }
+
+    /// Mark a process type as recently used (called when detection activates)
+    func markAsRecentlyUsed(_ processType: ProcessType) {
+        // Skip preview and calendar (calendar is not a traditional app)
+        guard processType != .preview && processType != .calendar && processType != .teams else { return }
+
+        // Remove if already present, add to front, keep max 4
+        recentlyUsedApps.removeAll { $0 == processType }
+        recentlyUsedApps.insert(processType, at: 0)
+        if recentlyUsedApps.count > 4 {
+            recentlyUsedApps = Array(recentlyUsedApps.prefix(4))
+        }
+    }
+
+    /// Get the tracking binding for a given process type
+    func trackingBinding(for processType: ProcessType) -> Binding<Bool> {
+        switch processType {
+        case .claudeCode: return Binding(get: { self.trackClaudeCode }, set: { self.trackClaudeCode = $0 })
+        case .claudeApp: return Binding(get: { self.trackClaudeApp }, set: { self.trackClaudeApp = $0 })
+        case .androidStudio: return Binding(get: { self.trackAndroidStudio }, set: { self.trackAndroidStudio = $0 })
+        case .xcode: return Binding(get: { self.trackXcode }, set: { self.trackXcode = $0 })
+        case .finder: return Binding(get: { self.trackFinder }, set: { self.trackFinder = $0 })
+        case .opencode: return Binding(get: { self.trackOpencode }, set: { self.trackOpencode = $0 })
+        case .codex: return Binding(get: { self.trackCodex }, set: { self.trackCodex = $0 })
+        case .dropbox: return Binding(get: { self.trackDropbox }, set: { self.trackDropbox = $0 })
+        case .googleDrive: return Binding(get: { self.trackGoogleDrive }, set: { self.trackGoogleDrive = $0 })
+        case .oneDrive: return Binding(get: { self.trackOneDrive }, set: { self.trackOneDrive = $0 })
+        case .icloud: return Binding(get: { self.trackICloud }, set: { self.trackICloud = $0 })
+        case .installer: return Binding(get: { self.trackInstaller }, set: { self.trackInstaller = $0 })
+        case .appStore: return Binding(get: { self.trackAppStore }, set: { self.trackAppStore = $0 })
+        case .automator: return Binding(get: { self.trackAutomator }, set: { self.trackAutomator = $0 })
+        case .scriptEditor: return Binding(get: { self.trackScriptEditor }, set: { self.trackScriptEditor = $0 })
+        case .downloads: return Binding(get: { self.trackDownloads }, set: { self.trackDownloads = $0 })
+        case .davinciResolve: return Binding(get: { self.trackDaVinciResolve }, set: { self.trackDaVinciResolve = $0 })
+        case .teams: return Binding(get: { self.trackTeams }, set: { self.trackTeams = $0 })
+        case .calendar: return Binding(get: { self.trackCalendar }, set: { self.trackCalendar = $0 })
+        case .preview: return Binding(get: { false }, set: { _ in })
+        }
+    }
+
     private init() {
         self.trackClaudeCode = UserDefaults.standard.object(forKey: "trackClaudeCode") as? Bool ?? false
         self.trackClaudeApp = UserDefaults.standard.object(forKey: "trackClaudeApp") as? Bool ?? false
@@ -306,6 +353,11 @@ final class TrackingSettings: ObservableObject {
         self.trackCalendar = UserDefaults.standard.object(forKey: "trackCalendar") as? Bool ?? false
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
+
+        // Load recently used apps
+        if let rawValues = UserDefaults.standard.array(forKey: "recentlyUsedApps") as? [String] {
+            self.recentlyUsedApps = rawValues.compactMap { ProcessType(rawValue: $0) }
+        }
     }
 }
 
@@ -905,11 +957,6 @@ final class AppState: ObservableObject {
     private func startMonitoringIfLicensed() {
         // Always start monitoring - we show a nag message if expired
         startMonitoring()
-
-        // Show calendar onboarding if not yet set up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            CalendarOnboardingWindowController.shared.showOnboarding()
-        }
     }
 
     private var previewTimer: Timer?
@@ -1387,10 +1434,18 @@ struct MenuBarView: View {
     let updater: SPUUpdater
     @ObservedObject var trackingSettings = TrackingSettings.shared
     @ObservedObject var licenseManager = LicenseManager.shared
-    @ObservedObject var calendarSettings = CalendarSettings.shared
 
     var body: some View {
         VStack(alignment: .leading) {
+            // Show calendar button at top if calendar tracking is enabled
+            if trackingSettings.trackCalendar {
+                Button("Show Today's Calendar") {
+                    DebugSettings.shared.showMorningOverview = true
+                }
+
+                Divider()
+            }
+
             // License status
             licenseStatusView
 
@@ -1403,89 +1458,34 @@ struct MenuBarView: View {
             .toggleStyle(.switch)
             .padding(.trailing, 8)
 
-            Divider()
+            // Recent apps section (only show if there are recently used apps)
+            if !trackingSettings.recentlyUsedApps.isEmpty {
+                Divider()
 
-            Group {
-                HStack {
-                    Text("Track Apps").font(.caption).foregroundColor(.secondary)
-                    Spacer()
-                    Text("⌘-click to demo").font(.caption2).foregroundColor(.secondary.opacity(0.6))
+                Text("Recent")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                ForEach(trackingSettings.recentlyUsedApps, id: \.self) { processType in
+                    Toggle(processType.displayName, isOn: trackingSettings.trackingBinding(for: processType))
+                        .toggleStyle(.switch)
+                        .padding(.trailing, 8)
                 }
-                DemoableToggle(label: "Claude Code", isOn: $trackingSettings.trackClaudeCode, processType: .claudeCode, appState: appState)
-                DemoableToggle(label: "Claude App", isOn: $trackingSettings.trackClaudeApp, processType: .claudeApp, appState: appState)
-                DemoableToggle(label: "Android Studio", isOn: $trackingSettings.trackAndroidStudio, processType: .androidStudio, appState: appState)
-                DemoableToggle(label: "Xcode", isOn: $trackingSettings.trackXcode, processType: .xcode, appState: appState)
-                DemoableToggle(label: "Finder", isOn: $trackingSettings.trackFinder, processType: .finder, appState: appState)
-                DemoableToggle(label: "Opencode", isOn: $trackingSettings.trackOpencode, processType: .opencode, appState: appState)
-                DemoableToggle(label: "Codex", isOn: $trackingSettings.trackCodex, processType: .codex, appState: appState)
-                DemoableToggle(label: "Dropbox", isOn: $trackingSettings.trackDropbox, processType: .dropbox, appState: appState)
-                DemoableToggle(label: "Google Drive", isOn: $trackingSettings.trackGoogleDrive, processType: .googleDrive, appState: appState)
-                DemoableToggle(label: "OneDrive", isOn: $trackingSettings.trackOneDrive, processType: .oneDrive, appState: appState)
-                DemoableToggle(label: "iCloud", isOn: $trackingSettings.trackICloud, processType: .icloud, appState: appState)
+                .disabled(!appState.isMonitoring)
             }
-            .disabled(!appState.isMonitoring)
-
-            Group {
-                DemoableToggle(label: "Installer", isOn: $trackingSettings.trackInstaller, processType: .installer, appState: appState)
-                DemoableToggle(label: "App Store", isOn: $trackingSettings.trackAppStore, processType: .appStore, appState: appState)
-                DemoableToggle(label: "Automator", isOn: $trackingSettings.trackAutomator, processType: .automator, appState: appState)
-                DemoableToggle(label: "Script Editor", isOn: $trackingSettings.trackScriptEditor, processType: .scriptEditor, appState: appState)
-                DemoableToggle(label: "Downloads", isOn: $trackingSettings.trackDownloads, processType: .downloads, appState: appState)
-                DemoableToggle(label: "DaVinci Resolve", isOn: $trackingSettings.trackDaVinciResolve, processType: .davinciResolve, appState: appState)
-                DemoableToggle(label: "Calendar", isOn: $trackingSettings.trackCalendar, processType: .calendar, appState: appState)
-
-                Divider()
-
-                Button("Show Today's Calendar") {
-                    DebugSettings.shared.showMorningOverview = true
-                }
-
-                Divider()
-
-                // Morning Overview settings
-                Toggle("Morning Overview", isOn: $calendarSettings.enableMorningOverview)
-                    .padding(.trailing, 8)
-
-                if calendarSettings.enableMorningOverview {
-                    HStack {
-                        Text("Show between")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("", selection: $calendarSettings.morningStartHour) {
-                            ForEach(5..<12, id: \.self) { hour in
-                                Text("\(hour):00").tag(hour)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 60)
-                        Text("and")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("", selection: $calendarSettings.morningEndHour) {
-                            ForEach(7..<14, id: \.self) { hour in
-                                Text("\(hour):00").tag(hour)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 60)
-                    }
-                    .padding(.leading, 8)
-                }
-
-                Divider()
-
-                Toggle("Confetti", isOn: $trackingSettings.confettiEnabled)
-                    .padding(.trailing, 8)
-                Toggle("Sound", isOn: $trackingSettings.soundEnabled)
-                    .padding(.trailing, 8)
-            }
-            .disabled(!appState.isMonitoring)
 
             Divider()
 
             Button("Settings...") {
                 SettingsWindowController.shared.showSettings()
             }
+            .keyboardShortcut(",")
+
+            Button("Check for Updates...") {
+                updater.checkForUpdates()
+            }
+
+            Divider()
 
             Button("Send Feedback") {
                 let subject = "Notchification Feedback"
@@ -1493,10 +1493,6 @@ struct MenuBarView: View {
                 if let url = URL(string: "mailto:alexanderkvamme@gmail.com?subject=\(encodedSubject)") {
                     NSWorkspace.shared.open(url)
                 }
-            }
-
-            Button("Check for Updates...") {
-                updater.checkForUpdates()
             }
 
             Button("Quit") {
@@ -1516,25 +1512,19 @@ struct MenuBarView: View {
     private var licenseStatusView: some View {
         switch licenseManager.state {
         case .licensed:
-            HStack {
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundColor(.green)
-                Text("Licensed")
-                    .font(.caption)
-            }
+            Label("Licensed", systemImage: "checkmark.seal.fill")
+                .font(.body.weight(.medium))
+                .foregroundColor(.green)
 
         case .trial(let daysRemaining):
-            HStack {
-                Image(systemName: "clock")
-                    .foregroundColor(.orange)
-                Text("Trial: \(daysRemaining) days left")
-                    .font(.caption)
-            }
+            Label("Trial: \(daysRemaining) days left", systemImage: "clock")
+                .font(.body.weight(.medium))
+                .foregroundColor(.orange)
 
         case .expired:
             HStack(spacing: 8) {
                 Label("Trial expired", systemImage: "xmark.circle.fill")
-                    .font(.caption)
+                    .font(.body.weight(.medium))
                     .foregroundColor(.red)
 
                 Button("Buy") {

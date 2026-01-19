@@ -89,19 +89,17 @@ final class XcodeDetector: ObservableObject, Detector {
         }
     }
 
-    /// Check if Xcode is building - tries Accessibility API first, falls back to process detection
+    /// Check if Xcode is building using Accessibility API (authoritative source)
+    /// Reads the actual status text from Xcode's toolbar - no heuristic fallbacks
     private func isXcodeBuilding() -> (Bool, String) {
-        // Primary: Check status text via Accessibility API
         if let statusText = getStatusTextViaAccessibility() {
             let isBuilding = buildingPatterns.contains { statusText.contains($0) }
             if debug { print("🔨 Xcode status: \"\(statusText)\" -> building=\(isBuilding)") }
             return isBuilding ? (true, "Status: \(statusText)") : (false, "Status: \(statusText)")
         }
 
-        if debug { print("🔨 Xcode: AX check failed, falling back to process detection") }
-
-        // Fallback: Check for compiler processes
-        return checkBuildProcesses()
+        if debug { print("🔨 Xcode: Could not read status via Accessibility API") }
+        return (false, "No AX status")
     }
 
     // MARK: - Primary Detection: Accessibility API (Status Text)
@@ -110,6 +108,7 @@ final class XcodeDetector: ObservableObject, Detector {
     /// Returns nil if AX check fails (permissions, UI not found, etc.)
     private func getStatusTextViaAccessibility() -> String? {
         guard let xcodeApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first else {
+            if debug { print("🔨 Xcode AX: Xcode app not found") }
             return nil
         }
 
@@ -119,30 +118,67 @@ final class XcodeDetector: ObservableObject, Detector {
         let windowsResult = AXUIElementCopyAttributeValue(appElement, "AXWindows" as CFString, &windowsValue)
 
         guard windowsResult == .success, let windows = windowsValue as? [AXUIElement], !windows.isEmpty else {
-            if debug { print("🔨 Xcode AX: No windows found") }
+            if debug {
+                let errorDesc = axErrorDescription(windowsResult)
+                print("🔨 Xcode AX: No windows found (error: \(errorDesc))")
+            }
             return nil
         }
 
+        if debug { print("🔨 Xcode AX: Found \(windows.count) windows") }
+
         // Check each window for status text
-        for window in windows {
-            if let status = findStatusTextInWindow(window) {
+        for (index, window) in windows.enumerated() {
+            if let status = findStatusTextInWindow(window, windowIndex: index) {
                 return status
             }
         }
 
+        if debug { print("🔨 Xcode AX: No status text found in any window") }
         return nil
     }
 
+    /// Convert AXError to readable string
+    private func axErrorDescription(_ error: AXError) -> String {
+        switch error {
+        case .success: return "success"
+        case .failure: return "failure"
+        case .illegalArgument: return "illegalArgument"
+        case .invalidUIElement: return "invalidUIElement"
+        case .invalidUIElementObserver: return "invalidUIElementObserver"
+        case .cannotComplete: return "cannotComplete"
+        case .attributeUnsupported: return "attributeUnsupported"
+        case .actionUnsupported: return "actionUnsupported"
+        case .notificationUnsupported: return "notificationUnsupported"
+        case .notImplemented: return "notImplemented"
+        case .notificationAlreadyRegistered: return "notificationAlreadyRegistered"
+        case .notificationNotRegistered: return "notificationNotRegistered"
+        case .apiDisabled: return "apiDisabled"
+        case .noValue: return "noValue"
+        case .parameterizedAttributeUnsupported: return "parameterizedAttributeUnsupported"
+        case .notEnoughPrecision: return "notEnoughPrecision"
+        @unknown default: return "unknown(\(error.rawValue))"
+        }
+    }
+
     /// Search for status text in a window's toolbar
-    private func findStatusTextInWindow(_ window: AXUIElement) -> String? {
+    private func findStatusTextInWindow(_ window: AXUIElement, windowIndex: Int = 0) -> String? {
+        // Get window title for debugging
+        var titleValue: CFTypeRef?
+        AXUIElementCopyAttributeValue(window, "AXTitle" as CFString, &titleValue)
+        let windowTitle = titleValue as? String ?? "untitled"
+
         // First try the toolbar directly
         var toolbarValue: CFTypeRef?
         let toolbarResult = AXUIElementCopyAttributeValue(window, "AXToolbar" as CFString, &toolbarValue)
 
         if toolbarResult == .success, let toolbar = toolbarValue {
+            if debug { print("🔨 Xcode AX: Window \(windowIndex) '\(windowTitle)' has toolbar") }
             if let status = findStatusTextInElement(toolbar as! AXUIElement) {
                 return status
             }
+        } else if debug {
+            print("🔨 Xcode AX: Window \(windowIndex) '\(windowTitle)' no toolbar (\(axErrorDescription(toolbarResult)))")
         }
 
         // Fallback: recursive search through window hierarchy
@@ -231,53 +267,5 @@ final class XcodeDetector: ObservableObject, Detector {
         }
 
         return nil
-    }
-
-    // MARK: - Fallback Detection: Process Monitoring
-
-    /// Check for compiler processes (fallback when AX fails)
-    private func checkBuildProcesses() -> (Bool, String) {
-        // Check for swift-frontend processes (active compilation)
-        let swiftCount = getProcessCount(name: "swift-frontend")
-        if swiftCount > 0 {
-            if debug { print("🔨 Xcode: Detected \(swiftCount) swift-frontend processes") }
-            return (true, "\(swiftCount) swift-frontend processes")
-        }
-
-        // Check for clang processes (C/ObjC compilation)
-        let clangCount = getProcessCount(name: "clang")
-        if clangCount > 0 {
-            if debug { print("🔨 Xcode: Detected \(clangCount) clang processes") }
-            return (true, "\(clangCount) clang processes")
-        }
-
-        if debug { print("🔨 Xcode: No build processes found") }
-        return (false, "no build processes")
-    }
-
-    /// Count running processes with given name
-    private func getProcessCount(name: String) -> Int {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-x", name]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch {
-            return 0
-        }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !output.isEmpty else {
-            return 0
-        }
-
-        return output.components(separatedBy: .newlines).count
     }
 }

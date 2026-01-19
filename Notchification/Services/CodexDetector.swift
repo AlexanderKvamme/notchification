@@ -102,11 +102,19 @@ final class CodexDetector: ObservableObject, Detector {
     }
 
     /// Codex bullet point - used to identify Codex vs Claude
-    private let codexBullet = "•"
+    private let codexBullet: Character = "•"
+
+    /// Regex to match Codex timing pattern: (1s •, (9s •, (54s •, etc.
+    /// This pattern is specific to Codex and distinguishes it from Claude.
+    /// DO NOT remove this check - it prevents false positives with Claude CLI.
+    private let timingPattern = try! NSRegularExpression(pattern: #"\(\d+s •"#)
 
     /// Check if Codex pattern appears in terminal output
     /// Codex shows: "• [action] (Xs • esc to interrupt)"
-    /// Just needs: line starts with • and contains "esc to interrupt"
+    /// Examples:
+    ///   • Working (1s • esc to interrupt)
+    ///   • Searching for pattern detection (9s • esc to interrupt)
+    ///   • Analyzing terminal output parsing issues (54s • esc to interrupt)
     private func hasCodexPattern(in output: String, scanner: TerminalScanner) -> Bool {
         let debug = DebugSettings.shared.debugCodex
         let sessions = scanner.parseSessions(from: output)
@@ -129,7 +137,11 @@ final class CodexDetector: ObservableObject, Detector {
 
                 // Check if line starts with Codex bullet •
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if trimmed.hasPrefix(codexBullet) {
+                guard trimmed.hasPrefix(String(codexBullet)) else { continue }
+
+                // Check for timing pattern (Xs • - this is specific to Codex
+                let range = NSRange(line.startIndex..., in: line)
+                if timingPattern.firstMatch(in: line, range: range) != nil {
                     if debug {
                         print("🤖 MATCH: \(line.prefix(100))")
                     }

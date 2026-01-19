@@ -29,7 +29,7 @@ final class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "Notchification Settings"
+        window.title = "Notchification"
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.level = .floating  // Ensure it appears above other windows
