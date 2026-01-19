@@ -43,8 +43,8 @@ final class LicenseManager: ObservableObject {
     private let licenseInstanceIdKey = "licenseInstanceId"
     private let licenseValidatedKey = "licenseValidated"
 
-    // TODO: Replace with your LemonSqueezy checkout URL
-    let purchaseURL = URL(string: "https://homeofficesinternational.lemonsqueezy.com/checkout/buy/1e30b007-d42b-44ef-8c74-849e3d1ad989")!
+    // LemonSqueezy production checkout URL
+    let purchaseURL = URL(string: "https://homeofficesinternational.lemonsqueezy.com/checkout/buy/f92881cf-2596-497c-b404-b1783a46bce3")!
 
     private init() {
         checkLicenseStatus()

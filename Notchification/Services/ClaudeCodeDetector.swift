@@ -1,9 +1,9 @@
 //
-//  ClaudeDetector.swift
+//  ClaudeCodeDetector.swift
 //  Notchification
 //
 //  Color: #D97757 (Claude orange)
-//  Detects Claude Code activity by looking for status indicators in terminal
+//  Detects Claude Code CLI activity by looking for status indicators in terminal
 //
 //  Uses shared TerminalScanner for terminal reading.
 //  See TerminalScanner.swift and Detector.swift for architecture notes.
@@ -13,14 +13,14 @@ import Foundation
 import Combine
 import os.log
 
-private let logger = Logger(subsystem: "com.hoi.Notchification", category: "ClaudeDetector")
+private let logger = Logger(subsystem: "com.hoi.Notchification", category: "ClaudeCodeDetector")
 
-/// Detects if Claude Code is actively working
+/// Detects if Claude Code CLI is actively working
 /// Uses TerminalScanner to read terminal content and look for "esc to interrupt"
-final class ClaudeDetector: ObservableObject, Detector {
+final class ClaudeCodeDetector: ObservableObject, Detector {
     @Published private(set) var isActive: Bool = false
 
-    let processType: ProcessType = .claude
+    let processType: ProcessType = .claudeCode
 
     // Consecutive readings required (1 = instant, no delay)
     private let requiredToShow: Int = 1
@@ -31,7 +31,7 @@ final class ClaudeDetector: ObservableObject, Detector {
     private var consecutiveInactiveReadings: Int = 0
 
     // Serial queue ensures checks don't overlap
-    private let checkQueue = DispatchQueue(label: "com.notchification.claude-check", qos: .utility)
+    private let checkQueue = DispatchQueue(label: "com.notchification.claudecode-check", qos: .utility)
 
     // Prevents polls from queuing up if checks take longer than poll interval
     private let checkLock = NSLock()
@@ -41,7 +41,7 @@ final class ClaudeDetector: ObservableObject, Detector {
         set { checkLock.lock(); defer { checkLock.unlock() }; _isCheckInProgress = newValue }
     }
 
-    // Claude-specific patterns (to distinguish from Codex)
+    // Claude CLI-specific patterns (to distinguish from Codex)
     // Claude shows: "✢ Dilly-dallying… (esc to interrupt · thinking)"
     // Codex shows: "• Working (1s • esc to interrupt)"
     //
@@ -67,8 +67,11 @@ final class ClaudeDetector: ObservableObject, Detector {
     // Codex uses bullet point - NOT a Claude spinner
     private let codexBullet: Character = "•"
 
+    // Debug logging toggle
+    private var debug: Bool { DebugSettings.shared.debugClaudeCode }
+
     init() {
-        logger.info("🔶 ClaudeDetector init")
+        logger.info("🔶 ClaudeCodeDetector init")
     }
 
     func reset() {
@@ -85,32 +88,31 @@ final class ClaudeDetector: ObservableObject, Detector {
             guard let self = self else { return }
             defer { self.isCheckInProgress = false }
 
-            let isWorking = self.isClaudeWorking()
-            let debug = DebugSettings.shared.debugClaude
+            let isWorking = self.isClaudeCodeWorking()
 
             DispatchQueue.main.async {
                 if isWorking {
                     self.consecutiveActiveReadings += 1
                     self.consecutiveInactiveReadings = 0
 
-                    if debug {
-                        logger.debug("🔶 Claude active: \(self.consecutiveActiveReadings)/\(self.requiredToShow)")
+                    if self.debug {
+                        logger.debug("🔶 Claude Code active: \(self.consecutiveActiveReadings)/\(self.requiredToShow)")
                     }
 
                     if self.consecutiveActiveReadings >= self.requiredToShow && !self.isActive {
-                        logger.info("🔶 Claude started working")
+                        logger.info("🔶 Claude Code started working")
                         self.isActive = true
                     }
                 } else {
                     self.consecutiveInactiveReadings += 1
                     self.consecutiveActiveReadings = 0
 
-                    if debug {
-                        logger.debug("🔶 Claude inactive: \(self.consecutiveInactiveReadings)/\(self.requiredToHide)")
+                    if self.debug {
+                        logger.debug("🔶 Claude Code inactive: \(self.consecutiveInactiveReadings)/\(self.requiredToHide)")
                     }
 
                     if self.consecutiveInactiveReadings >= self.requiredToHide && self.isActive {
-                        logger.info("🔶 Claude finished working")
+                        logger.info("🔶 Claude Code finished working")
                         self.isActive = false
                     }
                 }
@@ -118,10 +120,8 @@ final class ClaudeDetector: ObservableObject, Detector {
         }
     }
 
-    /// Check if Claude Code is working by scanning terminal apps
-    private func isClaudeWorking() -> Bool {
-        let debug = DebugSettings.shared.debugClaude
-
+    /// Check if Claude Code CLI is working by scanning terminal apps
+    private func isClaudeCodeWorking() -> Bool {
         let scanner = TerminalScanner(
             lineCount: 20,
             scanAllSessions: true,  // Check all sessions (Claude may be in background tab)
@@ -164,7 +164,6 @@ final class ClaudeDetector: ObservableObject, Detector {
     /// Claude thinking shows: "✻ Frosting... (ctrl+c to interrupt • 1m 13s • ↓ 5.1k tokens)"
     /// Codex shows: "• Working (1s • esc to interrupt)"
     private func hasClaudePattern(in output: String, scanner: TerminalScanner) -> Bool {
-        let debug = DebugSettings.shared.debugClaude
         let sessions = scanner.parseSessions(from: output)
         let checkLineCount = 7
 

@@ -90,7 +90,8 @@ struct DebugPanelView: View {
                 Text("Debug Logging")
                     .font(.headline)
 
-                Toggle("Claude", isOn: $debugSettings.debugClaude)
+                Toggle("Claude Code", isOn: $debugSettings.debugClaudeCode)
+                Toggle("Claude App", isOn: $debugSettings.debugClaudeApp)
                 Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
                 Toggle("Xcode", isOn: $debugSettings.debugXcode)
                 Toggle("Finder", isOn: $debugSettings.debugFinder)

@@ -26,11 +26,6 @@ struct SettingsView: View {
                 .tabItem {
                     Label("Detection", systemImage: "eye")
                 }
-
-            ThresholdsSettingsTab()
-                .tabItem {
-                    Label("Thresholds", systemImage: "slider.horizontal.3")
-                }
         }
         .frame(width: 450, height: 380)
         .onAppear {
@@ -332,62 +327,6 @@ struct DetectionSettingsTab: View {
         }
         .formStyle(.grouped)
         .padding()
-    }
-}
-
-// MARK: - Thresholds Tab
-
-struct ThresholdsSettingsTab: View {
-    @ObservedObject var settings = ThresholdSettings.shared
-
-    var body: some View {
-        Form {
-            Section {
-                Text("Adjust when each detector triggers. Lower values = more sensitive.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section("Claude") {
-                ThresholdSlider(label: "Low (idle)", value: $settings.claudeLowThreshold, range: 0...50, defaultValue: ThresholdSettings.defaultClaudeLow)
-                ThresholdSlider(label: "High (active)", value: $settings.claudeHighThreshold, range: 0...100, defaultValue: ThresholdSettings.defaultClaudeHigh)
-            }
-
-            Section("Opencode") {
-                ThresholdSlider(label: "Low (idle)", value: $settings.opencodeLowThreshold, range: 0...20, defaultValue: ThresholdSettings.defaultOpencodeLow)
-                ThresholdSlider(label: "High (active)", value: $settings.opencodeHighThreshold, range: 0...50, defaultValue: ThresholdSettings.defaultOpencodeHigh)
-            }
-
-            Section("Xcode") {
-                ThresholdSlider(label: "Threshold", value: $settings.xcodeThreshold, range: 0...50, defaultValue: ThresholdSettings.defaultXcode)
-            }
-
-            Section {
-                Button("Reset All to Defaults") {
-                    settings.resetToDefaults()
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .padding()
-    }
-}
-
-struct ThresholdSlider: View {
-    let label: String
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let defaultValue: Double
-
-    var body: some View {
-        HStack {
-            Text(label)
-                .frame(width: 100, alignment: .leading)
-            Slider(value: $value, in: range, step: 0.5)
-            Text("\(String(format: "%.1f", value))%")
-                .frame(width: 50)
-                .monospacedDigit()
-        }
     }
 }
 

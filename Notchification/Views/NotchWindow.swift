@@ -32,7 +32,7 @@ final class ConfettiState: ObservableObject {
 
     func trigger(for process: ProcessType) {
         switch process {
-        case .claude: claudeTrigger += 1
+        case .claudeCode, .claudeApp: claudeTrigger += 1
         case .xcode: xcodeTrigger += 1
         case .androidStudio: androidTrigger += 1
         case .finder: finderTrigger += 1
@@ -505,7 +505,7 @@ struct ConfettiOverlayView: View {
             // Confetti emitters positioned at top center
             VStack {
                 ZStack {
-                    ConfettiEmitterView(trigger: $confettiState.claudeTrigger, color: ProcessType.claude.color)
+                    ConfettiEmitterView(trigger: $confettiState.claudeTrigger, color: ProcessType.claudeCode.color)
                     ConfettiEmitterView(trigger: $confettiState.xcodeTrigger, color: ProcessType.xcode.color)
                     ConfettiEmitterView(trigger: $confettiState.androidTrigger, color: ProcessType.androidStudio.color)
                     ConfettiEmitterView(trigger: $confettiState.finderTrigger, color: ProcessType.finder.color)

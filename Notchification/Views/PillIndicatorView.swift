@@ -42,9 +42,9 @@ struct ProcessSegment: View {
 
 #Preview {
     VStack(spacing: 20) {
-        PillIndicatorView(activeProcesses: [.claude])
-        PillIndicatorView(activeProcesses: [.claude, .xcode])
-        PillIndicatorView(activeProcesses: [.claude, .xcode, .androidStudio])
+        PillIndicatorView(activeProcesses: [.claudeCode])
+        PillIndicatorView(activeProcesses: [.claudeCode, .xcode])
+        PillIndicatorView(activeProcesses: [.claudeCode, .xcode, .androidStudio])
     }
     .padding(40)
     .background(Color.black)

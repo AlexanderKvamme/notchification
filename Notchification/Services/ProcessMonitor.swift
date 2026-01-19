@@ -24,7 +24,8 @@ final class ProcessMonitor: ObservableObject {
     private var previouslyActiveDetectors: Set<ProcessType> = []
 
     // All detectors
-    private let claudeDetector = ClaudeDetector()
+    private let claudeCodeDetector = ClaudeCodeDetector()
+    private let claudeAppDetector = ClaudeAppDetector()
     private let androidStudioDetector = AndroidStudioDetector()
     private let xcodeDetector = XcodeDetector()
     private let finderDetector = FinderDetector()
@@ -157,7 +158,8 @@ final class ProcessMonitor: ObservableObject {
         timer = nil
 
         // Reset all detectors
-        claudeDetector.reset()
+        claudeCodeDetector.reset()
+        claudeAppDetector.reset()
         androidStudioDetector.reset()
         xcodeDetector.reset()
         finderDetector.reset()
@@ -181,8 +183,11 @@ final class ProcessMonitor: ObservableObject {
     private func tick() {
 
         // Poll each enabled detector
-        if trackingSettings.trackClaude {
-            claudeDetector.poll()
+        if trackingSettings.trackClaudeCode {
+            claudeCodeDetector.poll()
+        }
+        if trackingSettings.trackClaudeApp {
+            claudeAppDetector.poll()
         }
         if trackingSettings.trackAndroidStudio {
             androidStudioDetector.poll()
@@ -239,7 +244,12 @@ final class ProcessMonitor: ObservableObject {
 
     private func setupBindings() {
         // Listen to detector state changes
-        claudeDetector.$isActive
+        claudeCodeDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        claudeAppDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -336,11 +346,20 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         // Listen to tracking settings changes - reset detector when toggled
-        trackingSettings.$trackClaude
+        trackingSettings.$trackClaudeCode
             .dropFirst()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] enabled in
-                if !enabled { self?.claudeDetector.reset() }
+                if !enabled { self?.claudeCodeDetector.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        trackingSettings.$trackClaudeApp
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.claudeAppDetector.reset() }
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
@@ -503,10 +522,16 @@ final class ProcessMonitor: ObservableObject {
         // Build list of all currently active detectors (regardless of dismissal)
         var currentlyActive: Set<ProcessType> = []
 
-        if trackingSettings.trackClaude && claudeDetector.isActive {
-            currentlyActive.insert(.claude)
-            if DebugSettings.shared.debugClaude {
-                logger.debug("🔶 Claude detector isActive=true, adding to currentlyActive")
+        if trackingSettings.trackClaudeCode && claudeCodeDetector.isActive {
+            currentlyActive.insert(.claudeCode)
+            if DebugSettings.shared.debugClaudeCode {
+                logger.debug("🔶 Claude Code detector isActive=true, adding to currentlyActive")
+            }
+        }
+        if trackingSettings.trackClaudeApp && claudeAppDetector.isActive {
+            currentlyActive.insert(.claudeApp)
+            if DebugSettings.shared.debugClaudeApp {
+                logger.debug("🟠 Claude App detector isActive=true, adding to currentlyActive")
             }
         }
         if trackingSettings.trackAndroidStudio && androidStudioDetector.isActive {
@@ -575,13 +600,13 @@ final class ProcessMonitor: ObservableObject {
         let visibleProcesses = currentlyActive.subtracting(dismissedProcesses)
         activeProcesses = Array(visibleProcesses).sorted { $0.rawValue < $1.rawValue }
 
-        // Debug: Show what's happening with Claude
-        if DebugSettings.shared.debugClaude {
-            if currentlyActive.contains(.claude) {
-                if dismissedProcesses.contains(.claude) {
-                    logger.debug("🔶 Claude is DISMISSED - not showing (will reappear after Claude finishes)")
+        // Debug: Show what's happening with Claude Code
+        if DebugSettings.shared.debugClaudeCode {
+            if currentlyActive.contains(.claudeCode) {
+                if dismissedProcesses.contains(.claudeCode) {
+                    logger.debug("🔶 Claude Code is DISMISSED - not showing (will reappear after Claude finishes)")
                 } else {
-                    logger.debug("🔶 Claude visible in UI, activeProcesses count: \(self.activeProcesses.count)")
+                    logger.debug("🔶 Claude Code visible in UI, activeProcesses count: \(self.activeProcesses.count)")
                 }
             }
         }

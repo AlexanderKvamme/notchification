@@ -865,7 +865,7 @@ struct ProcessLogo: View {
 
     var body: some View {
         switch processType {
-        case .claude:
+        case .claudeCode, .claudeApp:
             ClaudeLogo()
         case .androidStudio:
             AndroidStudioLogo()
@@ -1462,7 +1462,7 @@ struct AnimatedProgressBar: View {
 struct ClaudeLogo: View {
     var body: some View {
         ClaudeLogoShape()
-            .fill(ProcessType.claude.color)
+            .fill(ProcessType.claudeCode.color)
     }
 }
 
@@ -1652,7 +1652,7 @@ struct ClaudeLogoShape: Shape {
 
 #Preview("Single Process") {
     let state = NotchState()
-    state.activeProcesses = [.claude]
+    let _ = { state.activeProcesses = [.claudeCode] }()
     return ZStack(alignment: .top) {
         Color.gray.opacity(0.2)
         NotchView(notchState: state, screenWidth: 400, screenHeight: 300)
@@ -1662,7 +1662,7 @@ struct ClaudeLogoShape: Shape {
 
 #Preview("Multiple Processes") {
     let state = NotchState()
-    state.activeProcesses = [.claude, .androidStudio]
+    let _ = { state.activeProcesses = [.claudeCode, .androidStudio] }()
     return ZStack(alignment: .top) {
         Color.gray.opacity(0.2)
         NotchView(notchState: state, screenWidth: 400, screenHeight: 300)

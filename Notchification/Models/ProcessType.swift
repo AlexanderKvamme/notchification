@@ -6,7 +6,8 @@
 import SwiftUI
 
 enum ProcessType: String, CaseIterable, Identifiable {
-    case claude = "claude"
+    case claudeCode = "claudecode"
+    case claudeApp = "claudeapp"
     case xcode = "xcode"
     case androidStudio = "android"
     case finder = "finder"
@@ -35,7 +36,8 @@ enum ProcessType: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .claude: return "Claude"
+        case .claudeCode: return "Claude Code"
+        case .claudeApp: return "Claude App"
         case .xcode: return "Xcode"
         case .androidStudio: return "Android Studio"
         case .finder: return "Finder"
@@ -59,7 +61,8 @@ enum ProcessType: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .claude: return Color(red: 0.85, green: 0.47, blue: 0.34) // #D97757 Claude orange
+        case .claudeCode: return Color(red: 0.85, green: 0.47, blue: 0.34) // #D97757 Claude orange
+        case .claudeApp: return Color(red: 0.85, green: 0.47, blue: 0.34) // #D97757 Claude orange (same as Code)
         case .xcode: return Color(red: 0.08, green: 0.49, blue: 0.98) // #147EFB Xcode blue
         case .androidStudio: return Color(red: 0.17, green: 0.63, blue: 0.38) // Darker Android green
         case .finder: return Color(red: 0.902, green: 0.910, blue: 0.937) // #e6e8ef Finder gray
@@ -83,7 +86,8 @@ enum ProcessType: String, CaseIterable, Identifiable {
 
     var waveColor: Color {
         switch self {
-        case .claude: return Color(red: 0.95, green: 0.60, blue: 0.48) // Lighter orange
+        case .claudeCode: return Color(red: 0.95, green: 0.60, blue: 0.48) // Lighter orange
+        case .claudeApp: return Color(red: 0.95, green: 0.60, blue: 0.48) // Lighter orange (same as Code)
         case .xcode: return Color(red: 0.30, green: 0.65, blue: 1.0) // Lighter blue
         case .androidStudio: return Color(red: 0.30, green: 0.85, blue: 0.55) // Brighter green
         case .finder: return .white // White wave on gray base
@@ -107,7 +111,8 @@ enum ProcessType: String, CaseIterable, Identifiable {
 
     var grayscalePattern: GrayscalePattern {
         switch self {
-        case .claude: return .solid
+        case .claudeCode: return .solid
+        case .claudeApp: return .solid
         case .xcode: return .horizontalStripes
         case .androidStudio: return .dots
         case .finder: return .diagonalStripes

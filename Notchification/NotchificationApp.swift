@@ -93,7 +93,8 @@ struct DebugMenuView: View {
             Divider()
 
             Text("Debug Logging").font(.caption).foregroundColor(.secondary)
-            Toggle("Claude", isOn: $debugSettings.debugClaude)
+            Toggle("Claude Code", isOn: $debugSettings.debugClaudeCode)
+            Toggle("Claude App", isOn: $debugSettings.debugClaudeApp)
             Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
             Toggle("Xcode", isOn: $debugSettings.debugXcode)
             Toggle("Finder", isOn: $debugSettings.debugFinder)
@@ -145,8 +146,11 @@ struct DebugMenuView: View {
 final class DebugSettings: ObservableObject {
     static let shared = DebugSettings()
 
-    @Published var debugClaude: Bool {
-        didSet { UserDefaults.standard.set(debugClaude, forKey: "debugClaude") }
+    @Published var debugClaudeCode: Bool {
+        didSet { UserDefaults.standard.set(debugClaudeCode, forKey: "debugClaudeCode") }
+    }
+    @Published var debugClaudeApp: Bool {
+        didSet { UserDefaults.standard.set(debugClaudeApp, forKey: "debugClaudeApp") }
     }
     @Published var debugAndroid: Bool {
         didSet { UserDefaults.standard.set(debugAndroid, forKey: "debugAndroid") }
@@ -194,7 +198,8 @@ final class DebugSettings: ObservableObject {
     }
 
     private init() {
-        self.debugClaude = UserDefaults.standard.object(forKey: "debugClaude") as? Bool ?? false
+        self.debugClaudeCode = UserDefaults.standard.object(forKey: "debugClaudeCode") as? Bool ?? false
+        self.debugClaudeApp = UserDefaults.standard.object(forKey: "debugClaudeApp") as? Bool ?? false
         self.debugAndroid = UserDefaults.standard.object(forKey: "debugAndroid") as? Bool ?? true
         self.debugXcode = UserDefaults.standard.object(forKey: "debugXcode") as? Bool ?? true
         self.debugFinder = UserDefaults.standard.object(forKey: "debugFinder") as? Bool ?? true
@@ -215,8 +220,11 @@ final class DebugSettings: ObservableObject {
 final class TrackingSettings: ObservableObject {
     static let shared = TrackingSettings()
 
-    @Published var trackClaude: Bool {
-        didSet { UserDefaults.standard.set(trackClaude, forKey: "trackClaude") }
+    @Published var trackClaudeCode: Bool {
+        didSet { UserDefaults.standard.set(trackClaudeCode, forKey: "trackClaudeCode") }
+    }
+    @Published var trackClaudeApp: Bool {
+        didSet { UserDefaults.standard.set(trackClaudeApp, forKey: "trackClaudeApp") }
     }
     @Published var trackAndroidStudio: Bool {
         didSet { UserDefaults.standard.set(trackAndroidStudio, forKey: "trackAndroidStudio") }
@@ -277,7 +285,8 @@ final class TrackingSettings: ObservableObject {
     }
 
     private init() {
-        self.trackClaude = UserDefaults.standard.object(forKey: "trackClaude") as? Bool ?? false
+        self.trackClaudeCode = UserDefaults.standard.object(forKey: "trackClaudeCode") as? Bool ?? false
+        self.trackClaudeApp = UserDefaults.standard.object(forKey: "trackClaudeApp") as? Bool ?? false
         self.trackAndroidStudio = UserDefaults.standard.object(forKey: "trackAndroidStudio") as? Bool ?? false
         self.trackXcode = UserDefaults.standard.object(forKey: "trackXcode") as? Bool ?? false
         self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? false
@@ -297,55 +306,6 @@ final class TrackingSettings: ObservableObject {
         self.trackCalendar = UserDefaults.standard.object(forKey: "trackCalendar") as? Bool ?? false
         self.confettiEnabled = UserDefaults.standard.object(forKey: "confettiEnabled") as? Bool ?? true
         self.soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
-    }
-}
-
-/// CPU threshold settings - customizable per detector
-final class ThresholdSettings: ObservableObject {
-    static let shared = ThresholdSettings()
-
-    // Claude thresholds (default: LOW 0-10, MED 10-20, HIGH 20+)
-    @Published var claudeLowThreshold: Double {
-        didSet { UserDefaults.standard.set(claudeLowThreshold, forKey: "claudeLowThreshold") }
-    }
-    @Published var claudeHighThreshold: Double {
-        didSet { UserDefaults.standard.set(claudeHighThreshold, forKey: "claudeHighThreshold") }
-    }
-
-    // Opencode thresholds (default: LOW 0-1, MED 1-3, HIGH 3+)
-    @Published var opencodeLowThreshold: Double {
-        didSet { UserDefaults.standard.set(opencodeLowThreshold, forKey: "opencodeLowThreshold") }
-    }
-    @Published var opencodeHighThreshold: Double {
-        didSet { UserDefaults.standard.set(opencodeHighThreshold, forKey: "opencodeHighThreshold") }
-    }
-
-    // Xcode threshold (default: 5%)
-    @Published var xcodeThreshold: Double {
-        didSet { UserDefaults.standard.set(xcodeThreshold, forKey: "xcodeThreshold") }
-    }
-
-    // Default values
-    static let defaultClaudeLow: Double = 10.0
-    static let defaultClaudeHigh: Double = 20.0
-    static let defaultOpencodeLow: Double = 0.5
-    static let defaultOpencodeHigh: Double = 2.0
-    static let defaultXcode: Double = 5.0
-
-    private init() {
-        self.claudeLowThreshold = UserDefaults.standard.object(forKey: "claudeLowThreshold") as? Double ?? Self.defaultClaudeLow
-        self.claudeHighThreshold = UserDefaults.standard.object(forKey: "claudeHighThreshold") as? Double ?? Self.defaultClaudeHigh
-        self.opencodeLowThreshold = UserDefaults.standard.object(forKey: "opencodeLowThreshold") as? Double ?? Self.defaultOpencodeLow
-        self.opencodeHighThreshold = UserDefaults.standard.object(forKey: "opencodeHighThreshold") as? Double ?? Self.defaultOpencodeHigh
-        self.xcodeThreshold = UserDefaults.standard.object(forKey: "xcodeThreshold") as? Double ?? Self.defaultXcode
-    }
-
-    func resetToDefaults() {
-        claudeLowThreshold = Self.defaultClaudeLow
-        claudeHighThreshold = Self.defaultClaudeHigh
-        opencodeLowThreshold = Self.defaultOpencodeLow
-        opencodeHighThreshold = Self.defaultOpencodeHigh
-        xcodeThreshold = Self.defaultXcode
     }
 }
 
@@ -753,7 +713,7 @@ enum MockProcessType: String, CaseIterable {
     var processType: ProcessType? {
         switch self {
         case .none: return nil
-        case .claude: return .claude
+        case .claude: return .claudeCode
         case .android: return .androidStudio
         case .xcode: return .xcode
         case .finder: return .finder
@@ -775,7 +735,7 @@ enum MockProcessType: String, CaseIterable {
 
     /// Returns 5 random process types for demo purposes
     var fiveRandomProcessTypes: [ProcessType] {
-        let allTypes: [ProcessType] = [.claude, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
+        let allTypes: [ProcessType] = [.claudeCode, .claudeApp, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
         return Array(allTypes.shuffled().prefix(5))
     }
 }
@@ -1202,7 +1162,7 @@ final class AppState: ObservableObject {
 
     private func runClaudeAndFinderMock() {
         isMocking = true
-        windowController.update(with: [.claude, .finder])
+        windowController.update(with: [.claudeCode, .finder])
 
         // Keep showing for 10 seconds then hide
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
@@ -1222,7 +1182,7 @@ final class AppState: ObservableObject {
 
     private func runThreeProcessesMock() {
         isMocking = true
-        windowController.update(with: [.claude, .finder, .androidStudio])
+        windowController.update(with: [.claudeCode, .finder, .androidStudio])
 
         // Keep showing for 15 seconds then hide
         DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
@@ -1451,7 +1411,8 @@ struct MenuBarView: View {
                     Spacer()
                     Text("⌘-click to demo").font(.caption2).foregroundColor(.secondary.opacity(0.6))
                 }
-                DemoableToggle(label: "Claude", isOn: $trackingSettings.trackClaude, processType: .claude, appState: appState)
+                DemoableToggle(label: "Claude Code", isOn: $trackingSettings.trackClaudeCode, processType: .claudeCode, appState: appState)
+                DemoableToggle(label: "Claude App", isOn: $trackingSettings.trackClaudeApp, processType: .claudeApp, appState: appState)
                 DemoableToggle(label: "Android Studio", isOn: $trackingSettings.trackAndroidStudio, processType: .androidStudio, appState: appState)
                 DemoableToggle(label: "Xcode", isOn: $trackingSettings.trackXcode, processType: .xcode, appState: appState)
                 DemoableToggle(label: "Finder", isOn: $trackingSettings.trackFinder, processType: .finder, appState: appState)
@@ -1571,9 +1532,17 @@ struct MenuBarView: View {
             }
 
         case .expired:
-            Label("Trial expired", systemImage: "xmark.circle.fill")
-                .font(.caption)
-                .foregroundColor(.red)
+            HStack(spacing: 8) {
+                Label("Trial expired", systemImage: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+
+                Button("Buy") {
+                    NSWorkspace.shared.open(licenseManager.purchaseURL)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
         }
     }
 }
