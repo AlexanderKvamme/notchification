@@ -303,3 +303,78 @@ When Claude detection isn't working:
 4. Check if iTerm2/Terminal is actually running
 5. Look at the actual terminal content being read
 6. Check the permissions output on launch (printed in Xcode console in DEBUG builds)
+
+---
+
+## Release Process
+
+When releasing a new version, follow these steps:
+
+### 1. Update CEO Welcome Message (REQUIRED)
+
+**Before every release**, update the welcome message in `Views/WelcomeMessageView.swift`:
+
+```swift
+static let current = WelcomeMessage(
+    version: "1.0.XX",  // Match the new version
+    title: "Welcome to Notchification 1.0.XX",
+    body: """
+    Your message to users here...
+    """,
+    signoff: "— Alexander"
+)
+```
+
+This message shows **once** when users first launch the new version.
+
+### 2. Bump Version
+
+Update `MARKETING_VERSION` in project.pbxproj (both Debug and Release configs).
+
+### 3. Build Release
+
+```bash
+xcodebuild -scheme Notchification -configuration Release clean build
+```
+
+### 4. Create Signed Zip
+
+```bash
+cd ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release
+zip -r -y Notchification-X.X.XX.zip Notchification.app
+```
+
+### 5. Sign with Sparkle
+
+```bash
+# Find sign_update tool
+find ~/Library/Developer/Xcode/DerivedData -name "sign_update" | head -1
+
+# Sign the zip (outputs edSignature and length)
+/path/to/sign_update Notchification-X.X.XX.zip
+```
+
+### 6. Update appcast.xml
+
+Add new `<item>` at the top with:
+- Version number
+- Publication date
+- EdDSA signature from step 5
+- File length from step 5
+- Release notes
+
+### 7. Upload and Commit
+
+1. Upload zip to `https://featurefest.dev/notchification/`
+2. Copy zip to Dropbox for backup
+3. Commit version bump and appcast.xml
+4. Push to GitHub
+
+### Checklist
+
+- [ ] CEO welcome message updated in WelcomeMessageView.swift
+- [ ] Version bumped
+- [ ] Release built and signed
+- [ ] appcast.xml updated
+- [ ] Zip uploaded to featurefest.dev
+- [ ] Committed and pushed

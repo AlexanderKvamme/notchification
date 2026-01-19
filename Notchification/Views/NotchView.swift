@@ -34,6 +34,7 @@ struct NotchView: View {
     @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
     @State private var isCameraHovered: Bool = false  // Track camera hover for frame expansion
     @State private var morningOverviewMouseEntered: Bool = false  // Track if mouse entered morning overview
+    @State private var welcomeMessageMouseEntered: Bool = false  // Track if mouse entered welcome message
 
     // Confetti is now rendered in a separate ConfettiWindow
     // Triggers are sent to ConfettiState.shared
@@ -175,8 +176,11 @@ struct NotchView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Check for morning overview debug mode first
-            if debugSettings.showMorningOverview {
+            // Check for welcome message debug mode first
+            if debugSettings.showWelcomeMessage {
+                welcomeMessageModeView
+            // Check for morning overview debug mode
+            } else if debugSettings.showMorningOverview {
                 morningOverviewModeView
             } else {
                 switch styleSettings.notchStyle {
@@ -590,6 +594,49 @@ struct NotchView: View {
             .opacity(isExpanded ? 1 : 0)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: notchState.activeProcesses.count)
+        }
+    }
+
+    // MARK: - Welcome Message Mode
+
+    /// Welcome message mode: Shows the CEO's "What's New" message
+    /// Uses the same NotchShape as normal mode - just with different height
+    @ViewBuilder
+    private var welcomeMessageModeView: some View {
+        let message = WelcomeMessage.current
+        let debugColors = debugSettings.debugViewColors
+        let contentWidth: CGFloat = 340
+
+        // NotchShape background
+        NotchShape()
+            .fill(debugColors ? Color.red : notchBlack)
+            .frame(width: contentWidth + 40, height: effectiveTopPadding + WelcomeMessageContent.estimatedHeight)
+            .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+
+        // Content positioned below the physical notch
+        WelcomeMessageContent(
+            message: message,
+            onDismiss: {
+                WelcomeMessageManager.shared.markAsSeen()
+                DebugSettings.shared.showWelcomeMessage = false
+            }
+        )
+        .frame(width: contentWidth)
+        .padding(.horizontal, 20)
+        .offset(y: effectiveTopPadding)
+        .opacity(isExpanded ? 1 : 0)
+        .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
+        .onHover { hovering in
+            if hovering {
+                welcomeMessageMouseEntered = true
+            } else if welcomeMessageMouseEntered {
+                // Mouse left after having entered - dismiss
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    WelcomeMessageManager.shared.markAsSeen()
+                    DebugSettings.shared.showWelcomeMessage = false
+                    welcomeMessageMouseEntered = false
+                }
+            }
         }
     }
 

@@ -114,6 +114,14 @@ struct DebugMenuView: View {
 
             Divider()
 
+            Text("Welcome Message").font(.caption).foregroundColor(.secondary)
+            Toggle("Show Every Launch", isOn: $debugSettings.alwaysShowWelcomeMessage)
+            Button("Show Now") {
+                WelcomeMessageWindowController.shared.show()
+            }
+
+            Divider()
+
             Text("Calendar").font(.caption).foregroundColor(.secondary)
             Button("Show Calendar Onboarding") {
                 CalendarOnboardingWindowController.shared.resetOnboarding()
@@ -196,6 +204,14 @@ final class DebugSettings: ObservableObject {
     @Published var debugViewColors: Bool {
         didSet { UserDefaults.standard.set(debugViewColors, forKey: "debugViewColors") }
     }
+    /// When true, shows the welcome message on every launch (for design testing)
+    @Published var alwaysShowWelcomeMessage: Bool {
+        didSet { UserDefaults.standard.set(alwaysShowWelcomeMessage, forKey: "alwaysShowWelcomeMessage") }
+    }
+    /// When true, shows the welcome message in the notch (set by WelcomeMessageWindowController)
+    @Published var showWelcomeMessage: Bool {
+        didSet { UserDefaults.standard.set(showWelcomeMessage, forKey: "showWelcomeMessage") }
+    }
 
     private init() {
         self.debugClaudeCode = UserDefaults.standard.object(forKey: "debugClaudeCode") as? Bool ?? false
@@ -213,6 +229,8 @@ final class DebugSettings: ObservableObject {
         self.showMorningOverview = UserDefaults.standard.object(forKey: "showMorningOverview") as? Bool ?? false
         self.claudeScanAllSessions = UserDefaults.standard.object(forKey: "claudeScanAllSessions") as? Bool ?? false
         self.debugViewColors = UserDefaults.standard.object(forKey: "debugViewColors") as? Bool ?? false
+        self.alwaysShowWelcomeMessage = UserDefaults.standard.object(forKey: "alwaysShowWelcomeMessage") as? Bool ?? false
+        self.showWelcomeMessage = UserDefaults.standard.object(forKey: "showWelcomeMessage") as? Bool ?? false
     }
 }
 
@@ -957,11 +975,33 @@ final class AppState: ObservableObject {
     private func startMonitoringIfLicensed() {
         // Always start monitoring - we show a nag message if expired
         startMonitoring()
+
+        // Show welcome message if this is a new version (with slight delay for app to settle)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            WelcomeMessageWindowController.shared.showIfNeeded()
+        }
     }
 
     private var previewTimer: Timer?
 
     private func setupBindings() {
+        // Observe welcome message debug flag
+        DebugSettings.shared.$showWelcomeMessage
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] showMessage in
+                guard let self = self else { return }
+                if showMessage {
+                    // Show window for welcome message (empty processes, view checks flag)
+                    self.windowController.update(with: [.preview])  // Use preview as a trigger
+                } else {
+                    // Restore normal state
+                    let processes = self.processMonitor.activeProcesses
+                    self.windowController.update(with: processes)
+                }
+            }
+            .store(in: &cancellables)
+
         // Observe morning overview debug flag
         // Use dropFirst() to prevent firing on launch with the stored value
         DebugSettings.shared.$showMorningOverview
@@ -984,7 +1024,8 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] processes in
                 guard let self = self else { return }
-                // Skip updates when morning overview is showing
+                // Skip updates when welcome message or morning overview is showing
+                guard !DebugSettings.shared.showWelcomeMessage else { return }
                 guard !DebugSettings.shared.showMorningOverview else { return }
                 print("📡 App received activeProcesses update: \(processes.map { $0.displayName })")
                 #if DEBUG
