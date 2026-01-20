@@ -3,20 +3,21 @@
     <channel>
         <title>Notchification</title>
         <item>
-            <title>1.0.29</title>
-            <pubDate>Mon, 20 Jan 2026 16:20:00 +0100</pubDate>
-            <sparkle:version>29</sparkle:version>
-            <sparkle:shortVersionString>1.0.29</sparkle:shortVersionString>
+            <title>1.0.30</title>
+            <pubDate>Mon, 20 Jan 2026 17:20:00 +0100</pubDate>
+            <sparkle:version>30</sparkle:version>
+            <sparkle:shortVersionString>1.0.30</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure
-                url="https://featurefest.dev/notchification/Notchification-1.0.29.zip"
-                sparkle:edSignature="WNgOpN68TOn0AdBGebV0UO0vaOy7IFAHqQ08t44jjJ+Q60L7uaiKxGDX1e4qzu9hPxyTxVpUQ5y0ew+Jzcb4Cg=="
-                length="3160975"
+                url="https://featurefest.dev/notchification/Notchification-1.0.30.zip"
+                sparkle:edSignature="YE2GUyYMhXtEmY1HBVcLR+MvaY724ATLMDWf34cu0cglFapBBigdD65wzuR0bhvedb/2kN1YTrSkVVvz212YCw=="
+                length="3171335"
                 type="application/octet-stream" />
             <description><![CDATA[
-                <h2>What's New in 1.0.29</h2>
+                <h2>What's New in 1.0.30</h2>
                 <ul>
-                    <li>Bundled Fira Code fonts for consistent typography</li>
+                    <li>Redesigned menu bar dropdown with icons and hover highlights</li>
+                    <li>Better spacing and visual polish throughout the menu</li>
                 </ul>
             ]]></description>
         </item>

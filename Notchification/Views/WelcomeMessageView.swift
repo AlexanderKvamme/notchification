@@ -17,12 +17,12 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.29",
+        version: "1.0.30",
         title: "What's New",
         body: """
         Hello Notchification family!
 
-        This update brings a cleaner menu and redesigned settings. I've also fixed detection issues with Xcode and Claude Code.
+        The menu bar dropdown got a fresh coat of paint! Menu items now have icons, better spacing, and proper hover highlights.
 
         If you have feedback, click "Send Feedback" in the menu.
         """,

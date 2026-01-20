@@ -15,6 +15,12 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
         // Only allow updates for licensed users
         return LicenseManager.shared.state == .licensed
     }
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        DispatchQueue.main.async {
+            AppState.shared.updateAvailable = true
+        }
+    }
 }
 
 /// App delegate to handle single-instance enforcement
@@ -36,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct NotchificationApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self)
     var appDelegate
-    @StateObject private var appState = AppState()
+    @ObservedObject private var appState = AppState.shared
     private let updaterDelegate = UpdaterDelegate()
     private var updaterController: SPUStandardUpdaterController
 
@@ -89,33 +95,65 @@ struct DebugMenuView: View {
             }
             .labelsHidden()
             Toggle("Repeat", isOn: $appState.mockRepeat)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
 
             Divider()
 
             Text("Debug Logging").font(.caption).foregroundColor(.secondary)
             Toggle("Claude Code", isOn: $debugSettings.debugClaudeCode)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Claude App", isOn: $debugSettings.debugClaudeApp)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Android Studio", isOn: $debugSettings.debugAndroid)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Xcode", isOn: $debugSettings.debugXcode)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Finder", isOn: $debugSettings.debugFinder)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Opencode", isOn: $debugSettings.debugOpencode)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Codex", isOn: $debugSettings.debugCodex)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Automator", isOn: $debugSettings.debugAutomator)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Downloads", isOn: $debugSettings.debugDownloads)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("DaVinci Resolve", isOn: $debugSettings.debugDaVinciResolve)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Teams", isOn: $debugSettings.debugTeams)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Calendar", isOn: $debugSettings.debugCalendar)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
 
             Divider()
 
             Text("View Debug").font(.caption).foregroundColor(.secondary)
             Toggle("Show View Colors", isOn: $debugSettings.debugViewColors)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Show Morning Overview", isOn: $debugSettings.showMorningOverview)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
 
             Divider()
 
             Text("Welcome Message").font(.caption).foregroundColor(.secondary)
             Toggle("Show Every Launch", isOn: $debugSettings.alwaysShowWelcomeMessage)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Button("Show Now") {
                 WelcomeMessageWindowController.shared.show()
             }
@@ -912,7 +950,9 @@ enum PermissionsChecker {
 
 /// Main app state that coordinates monitoring and UI
 final class AppState: ObservableObject {
+    static let shared = AppState()
     @Published var isMonitoring: Bool = true
+    @Published var updateAvailable: Bool = false
 
     #if DEBUG
     @Published var isMocking: Bool = false
@@ -1436,6 +1476,42 @@ private func triggerCameraPermissionPrompt() {
     }
 }
 
+/// Menu item button with icon and hover highlight
+struct MenuItemButton: View {
+    let label: String
+    let icon: String
+    let action: () -> Void
+    var shortcut: String? = nil
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .frame(width: 16)
+                Text(label)
+                Spacer()
+                if let shortcut = shortcut {
+                    Text(shortcut)
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isHovered ? Color.accentColor : Color.clear)
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
 /// Toggle that supports ⌘-click to demo the feature
 struct DemoableToggle: View {
     let label: String
@@ -1477,58 +1553,81 @@ struct MenuBarView: View {
     @ObservedObject var licenseManager = LicenseManager.shared
 
     var body: some View {
-        VStack(alignment: .leading) {
-            // Show calendar button at top if calendar tracking is enabled
-            if trackingSettings.trackCalendar {
-                Button("Show Today's Calendar") {
-                    DebugSettings.shared.showMorningOverview = true
-                }
-
-                Divider()
-            }
-
+        VStack(alignment: .leading, spacing: 2) {
             // License status
             licenseStatusView
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+
+            // Show calendar button at top if calendar tracking is enabled
+            if trackingSettings.trackCalendar {
+                MenuItemButton(label: "Show Today's Calendar", icon: "calendar") {
+                    DebugSettings.shared.showMorningOverview = true
+                }
+            }
 
             Divider()
+                .padding(.vertical, 4)
 
-            Toggle("Enabled", isOn: Binding(
-                get: { appState.isMonitoring },
-                set: { _ in appState.toggleMonitoring() }
-            ))
-            .toggleStyle(.switch)
-            .padding(.trailing, 8)
+            HStack {
+                Text("Enabled")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Toggle("", isOn: Binding(
+                    get: { appState.isMonitoring },
+                    set: { _ in appState.toggleMonitoring() }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
 
             // Recent apps section (only show if there are recently used apps)
             if !trackingSettings.recentlyUsedApps.isEmpty {
                 Divider()
+                    .padding(.vertical, 4)
 
                 Text("Recent")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
 
                 ForEach(trackingSettings.recentlyUsedApps, id: \.self) { processType in
-                    Toggle(processType.displayName, isOn: trackingSettings.trackingBinding(for: processType))
-                        .toggleStyle(.switch)
-                        .padding(.trailing, 8)
+                    HStack {
+                        Text(processType.displayName)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Toggle("", isOn: trackingSettings.trackingBinding(for: processType))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                 }
                 .disabled(!appState.isMonitoring)
             }
 
             Divider()
+                .padding(.vertical, 4)
 
-            Button("Settings...") {
+            MenuItemButton(label: "Settings...", icon: "gearshape", shortcut: "⌘,") {
                 SettingsWindowController.shared.showSettings()
             }
-            .keyboardShortcut(",")
 
-            Button("Check for Updates...") {
-                updater.checkForUpdates()
+            HStack(spacing: 4) {
+                MenuItemButton(label: "Check for Updates...", icon: "arrow.clockwise") {
+                    updater.checkForUpdates()
+                }
+                if appState.updateAvailable {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 8, height: 8)
+                }
             }
 
             Divider()
+                .padding(.vertical, 4)
 
-            Button("Send Feedback") {
+            MenuItemButton(label: "Send Feedback", icon: "envelope") {
                 let subject = "Notchification Feedback"
                 let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject
                 if let url = URL(string: "mailto:alexanderkvamme@gmail.com?subject=\(encodedSubject)") {
@@ -1536,17 +1635,17 @@ struct MenuBarView: View {
                 }
             }
 
-            Button("Quit") {
+            MenuItemButton(label: "Quit", icon: "xmark.circle", shortcut: "⌘Q") {
                 NSApplication.shared.terminate(nil)
             }
-            .keyboardShortcut("q")
 
             Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.top, 4)
         }
-        .padding(.leading, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
