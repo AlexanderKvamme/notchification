@@ -17,7 +17,7 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.28",
+        version: "1.0.29",
         title: "What's New",
         body: """
         Hello Notchification family!
