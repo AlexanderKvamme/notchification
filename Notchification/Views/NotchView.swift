@@ -298,6 +298,13 @@ struct NotchView: View {
                 isExpanded = true
             }
         }
+        .onChange(of: debugSettings.showMorningOverview) { _, showOverview in
+            if showOverview {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)) {
+                    isExpanded = true
+                }
+            }
+        }
         .onAppear {
             previousProcesses = Set(notchState.activeProcesses)
             if !notchState.activeProcesses.isEmpty {

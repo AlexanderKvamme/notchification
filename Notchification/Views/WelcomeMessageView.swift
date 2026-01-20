@@ -17,12 +17,12 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.30",
+        version: "1.0.31",
         title: "What's New",
         body: """
         Hello Notchification family!
 
-        The menu bar dropdown got a fresh coat of paint! Menu items now have icons, better spacing, and proper hover highlights.
+        Fixed: "Show Today's Calendar" button now works reliably.
 
         If you have feedback, click "Send Feedback" in the menu.
         """,
