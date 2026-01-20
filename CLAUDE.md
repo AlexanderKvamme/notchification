@@ -365,10 +365,15 @@ Add new `<item>` at the top with:
 
 ### 7. Upload and Commit
 
-1. Upload zip to `https://featurefest.dev/notchification/`
-2. Copy zip to Dropbox for backup
-3. Commit version bump and appcast.xml
-4. Push to GitHub
+1. Copy zip to the featurefest website folder:
+   ```bash
+   cp ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release/Notchification-X.X.XX.zip \
+      ~/Documents/workspaces/code/web/featurefest/notchification/
+   ```
+2. Deploy featurefest (the zip is served from `https://featurefest.dev/notchification/`)
+3. Copy zip to Dropbox for backup
+4. Commit version bump and appcast.xml
+5. Push to GitHub
 
 ### Checklist
 
@@ -376,5 +381,6 @@ Add new `<item>` at the top with:
 - [ ] Version bumped
 - [ ] Release built and signed
 - [ ] appcast.xml updated
-- [ ] Zip uploaded to featurefest.dev
+- [ ] Zip copied to `~/Documents/workspaces/code/web/featurefest/notchification/`
+- [ ] Featurefest deployed
 - [ ] Committed and pushed
