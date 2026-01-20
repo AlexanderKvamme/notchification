@@ -17,14 +17,12 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.31",
+        version: "1.0.32",
         title: "What's New",
         body: """
-        Hello Notchification family!
+        Maintenance release to restore automatic updates.
 
-        Fixed: "Show Today's Calendar" button now works reliably.
-
-        If you have feedback, click "Send Feedback" in the menu.
+        Thanks for using Notchification!
         """,
         signoff: "— Alexander"
     )

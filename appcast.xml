@@ -3,6 +3,25 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.32</title>
+            <pubDate>Mon, 20 Jan 2026 19:30:00 +0100</pubDate>
+            <sparkle:version>32</sparkle:version>
+            <sparkle:shortVersionString>1.0.32</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.32.zip"
+                sparkle:edSignature="DBKMSP5SNmKjfV5RU5AQvexZIXAwZDv+cbe8EKfKjAWNVER1tM1p+VYHngUq2bMqTPuVLi2V0YHEi78kNKUsDA=="
+                length="3171676"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.32</h2>
+                <ul>
+                    <li>Maintenance release to restore automatic updates</li>
+                    <li>Fixed: "Show Today's Calendar" button now works reliably</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.30</title>
             <pubDate>Mon, 20 Jan 2026 17:20:00 +0100</pubDate>
             <sparkle:version>30</sparkle:version>
