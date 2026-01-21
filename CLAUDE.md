@@ -354,33 +354,48 @@ find ~/Library/Developer/Xcode/DerivedData -name "sign_update" | head -1
 /path/to/sign_update Notchification-X.X.XX.zip
 ```
 
-### 6. Update appcast.xml
+### 6. Update BOTH appcast.xml files
 
-Add new `<item>` at the top with:
+**IMPORTANT**: There are TWO appcast.xml files that must be updated:
+
+1. **Notchification repo** (`./appcast.xml`) - for reference/backup
+2. **Featurefest folder** (`~/Documents/workspaces/code/web/featurefest/notchification/appcast.xml`) - **THIS IS THE ONE SPARKLE READS**
+
+The featurefest appcast.xml is served at `https://featurefest.dev/notchification/appcast.xml` and is what the app actually checks for updates. If you only update the repo's appcast.xml, users won't see the update!
+
+Add new `<item>` at the top of BOTH files with:
 - Version number
 - Publication date
 - EdDSA signature from step 5
 - File length from step 5
 - Release notes
 
-### 7. Upload and Commit
+### 7. Upload and Deploy
 
 1. Copy zip to the featurefest website folder:
    ```bash
    cp ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release/Notchification-X.X.XX.zip \
       ~/Documents/workspaces/code/web/featurefest/notchification/
    ```
-2. Deploy featurefest (the zip is served from `https://featurefest.dev/notchification/`)
-3. Copy zip to Dropbox for backup
-4. Commit version bump and appcast.xml
-5. Push to GitHub
+2. Deploy featurefest:
+   ```bash
+   cd ~/Documents/workspaces/code/web/featurefest && firebase deploy --only hosting
+   ```
+3. Verify the update is live:
+   ```bash
+   curl -s "https://featurefest.dev/notchification/appcast.xml" | head -10
+   ```
+4. Copy zip to Dropbox for backup
+5. Commit version bump and appcast.xml in Notchification repo
+6. Push to GitHub
 
 ### Checklist
 
 - [ ] CEO welcome message updated in WelcomeMessageView.swift
 - [ ] Version bumped
 - [ ] Release built and signed
-- [ ] appcast.xml updated
+- [ ] **BOTH** appcast.xml files updated (repo AND featurefest)
 - [ ] Zip copied to `~/Documents/workspaces/code/web/featurefest/notchification/`
-- [ ] Featurefest deployed
+- [ ] Featurefest deployed with `firebase deploy --only hosting`
+- [ ] Verified appcast.xml is live with curl
 - [ ] Committed and pushed
