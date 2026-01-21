@@ -3,6 +3,24 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.34</title>
+            <pubDate>Tue, 21 Jan 2026 13:00:00 +0100</pubDate>
+            <sparkle:version>34</sparkle:version>
+            <sparkle:shortVersionString>1.0.34</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.34.zip"
+                sparkle:edSignature="hW7a+2j5li4fXMTBQp70sROZWScTitl//5IVnYYJmfcYFLvr8kT/G+0j9X43o+6ZbD4TSueSGFzX0Xa/HME/Cw=="
+                length="3175912"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.34</h2>
+                <ul>
+                    <li>Fixed: Sparkle update signature verification</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.33</title>
             <pubDate>Tue, 21 Jan 2026 12:00:00 +0100</pubDate>
             <sparkle:version>33</sparkle:version>

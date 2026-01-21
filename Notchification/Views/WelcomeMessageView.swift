@@ -17,7 +17,7 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.33",
+        version: "1.0.34",
         title: "What's New",
         body: """
         Hello Notification Family!
