@@ -542,7 +542,11 @@ final class StyleSettings: ObservableObject {
             if let screen = externalScreen {
                 return [screen]
             }
-            return []  // No external display connected
+            // Fallback to built-in display when no external connected
+            if let screen = builtInScreen {
+                return [screen]
+            }
+            return NSScreen.screens.isEmpty ? [] : [NSScreen.screens[0]]
         case .both:
             return NSScreen.screens
         }
@@ -1560,10 +1564,10 @@ struct MenuBarView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
 
-            // Show calendar button at top if calendar tracking is enabled
+            // Toggle calendar button at top if calendar tracking is enabled
             if trackingSettings.trackCalendar {
-                MenuItemButton(label: "Show Today's Calendar", icon: "calendar") {
-                    DebugSettings.shared.showMorningOverview = true
+                MenuItemButton(label: "Today's Calendar", icon: "calendar") {
+                    DebugSettings.shared.showMorningOverview.toggle()
                 }
             }
 

@@ -17,12 +17,12 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.34",
+        version: "1.0.35",
         title: "What's New",
         body: """
         Hello Notification Family!
 
-        I hope you enjoy this brand new version of Notchification. We got a bunch of fixes, especially regarding the new cool calendar overview.
+        Quick update: The notch now shows on your laptop when no external display is connected. Also, the calendar button in the menu now toggles on/off.
 
         Have a good one, fellas.
         """,
