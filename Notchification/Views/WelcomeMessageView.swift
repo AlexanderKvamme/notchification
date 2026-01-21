@@ -17,12 +17,14 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.32",
+        version: "1.0.33",
         title: "What's New",
         body: """
-        Maintenance release to restore automatic updates.
+        Hello Notification Family!
 
-        Thanks for using Notchification!
+        I hope you enjoy this brand new version of Notchification. We got a bunch of fixes, especially regarding the new cool calendar overview.
+
+        Have a good one, fellas.
         """,
         signoff: "— Alexander"
     )
