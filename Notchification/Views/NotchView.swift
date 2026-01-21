@@ -35,6 +35,7 @@ struct NotchView: View {
     @State private var isCameraHovered: Bool = false  // Track camera hover for frame expansion
     @State private var morningOverviewMouseEntered: Bool = false  // Track if mouse entered morning overview
     @State private var welcomeMessageMouseEntered: Bool = false  // Track if mouse entered welcome message
+    @State private var welcomeMessageContentHeight: CGFloat = 200  // Dynamic height for welcome message
 
     // Confetti is now rendered in a separate ConfettiWindow
     // Triggers are sent to ConfettiState.shared
@@ -614,10 +615,10 @@ struct NotchView: View {
         let debugColors = debugSettings.debugViewColors
         let contentWidth: CGFloat = 340
 
-        // NotchShape background
+        // NotchShape background - uses dynamic height
         NotchShape()
             .fill(debugColors ? Color.red : notchBlack)
-            .frame(width: contentWidth + 40, height: effectiveTopPadding + WelcomeMessageContent.estimatedHeight)
+            .frame(width: contentWidth + 40, height: effectiveTopPadding + welcomeMessageContentHeight)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
 
         // Content positioned below the physical notch
@@ -630,6 +631,14 @@ struct NotchView: View {
         )
         .frame(width: contentWidth)
         .padding(.horizontal, 20)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: WelcomeMessageHeightKey.self, value: geo.size.height)
+            }
+        )
+        .onPreferenceChange(WelcomeMessageHeightKey.self) { height in
+            welcomeMessageContentHeight = height
+        }
         .offset(y: effectiveTopPadding)
         .opacity(isExpanded ? 1 : 0)
         .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
@@ -1699,6 +1708,16 @@ struct ClaudeLogoShape: Shape {
 
     private func p(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) -> CGPoint {
         CGPoint(x: x * s, y: y * s)
+    }
+}
+
+// MARK: - Preference Keys
+
+/// Preference key for measuring welcome message content height
+struct WelcomeMessageHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 200
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

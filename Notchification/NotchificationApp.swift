@@ -8,6 +8,7 @@ import Combine
 import Sparkle
 import ApplicationServices  // For AXIsProcessTrusted()
 import AVFoundation  // For camera permission
+import EventKit  // For calendar permission
 
 /// Sparkle delegate that gates updates to licensed users only
 final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {

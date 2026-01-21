@@ -184,6 +184,34 @@ struct CalendarSettingsTab: View {
 
     var body: some View {
         Form {
+            // Calendar permission status
+            Section {
+                HStack(spacing: 10) {
+                    Image(systemName: calendarStatus == .authorized ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                        .font(.title2)
+                        .foregroundColor(calendarStatus == .authorized ? .green : .orange)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(calendarStatus == .authorized ? "Calendar Access Enabled" : "Calendar Access Required")
+                            .font(.headline)
+                        Text(calendarStatus == .authorized
+                            ? "Calendar reminders are fully functional"
+                            : "Enable access to show meeting reminders")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    if calendarStatus != .authorized {
+                        Button("Enable Access") {
+                            handleCalendarPermission()
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+
             Section("Calendar Reminders") {
                 Toggle("Enable", isOn: $trackingSettings.trackCalendar)
                     .onChange(of: trackingSettings.trackCalendar) { _, enabled in
@@ -194,22 +222,6 @@ struct CalendarSettingsTab: View {
                 Text("Show a reminder in the notch before meetings start. Reads from macOS Calendar.app (syncs with Outlook, iCloud, Google, etc).")
                     .font(.caption)
                     .foregroundColor(.secondary)
-
-                if calendarStatus == .denied || calendarStatus == .restricted {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text("Calendar access denied")
-                            .font(.caption)
-                        Spacer()
-                        Button("Open Settings") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        .font(.caption)
-                    }
-                }
 
                 if trackingSettings.trackCalendar && calendarStatus == .authorized {
                     Text("Remind me:")

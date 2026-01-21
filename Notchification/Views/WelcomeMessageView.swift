@@ -103,7 +103,9 @@ struct WelcomeMessageContent: View {
             .foregroundColor(.white)
             .padding(.top, -15)
             .padding(.leading, 5)
+            .padding(.bottom, 20)
         }
+        .fixedSize(horizontal: false, vertical: true)
         .scaleEffect(isHovering ? 1.01 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isHovering)
         .contentShape(Rectangle())
@@ -144,12 +146,6 @@ struct WelcomeMessageContent: View {
                 opacityO = 0.5
             }
         }
-    }
-
-    /// Approximate height for layout calculations
-    static var estimatedHeight: CGFloat {
-        // Title: ~22, Body: ~120, Signature: ~40, CEO: ~20, Spacing: ~64, Bottom padding: ~50
-        return 320
     }
 }
 
