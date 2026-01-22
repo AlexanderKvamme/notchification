@@ -10,8 +10,8 @@
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure
                 url="https://featurefest.dev/notchification/Notchification-1.0.36.zip"
-                sparkle:edSignature="lJMDh9czjUVUg4ZdQt473V7zkAgSSkDrEk6FoBZMSG/OT6e/o8YCBR3hbrrPJU3iEvaGnshrUfknzOKTmcYqBg=="
-                length="3181223"
+                sparkle:edSignature="V1UAno2JdmuG7UCO28Stxna0yHesP5EIUZ89Fuospzx4r/X+taQy5B05UzQeoiifGFdFVpQd6VZpyvIhh8cSBA=="
+                length="3000137"
                 type="application/octet-stream" />
             <description><![CDATA[
                 <h2>What's New in 1.0.36</h2>

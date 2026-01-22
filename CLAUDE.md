@@ -331,16 +331,49 @@ This message shows **once** when users first launch the new version.
 
 Update `MARKETING_VERSION` in project.pbxproj (both Debug and Release configs).
 
-### 3. Build Release
+### 3. Archive and Export
+
+**IMPORTANT**: You must use `archive` + `exportArchive` (not just `build`) for proper code signing and notarization.
 
 ```bash
-xcodebuild -scheme Notchification -configuration Release clean build
+# Archive the app
+xcodebuild -scheme Notchification -configuration Release -archivePath ./build/Notchification.xcarchive archive
+
+# Create export options plist (only needed once)
+cat > /tmp/export-options.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>developer-id</string>
+    <key>teamID</key>
+    <string>52VSB9N5CT</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>Developer ID Application</string>
+</dict>
+</plist>
+EOF
+
+# Export with proper signing (includes timestamps required for notarization)
+xcodebuild -exportArchive -archivePath ./build/Notchification.xcarchive -exportPath ./build/export -exportOptionsPlist /tmp/export-options.plist
 ```
 
-### 4. Create Signed Zip
+### 4. Notarize
 
 ```bash
-cd ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release
+# Submit for notarization (requires keychain profile "notarytool" to be set up)
+cd ./build/export
+zip -r -y Notchification-X.X.XX.zip Notchification.app
+xcrun notarytool submit Notchification-X.X.XX.zip --keychain-profile "notarytool" --wait
+
+# Staple the ticket to the app
+xcrun stapler staple Notchification.app
+
+# Re-create zip with stapled app
+rm Notchification-X.X.XX.zip
 zip -r -y Notchification-X.X.XX.zip Notchification.app
 ```
 
@@ -374,7 +407,7 @@ Add new `<item>` at the top of BOTH files with:
 
 1. Copy zip to the featurefest website folder:
    ```bash
-   cp ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release/Notchification-X.X.XX.zip \
+   cp ./build/export/Notchification-X.X.XX.zip \
       ~/Documents/workspaces/code/web/featurefest/notchification/
    ```
 2. Deploy featurefest:
@@ -388,7 +421,7 @@ Add new `<item>` at the top of BOTH files with:
 4. Update homeofficesinternational (public download site):
    ```bash
    # Copy new zip
-   cp ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release/Notchification-X.X.XX.zip \
+   cp ./build/export/Notchification-X.X.XX.zip \
       ~/Documents/workspaces/code/web/homeofficesinternational/notchification/
 
    # Update download links in index.html (replace old version with new)
@@ -409,7 +442,9 @@ Add new `<item>` at the top of BOTH files with:
 
 - [ ] CEO welcome message updated in WelcomeMessageView.swift
 - [ ] Version bumped
-- [ ] Release built and signed
+- [ ] Archived and exported with `xcodebuild -archivePath` and `-exportArchive`
+- [ ] Notarized with `xcrun notarytool submit` and stapled with `xcrun stapler staple`
+- [ ] Zip created and signed with Sparkle
 - [ ] **BOTH** appcast.xml files updated (repo AND featurefest)
 - [ ] Zip copied to `~/Documents/workspaces/code/web/featurefest/notchification/`
 - [ ] Featurefest deployed with `firebase deploy --only hosting`
