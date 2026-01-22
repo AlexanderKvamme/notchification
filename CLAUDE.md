@@ -385,19 +385,27 @@ Add new `<item>` at the top of BOTH files with:
    ```bash
    curl -s "https://featurefest.dev/notchification/appcast.xml" | head -10
    ```
-4. Copy zip to homeofficesinternational (public download site):
+4. Update homeofficesinternational (public download site):
    ```bash
+   # Copy new zip
    cp ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release/Notchification-X.X.XX.zip \
       ~/Documents/workspaces/code/web/homeofficesinternational/notchification/
+
+   # Update download links in index.html (replace old version with new)
+   sed -i '' 's/Notchification-X.X.OLD.zip/Notchification-X.X.XX.zip/g' \
+      ~/Documents/workspaces/code/web/homeofficesinternational/notchification/index.html
+
+   # Remove old zip, add new zip and updated html, commit and push
+   cd ~/Documents/workspaces/code/web/homeofficesinternational
+   rm notchification/Notchification-X.X.OLD.zip
+   git add notchification/
+   git commit -m "Update Notchification to vX.X.XX"
+   git push
    ```
-5. Deploy homeofficesinternational:
-   ```bash
-   cd ~/Documents/workspaces/code/web/homeofficesinternational && netlify deploy --prod --dir .
-   ```
-   Or just commit and push to GitHub (auto-deploys via Netlify).
-6. Copy zip to Dropbox for backup
-7. Commit version bump and appcast.xml in Notchification repo
-8. Push to GitHub
+   Netlify auto-deploys when you push to GitHub.
+5. Copy zip to Dropbox for backup
+6. Commit version bump and appcast.xml in Notchification repo
+7. Push to GitHub
 
 ### Checklist
 
@@ -408,6 +416,6 @@ Add new `<item>` at the top of BOTH files with:
 - [ ] Zip copied to `~/Documents/workspaces/code/web/featurefest/notchification/`
 - [ ] Featurefest deployed with `firebase deploy --only hosting`
 - [ ] Verified appcast.xml is live with curl
-- [ ] Zip copied to `~/Documents/workspaces/code/web/homeofficesinternational/notchification/`
-- [ ] Homeofficesinternational deployed (Netlify CLI or GitHub push)
+- [ ] Homeofficesinternational updated (zip, index.html download links, old zip removed)
+- [ ] Homeofficesinternational committed and pushed (auto-deploys via Netlify)
 - [ ] Committed and pushed
