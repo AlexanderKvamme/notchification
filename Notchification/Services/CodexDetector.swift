@@ -30,6 +30,10 @@ final class CodexDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Throttling to reduce power usage (AppleScript is expensive)
+    private var pollCount: Int = 0
+    private let throttleInterval: Int = 3
+
     // Serial queue ensures checks don't overlap
     private let checkQueue = DispatchQueue(label: "com.notchification.codex-check", qos: .utility)
 
@@ -40,10 +44,18 @@ final class CodexDetector: ObservableObject, Detector {
     func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
+        pollCount = 0
         isActive = false
     }
 
     func poll() {
+        pollCount += 1
+
+        // Throttle when idle to save power (AppleScript is expensive)
+        if !isActive && pollCount % throttleInterval != 0 {
+            return
+        }
+
         checkQueue.async { [weak self] in
             guard let self = self else { return }
 

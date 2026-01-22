@@ -30,6 +30,12 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Throttling to reduce power usage
+    // When idle: check every 3rd poll (every ~9s at 3s polling interval)
+    // When active: check every poll (every ~3s) for quick finish detection
+    private var pollCount: Int = 0
+    private let throttleInterval: Int = 3
+
     // Serial queue ensures checks don't overlap
     private let checkQueue = DispatchQueue(label: "com.notchification.claudecode-check", qos: .utility)
 
@@ -84,11 +90,22 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
     func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
+        pollCount = 0
         isActive = false
     }
 
     func poll() {
         guard !isCheckInProgress else { return }
+
+        pollCount += 1
+
+        // Throttle when idle to save power (AppleScript is expensive)
+        // When active (isActive), check every poll for quick finish detection
+        // When idle (!isActive), only check every Nth poll to reduce overhead
+        if !isActive && pollCount % throttleInterval != 0 {
+            return
+        }
+
         isCheckInProgress = true
 
         checkQueue.async { [weak self] in

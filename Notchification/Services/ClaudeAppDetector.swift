@@ -34,6 +34,10 @@ final class ClaudeAppDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Throttling to reduce power usage (Accessibility API can be expensive)
+    private var pollCount: Int = 0
+    private let throttleInterval: Int = 3
+
     // Serial queue ensures checks don't overlap
     private let checkQueue = DispatchQueue(label: "com.notchification.claudeapp-check", qos: .utility)
 
@@ -56,6 +60,7 @@ final class ClaudeAppDetector: ObservableObject, Detector {
     func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
+        pollCount = 0
         isActive = false
     }
 
@@ -70,6 +75,13 @@ final class ClaudeAppDetector: ObservableObject, Detector {
             if isActive {
                 DispatchQueue.main.async { self.reset() }
             }
+            return
+        }
+
+        pollCount += 1
+
+        // Throttle when idle to save power (Accessibility API is expensive)
+        if !isActive && pollCount % throttleInterval != 0 {
             return
         }
 

@@ -119,10 +119,23 @@ final class CalendarService: ObservableObject, Detector {
             name: .EKEventStoreChanged,
             object: eventStore
         )
+
+        // Listen for day changes (midnight rollover)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(dayChanged),
+            name: .NSCalendarDayChanged,
+            object: nil
+        )
     }
 
     @objc private func calendarStoreChanged() {
         if debug { print("📅 Calendar store changed, refreshing...") }
+        poll()
+    }
+
+    @objc private func dayChanged() {
+        if debug { print("📅 Day changed (midnight rollover), refreshing...") }
         poll()
     }
 

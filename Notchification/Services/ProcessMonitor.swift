@@ -49,7 +49,7 @@ final class ProcessMonitor: ObservableObject {
 
     // Central timer using DispatchSourceTimer on background queue
     private var timer: DispatchSourceTimer?
-    private let pollingInterval: TimeInterval = 1.0
+    private let pollingInterval: TimeInterval = 2.0
     private let timerQueue = DispatchQueue(label: "com.notchification.timer", qos: .userInitiated)
 
     private init() {
@@ -142,7 +142,7 @@ final class ProcessMonitor: ObservableObject {
     func startMonitoring() {
         guard timer == nil else { return }
 
-        logger.info("ProcessMonitor: Starting central timer (1s interval)")
+        logger.info("ProcessMonitor: Starting central timer (2s interval)")
 
         let newTimer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
         newTimer.schedule(deadline: .now(), repeating: pollingInterval)

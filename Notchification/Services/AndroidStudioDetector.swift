@@ -35,6 +35,12 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     private var consecutiveActiveReadings: Int = 0
     private var consecutiveInactiveReadings: Int = 0
 
+    // Throttling to reduce power usage
+    // When idle: check every 3rd poll (every ~9s at 3s polling interval)
+    // When building: check every poll (every ~3s)
+    private var pollCount: Int = 0
+    private let throttleInterval: Int = 3  // Only check every Nth poll when idle
+
     // Serial queue ensures checks don't overlap
     private let checkQueue = DispatchQueue(label: "com.notchification.android-check", qos: .utility)
 
@@ -152,6 +158,7 @@ final class AndroidStudioDetector: ObservableObject, Detector {
     func reset() {
         consecutiveActiveReadings = 0
         consecutiveInactiveReadings = 0
+        pollCount = 0
         isActive = false
     }
 
@@ -222,6 +229,15 @@ final class AndroidStudioDetector: ObservableObject, Detector {
             if isActive {
                 DispatchQueue.main.async { self.reset() }
             }
+            return
+        }
+
+        pollCount += 1
+
+        // Throttle when idle to save power
+        // When building (isActive), check every poll for quick finish detection
+        // When idle (!isActive), only check every Nth poll to reduce overhead
+        if !isActive && pollCount % throttleInterval != 0 {
             return
         }
 

@@ -1550,6 +1550,40 @@ struct DemoableToggle: View {
     }
 }
 
+/// Version button that shows CEO message on click
+struct VersionButton: View {
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: {
+            // Show CEO welcome message
+            WelcomeMessageWindowController.shared.show()
+            // Dismiss the menu
+            DispatchQueue.main.async {
+                NSApp.keyWindow?.close()
+            }
+        }) {
+            HStack {
+                Spacer()
+                Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .background(isHovered ? Color.accentColor : Color.clear)
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
 /// Menu bar dropdown view
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
@@ -1644,13 +1678,9 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
 
-            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
+            VersionButton()
         }
-        .padding(.vertical, 8)
+        .padding(.top, 8)
     }
 
     @ViewBuilder
