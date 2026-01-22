@@ -493,9 +493,9 @@ final class StyleSettings: ObservableObject {
         didSet { UserDefaults.standard.set(minimalStrokeWidth, forKey: "minimalStrokeWidth") }
     }
 
-    /// When true, converts all notch colors to grayscale
-    @Published var grayscaleMode: Bool {
-        didSet { UserDefaults.standard.set(grayscaleMode, forKey: "grayscaleMode") }
+    /// The selected color theme for the notch indicator
+    @Published var selectedTheme: ColorTheme {
+        didSet { UserDefaults.standard.set(selectedTheme.rawValue, forKey: "selectedTheme") }
     }
 
     private init() {
@@ -518,7 +518,17 @@ final class StyleSettings: ObservableObject {
         self.trimTopOnNotchDisplay = UserDefaults.standard.object(forKey: "trimTopOnNotchDisplay") as? Bool ?? false
         self.horizontalOffset = UserDefaults.standard.object(forKey: "horizontalOffset") as? CGFloat ?? 0
         self.minimalStrokeWidth = UserDefaults.standard.object(forKey: "minimalStrokeWidth") as? CGFloat ?? 4
-        self.grayscaleMode = UserDefaults.standard.object(forKey: "grayscaleMode") as? Bool ?? false
+
+        // Load selected theme (migrate from grayscaleMode if needed)
+        if let themeRaw = UserDefaults.standard.string(forKey: "selectedTheme"),
+           let theme = ColorTheme(rawValue: themeRaw) {
+            self.selectedTheme = theme
+        } else if UserDefaults.standard.object(forKey: "grayscaleMode") as? Bool == true {
+            // Migrate from old grayscaleMode setting
+            self.selectedTheme = .noir
+        } else {
+            self.selectedTheme = .default
+        }
     }
 
     /// Get the built-in (MacBook) display
@@ -572,6 +582,7 @@ extension Notification.Name {
     static let hideSettingsPreview = Notification.Name("hideSettingsPreview")
     static let teamsMockDismissed = Notification.Name("teamsMockDismissed")
     static let showTeamsPreview = Notification.Name("showTeamsPreview")
+    static let showThemePreview = Notification.Name("showThemePreview")
 }
 
 /// Information about the physical notch on the current screen
@@ -717,8 +728,29 @@ struct NotchLayout {
         // Check if morning overview is showing (calendar in expanded view mode)
         let isMorningOverview = calendarOnly && DebugSettings.shared.showMorningOverview
 
+        // Check if welcome message is showing
+        let isWelcomeMessage = DebugSettings.shared.showWelcomeMessage
+
         // Minimal stroke width from settings
         let minimalStrokeWidth = settings.minimalStrokeWidth
+
+        // Special case: Welcome message needs a larger window
+        if isWelcomeMessage {
+            let effTopPadding = effectiveTopPadding(notchInfo: notchInfo, settings: settings)
+            let contentWidth: CGFloat = 340
+            let normalEarSpace: CGFloat = 60
+            // Welcome message content height (approximate) + extra for spring overshoot
+            let welcomeContentHeight: CGFloat = 200
+            // Spring with dampingFraction 0.6 overshoots ~15-20%, need generous padding
+            let overshootPadding: CGFloat = 80
+
+            width = contentWidth + 40 + normalEarSpace
+            height = effTopPadding + welcomeContentHeight + overshootPadding
+
+            let x = screen.frame.minX + (screen.frame.width - width) / 2 + horizontalOffset
+            let y = screen.frame.maxY - height
+            return NSRect(x: x, y: y, width: width, height: height)
+        }
 
         // Special case: Calendar morning overview needs a larger window
         if isMorningOverview {
@@ -1148,6 +1180,15 @@ final class AppState: ObservableObject {
         ) { [weak self] _ in
             self?.showTeamsPreview()
         }
+
+        // Listen for theme preview request from Appearance settings
+        NotificationCenter.default.addObserver(
+            forName: .showThemePreview,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showThemePreview()
+        }
     }
 
     /// Show Teams camera preview (triggered from Smart Features settings)
@@ -1169,6 +1210,53 @@ final class AppState: ObservableObject {
         }
         combined.sort { $0.rawValue < $1.rawValue }
         windowController.update(with: combined)
+    }
+
+    /// Work items for theme preview (so they can be cancelled)
+    private var themePreviewWorkItems: [DispatchWorkItem] = []
+
+    /// Show theme preview with multiple processes (triggered from Appearance settings)
+    private func showThemePreview() {
+        // Cancel any existing preview work items
+        for workItem in themePreviewWorkItems {
+            workItem.cancel()
+        }
+        themePreviewWorkItems.removeAll()
+
+        // Show process types with unique themeIndex values (0-4) to demonstrate all theme colors
+        let previewProcesses: [ProcessType] = [
+            .claudeCode,     // themeIndex 0
+            .xcode,          // themeIndex 1
+            .androidStudio,  // themeIndex 2
+            .finder,         // themeIndex 3
+            .opencode        // themeIndex 4
+        ]
+
+        // Start fresh - clear current processes first
+        windowController.update(with: [])
+
+        // Add processes one by one with a delay
+        let delay: Double = 0.3
+        for (index, _) in previewProcesses.enumerated() {
+            let workItem = DispatchWorkItem { [weak self] in
+                guard self?.isShowingSettingsPreview == true else { return }
+                let processesToShow = Array(previewProcesses.prefix(index + 1))
+                self?.windowController.update(with: processesToShow)
+            }
+            themePreviewWorkItems.append(workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay * Double(index), execute: workItem)
+        }
+
+        // Hide after all are shown + 2 seconds viewing time, then restore to preview
+        let totalShowTime = delay * Double(previewProcesses.count) + 2.0
+        let restoreWorkItem = DispatchWorkItem { [weak self] in
+            // Only restore if settings preview is still showing
+            if self?.isShowingSettingsPreview == true {
+                self?.windowController.update(with: [.preview])
+            }
+        }
+        themePreviewWorkItems.append(restoreWorkItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + totalShowTime, execute: restoreWorkItem)
     }
 
     private var isShowingSettingsPreview = false

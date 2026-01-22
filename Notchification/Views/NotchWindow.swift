@@ -497,33 +497,36 @@ final class ConfettiWindow: NSWindow {
 /// SwiftUI view that renders confetti emitters based on shared ConfettiState
 struct ConfettiOverlayView: View {
     @ObservedObject private var confettiState = ConfettiState.shared
+    @ObservedObject private var styleSettings = StyleSettings.shared
 
     var body: some View {
         ZStack(alignment: .top) {
             Color.clear
 
             // Confetti emitters positioned at top center
+            // Use .id() to force recreation when theme changes so colors update
             VStack {
                 ZStack {
-                    ConfettiEmitterView(trigger: $confettiState.claudeTrigger, color: ProcessType.claudeCode.color)
-                    ConfettiEmitterView(trigger: $confettiState.xcodeTrigger, color: ProcessType.xcode.color)
-                    ConfettiEmitterView(trigger: $confettiState.androidTrigger, color: ProcessType.androidStudio.color)
-                    ConfettiEmitterView(trigger: $confettiState.finderTrigger, color: ProcessType.finder.color)
-                    ConfettiEmitterView(trigger: $confettiState.opencodeTrigger, color: ProcessType.opencode.color)
-                    ConfettiEmitterView(trigger: $confettiState.codexTrigger, color: ProcessType.codex.color)
-                    ConfettiEmitterView(trigger: $confettiState.dropboxTrigger, color: ProcessType.dropbox.color)
-                    ConfettiEmitterView(trigger: $confettiState.googleDriveTrigger, color: ProcessType.googleDrive.color)
-                    ConfettiEmitterView(trigger: $confettiState.oneDriveTrigger, color: ProcessType.oneDrive.color)
-                    ConfettiEmitterView(trigger: $confettiState.icloudTrigger, color: ProcessType.icloud.color)
-                    ConfettiEmitterView(trigger: $confettiState.installerTrigger, color: ProcessType.installer.color)
-                    ConfettiEmitterView(trigger: $confettiState.appStoreTrigger, color: ProcessType.appStore.color)
-                    ConfettiEmitterView(trigger: $confettiState.automatorTrigger, color: ProcessType.automator.color)
-                    ConfettiEmitterView(trigger: $confettiState.scriptEditorTrigger, color: ProcessType.scriptEditor.color)
-                    ConfettiEmitterView(trigger: $confettiState.downloadsTrigger, color: ProcessType.downloads.color)
-                    ConfettiEmitterView(trigger: $confettiState.davinciResolveTrigger, color: ProcessType.davinciResolve.color)
-                    ConfettiEmitterView(trigger: $confettiState.teamsTrigger, color: ProcessType.teams.color)
-                    ConfettiEmitterView(trigger: $confettiState.calendarTrigger, color: ProcessType.calendar.color)
+                    ConfettiEmitterView(trigger: $confettiState.claudeTrigger, color: styleSettings.selectedTheme.color(for: .claudeCode))
+                    ConfettiEmitterView(trigger: $confettiState.xcodeTrigger, color: styleSettings.selectedTheme.color(for: .xcode))
+                    ConfettiEmitterView(trigger: $confettiState.androidTrigger, color: styleSettings.selectedTheme.color(for: .androidStudio))
+                    ConfettiEmitterView(trigger: $confettiState.finderTrigger, color: styleSettings.selectedTheme.color(for: .finder))
+                    ConfettiEmitterView(trigger: $confettiState.opencodeTrigger, color: styleSettings.selectedTheme.color(for: .opencode))
+                    ConfettiEmitterView(trigger: $confettiState.codexTrigger, color: styleSettings.selectedTheme.color(for: .codex))
+                    ConfettiEmitterView(trigger: $confettiState.dropboxTrigger, color: styleSettings.selectedTheme.color(for: .dropbox))
+                    ConfettiEmitterView(trigger: $confettiState.googleDriveTrigger, color: styleSettings.selectedTheme.color(for: .googleDrive))
+                    ConfettiEmitterView(trigger: $confettiState.oneDriveTrigger, color: styleSettings.selectedTheme.color(for: .oneDrive))
+                    ConfettiEmitterView(trigger: $confettiState.icloudTrigger, color: styleSettings.selectedTheme.color(for: .icloud))
+                    ConfettiEmitterView(trigger: $confettiState.installerTrigger, color: styleSettings.selectedTheme.color(for: .installer))
+                    ConfettiEmitterView(trigger: $confettiState.appStoreTrigger, color: styleSettings.selectedTheme.color(for: .appStore))
+                    ConfettiEmitterView(trigger: $confettiState.automatorTrigger, color: styleSettings.selectedTheme.color(for: .automator))
+                    ConfettiEmitterView(trigger: $confettiState.scriptEditorTrigger, color: styleSettings.selectedTheme.color(for: .scriptEditor))
+                    ConfettiEmitterView(trigger: $confettiState.downloadsTrigger, color: styleSettings.selectedTheme.color(for: .downloads))
+                    ConfettiEmitterView(trigger: $confettiState.davinciResolveTrigger, color: styleSettings.selectedTheme.color(for: .davinciResolve))
+                    ConfettiEmitterView(trigger: $confettiState.teamsTrigger, color: styleSettings.selectedTheme.color(for: .teams))
+                    ConfettiEmitterView(trigger: $confettiState.calendarTrigger, color: styleSettings.selectedTheme.color(for: .calendar))
                 }
+                .id(styleSettings.selectedTheme)  // Force recreation when theme changes
                 .padding(.top, 40)  // Position below the notch
 
                 Spacer()

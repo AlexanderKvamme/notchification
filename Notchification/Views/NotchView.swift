@@ -132,8 +132,8 @@ struct NotchView: View {
 
     /// Base color for minimal mode - first active process color
     private var baseStrokeColor: Color {
-        let color = notchState.activeProcesses.first?.color ?? .white
-        return styleSettings.grayscaleMode ? color.toGrayscale() : color
+        guard let process = notchState.activeProcesses.first else { return .white }
+        return styleSettings.selectedTheme.color(for: process)
     }
 
     /// Current highlight color based on which process is animating
@@ -143,16 +143,15 @@ struct NotchView: View {
         let processes = notchState.activeProcesses
         guard !processes.isEmpty else { return .white }
         let index = currentWaveIndex % processes.count
+        let process = processes[index]
 
         // For multiple processes, use actual colors to cycle between them
         // For single process, use the lighter wave color like the regular progress bar
-        let color: Color
         if processes.count > 1 {
-            color = processes[index].color
+            return styleSettings.selectedTheme.color(for: process)
         } else {
-            color = processes[index].waveColor
+            return styleSettings.selectedTheme.waveColor(for: process)
         }
-        return styleSettings.grayscaleMode ? color.toGrayscale() : color
     }
 
     /// Whether to show the base stroke layer (only for single process)
@@ -175,8 +174,8 @@ struct NotchView: View {
         let processes = notchState.activeProcesses
         guard !processes.isEmpty, previousWaveIndex >= 0 else { return .clear }
         let index = previousWaveIndex % processes.count
-        let color = processes[index].color
-        return styleSettings.grayscaleMode ? color.toGrayscale() : color
+        let process = processes[index]
+        return styleSettings.selectedTheme.color(for: process)
     }
 
     var body: some View {
@@ -305,6 +304,13 @@ struct NotchView: View {
         }
         .onChange(of: debugSettings.showMorningOverview) { _, showOverview in
             if showOverview {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)) {
+                    isExpanded = true
+                }
+            }
+        }
+        .onChange(of: debugSettings.showWelcomeMessage) { _, showMessage in
+            if showMessage {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)) {
                     isExpanded = true
                 }
@@ -618,14 +624,20 @@ struct NotchView: View {
         let message = WelcomeMessage.current
         let debugColors = debugSettings.debugViewColors
         let contentWidth: CGFloat = 340
+        // Extra padding to accommodate spring animation overshoot (~20%)
+        // Spring with dampingFraction 0.6 can overshoot by ~15-20%
+        let overshootPadding: CGFloat = 60
 
         // NotchShape background - uses dynamic height
+        // Padding added before scaleEffect to give room for overshoot
         NotchShape()
             .fill(debugColors ? Color.red : notchBlack)
             .frame(width: contentWidth + 40, height: effectiveTopPadding + welcomeMessageContentHeight)
+            .padding(.bottom, overshootPadding)
             .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
 
         // Content positioned below the physical notch
+        // Padding added before scaleEffect to give room for overshoot
         WelcomeMessageContent(
             message: message,
             onDismiss: {
@@ -644,6 +656,7 @@ struct NotchView: View {
             welcomeMessageContentHeight = height
         }
         .offset(y: effectiveTopPadding)
+        .padding(.bottom, overshootPadding)
         .opacity(isExpanded ? 1 : 0)
         .scaleEffect(x: isExpanded ? 1 : 0.3, y: isExpanded ? 1 : 0, anchor: .top)
         .onHover { hovering in
@@ -822,14 +835,14 @@ struct ProcessRow: View {
     @ObservedObject private var styleSettings = StyleSettings.shared
     @State private var isHovering: Bool = false
 
-    /// The process color, converted to grayscale if grayscale mode is enabled
+    /// The process color based on the selected theme
     private var effectiveColor: Color {
-        styleSettings.grayscaleMode ? process.color.toGrayscale() : process.color
+        styleSettings.selectedTheme.color(for: process)
     }
 
-    /// The process wave color, converted to grayscale if grayscale mode is enabled
+    /// The process wave color based on the selected theme
     private var effectiveWaveColor: Color {
-        styleSettings.grayscaleMode ? process.waveColor.toGrayscale() : process.waveColor
+        styleSettings.selectedTheme.waveColor(for: process)
     }
 
     /// Get progress for processes that support it (reactive via processMonitor observation)

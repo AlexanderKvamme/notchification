@@ -371,11 +371,10 @@ struct AppearanceSettingsTab: View {
                             in: 2...10,
                             step: 1)
                 }
+            }
 
-                Toggle("Grayscale Mode", isOn: $styleSettings.grayscaleMode)
-                Text("Convert all notch colors to grayscale")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            Section("Color Theme") {
+                ThemePickerView(selectedTheme: $styleSettings.selectedTheme)
             }
 
             Section {
@@ -472,6 +471,89 @@ struct AdvancedSettingsTab: View {
                 .font(.body.weight(.medium))
                 .foregroundColor(.red)
         }
+    }
+}
+
+// MARK: - Theme Picker View
+
+struct ThemePickerView: View {
+    @Binding var selectedTheme: ColorTheme
+
+    private let allThemes = ColorTheme.allCases
+    @State private var isHovered: Bool = false
+
+    private var currentIndex: Int {
+        allThemes.firstIndex(of: selectedTheme) ?? 0
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // Previous button
+            Button(action: goToPrevious) {
+                Image(systemName: "chevron.left")
+                    .font(.title2)
+                    .foregroundColor(currentIndex > 0 ? .primary : .secondary.opacity(0.3))
+            }
+            .buttonStyle(.plain)
+            .disabled(currentIndex == 0)
+
+            // Current theme display - clickable to trigger preview
+            Button(action: triggerThemePreview) {
+                VStack(spacing: 10) {
+                    // Color preview dots
+                    HStack(spacing: 6) {
+                        ForEach(0..<selectedTheme.previewColors.count, id: \.self) { index in
+                            Circle()
+                                .fill(selectedTheme.previewColors[index])
+                                .frame(width: 20, height: 20)
+                        }
+                    }
+
+                    // Theme name
+                    Text(selectedTheme.displayName)
+                        .font(.headline)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isHovered ? Color.secondary.opacity(0.1) : Color.clear)
+                )
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                isHovered = hovering
+            }
+            .frame(maxWidth: .infinity)
+
+            // Next button
+            Button(action: goToNext) {
+                Image(systemName: "chevron.right")
+                    .font(.title2)
+                    .foregroundColor(currentIndex < allThemes.count - 1 ? .primary : .secondary.opacity(0.3))
+            }
+            .buttonStyle(.plain)
+            .disabled(currentIndex >= allThemes.count - 1)
+        }
+        .padding(.vertical, 8)
+        .onChange(of: selectedTheme) { _, _ in
+            triggerThemePreview()
+        }
+    }
+
+    private func goToPrevious() {
+        guard currentIndex > 0 else { return }
+        selectedTheme = allThemes[currentIndex - 1]
+    }
+
+    private func goToNext() {
+        guard currentIndex < allThemes.count - 1 else { return }
+        selectedTheme = allThemes[currentIndex + 1]
+    }
+
+    private func triggerThemePreview() {
+        // Post notification to show theme preview with multiple processes
+        NotificationCenter.default.post(name: .showThemePreview, object: nil)
     }
 }
 
