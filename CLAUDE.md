@@ -363,18 +363,20 @@ xcodebuild -exportArchive -archivePath ./build/Notchification.xcarchive -exportP
 
 ### 4. Notarize
 
-```bash
-# Submit for notarization (requires keychain profile "notarytool" to be set up)
-cd ./build/export
-zip -r -y Notchification-X.X.XX.zip Notchification.app
-xcrun notarytool submit Notchification-X.X.XX.zip --keychain-profile "notarytool" --wait
+**Note:** Use absolute paths - shell cwd may reset between commands.
 
-# Staple the ticket to the app
-xcrun stapler staple Notchification.app
+```bash
+# Create zip for notarization (from project root)
+cd ./build/export && zip -r -y Notchification-X.X.XX.zip Notchification.app
+
+# Submit for notarization (requires keychain profile "notarytool" to be set up)
+xcrun notarytool submit ./build/export/Notchification-X.X.XX.zip --keychain-profile "notarytool" --wait
+
+# Staple the ticket to the app (use full path)
+xcrun stapler staple ./build/export/Notchification.app
 
 # Re-create zip with stapled app
-rm Notchification-X.X.XX.zip
-zip -r -y Notchification-X.X.XX.zip Notchification.app
+cd ./build/export && rm Notchification-X.X.XX.zip && zip -r -y Notchification-X.X.XX.zip Notchification.app
 ```
 
 ### 5. Sign with Sparkle
@@ -383,8 +385,8 @@ zip -r -y Notchification-X.X.XX.zip Notchification.app
 # Find sign_update tool
 find ~/Library/Developer/Xcode/DerivedData -name "sign_update" | head -1
 
-# Sign the zip (outputs edSignature and length)
-/path/to/sign_update Notchification-X.X.XX.zip
+# Sign the zip (outputs edSignature and length) - use full path
+/path/to/sign_update ./build/export/Notchification-X.X.XX.zip
 ```
 
 ### 6. Update BOTH appcast.xml files
