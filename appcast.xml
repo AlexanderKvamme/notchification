@@ -3,6 +3,24 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.37</title>
+            <pubDate>Wed, 22 Jan 2026 18:30:00 +0100</pubDate>
+            <sparkle:version>37</sparkle:version>
+            <sparkle:shortVersionString>1.0.37</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.37.zip"
+                sparkle:edSignature="bBWjkPtJOWVyQ3jS4mkJjwzESMoWj4u9bRlnoMSJxm/NOiNopMcl7dM1lSPt0yto2aM988773Io8UtcLYqylAw=="
+                length="3002045"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.37</h2>
+                <ul>
+                    <li>New: Grayscale Mode - convert all notch colors to grayscale (Settings > Appearance)</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.36</title>
             <pubDate>Wed, 22 Jan 2026 17:00:00 +0100</pubDate>
             <sparkle:version>36</sparkle:version>
