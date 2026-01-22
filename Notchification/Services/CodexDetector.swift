@@ -103,11 +103,36 @@ final class CodexDetector: ObservableObject, Detector {
             useiTermContents: false // Use 'text' (visible only) for speed
         )
 
-        if let output = scanner.scan() {
+        if debug {
+            print("🤖 Codex: scanning terminals...")
+        }
+
+        // Check iTerm2
+        let iTermStart = CFAbsoluteTimeGetCurrent()
+        if let output = scanner.scanITerm2() {
+            let iTermTime = (CFAbsoluteTimeGetCurrent() - iTermStart) * 1000
             if debug {
-                print("🤖 Codex: scanning terminals...")
+                print("🤖 iTerm2 check: \(String(format: "%.1f", iTermTime))ms")
             }
-            return hasCodexPattern(in: output, scanner: scanner)
+            if hasCodexPattern(in: output, scanner: scanner) {
+                return true
+            }
+        } else if debug {
+            print("🤖 iTerm2: not running")
+        }
+
+        // Check Terminal.app
+        let terminalStart = CFAbsoluteTimeGetCurrent()
+        if let output = scanner.scanTerminal() {
+            let terminalTime = (CFAbsoluteTimeGetCurrent() - terminalStart) * 1000
+            if debug {
+                print("🤖 Terminal check: \(String(format: "%.1f", terminalTime))ms")
+            }
+            if hasCodexPattern(in: output, scanner: scanner) {
+                return true
+            }
+        } else if debug {
+            print("🤖 Terminal: not running")
         }
 
         return false
