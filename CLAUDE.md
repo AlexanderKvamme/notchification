@@ -385,9 +385,19 @@ Add new `<item>` at the top of BOTH files with:
    ```bash
    curl -s "https://featurefest.dev/notchification/appcast.xml" | head -10
    ```
-4. Copy zip to Dropbox for backup
-5. Commit version bump and appcast.xml in Notchification repo
-6. Push to GitHub
+4. Copy zip to homeofficesinternational (public download site):
+   ```bash
+   cp ~/Library/Developer/Xcode/DerivedData/Notchification-*/Build/Products/Release/Notchification-X.X.XX.zip \
+      ~/Documents/workspaces/code/web/homeofficesinternational/notchification/
+   ```
+5. Deploy homeofficesinternational:
+   ```bash
+   cd ~/Documents/workspaces/code/web/homeofficesinternational && netlify deploy --prod --dir .
+   ```
+   Or just commit and push to GitHub (auto-deploys via Netlify).
+6. Copy zip to Dropbox for backup
+7. Commit version bump and appcast.xml in Notchification repo
+8. Push to GitHub
 
 ### Checklist
 
@@ -398,4 +408,6 @@ Add new `<item>` at the top of BOTH files with:
 - [ ] Zip copied to `~/Documents/workspaces/code/web/featurefest/notchification/`
 - [ ] Featurefest deployed with `firebase deploy --only hosting`
 - [ ] Verified appcast.xml is live with curl
+- [ ] Zip copied to `~/Documents/workspaces/code/web/homeofficesinternational/notchification/`
+- [ ] Homeofficesinternational deployed (Netlify CLI or GitHub push)
 - [ ] Committed and pushed

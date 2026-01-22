@@ -1590,6 +1590,7 @@ struct MenuBarView: View {
     let updater: SPUUpdater
     @ObservedObject var trackingSettings = TrackingSettings.shared
     @ObservedObject var licenseManager = LicenseManager.shared
+    @State private var isVersionHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -1602,6 +1603,7 @@ struct MenuBarView: View {
             if trackingSettings.trackCalendar {
                 MenuItemButton(label: "Today's Calendar", icon: "calendar") {
                     DebugSettings.shared.showMorningOverview.toggle()
+                    NSApp.keyWindow?.close()
                 }
             }
 
@@ -1660,6 +1662,7 @@ struct MenuBarView: View {
                     Circle()
                         .fill(Color.orange)
                         .frame(width: 8, height: 8)
+                        .padding(.trailing, 8)
                 }
             }
 
@@ -1678,7 +1681,26 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
 
+<<<<<<< Updated upstream
             VersionButton()
+=======
+            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
+                .font(.caption)
+                .foregroundColor(isVersionHovered ? .white : .secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .background(isVersionHovered ? Color.accentColor : Color.clear)
+                .cornerRadius(4)
+                .padding(.top, 8)
+                .onTapGesture {
+                    DebugSettings.shared.showWelcomeMessage = true
+                    NSApp.keyWindow?.close()
+                }
+                .onHover { hovering in
+                    isVersionHovered = hovering
+                }
+>>>>>>> Stashed changes
         }
         .padding(.top, 8)
     }
