@@ -395,14 +395,12 @@ Add new `<item>` at the top of BOTH files with:
    sed -i '' 's/Notchification-X.X.OLD.zip/Notchification-X.X.XX.zip/g' \
       ~/Documents/workspaces/code/web/homeofficesinternational/notchification/index.html
 
-   # Remove old zip, add new zip and updated html, commit and push
-   cd ~/Documents/workspaces/code/web/homeofficesinternational
-   rm notchification/Notchification-X.X.OLD.zip
-   git add notchification/
-   git commit -m "Update Notchification to vX.X.XX"
-   git push
+   # Remove old zip
+   rm ~/Documents/workspaces/code/web/homeofficesinternational/notchification/Notchification-X.X.OLD.zip
+
+   # Deploy to Netlify
+   cd ~/Documents/workspaces/code/web/homeofficesinternational && netlify deploy --prod --dir .
    ```
-   Netlify auto-deploys when you push to GitHub.
 5. Copy zip to Dropbox for backup
 6. Commit version bump and appcast.xml in Notchification repo
 7. Push to GitHub
@@ -417,5 +415,5 @@ Add new `<item>` at the top of BOTH files with:
 - [ ] Featurefest deployed with `firebase deploy --only hosting`
 - [ ] Verified appcast.xml is live with curl
 - [ ] Homeofficesinternational updated (zip, index.html download links, old zip removed)
-- [ ] Homeofficesinternational committed and pushed (auto-deploys via Netlify)
+- [ ] Homeofficesinternational deployed with `netlify deploy --prod --dir .`
 - [ ] Committed and pushed
