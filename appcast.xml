@@ -3,6 +3,26 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.38</title>
+            <pubDate>Wed, 22 Jan 2026 19:10:00 +0100</pubDate>
+            <sparkle:version>38</sparkle:version>
+            <sparkle:shortVersionString>1.0.38</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.38.zip"
+                sparkle:edSignature="MejvxiweQ2dQNyd9GGFAyw+M01Zls2UMdd1CGPNd9bkyl3z/wg8lGPiLBfkFIOLOx16hCEzEbWyB/a9POLAhBg=="
+                length="3015681"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.38</h2>
+                <ul>
+                    <li>New: Color Themes - 8 beautiful themes (Ocean, Sunset, Forest, Neon, Pastel, and more)</li>
+                    <li>Confetti now matches your selected theme colors</li>
+                    <li>Theme preview shows all colors when switching</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.37</title>
             <pubDate>Wed, 22 Jan 2026 18:30:00 +0100</pubDate>
             <sparkle:version>37</sparkle:version>

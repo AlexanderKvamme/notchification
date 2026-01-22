@@ -17,12 +17,12 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.37",
+        version: "1.0.38",
         title: "What's New",
         body: """
-        Hello Notification Family!
+        Hello Notification FAMILY!
 
-        New in this release: Grayscale Mode! Find it in Settings > Appearance. When enabled, all notch colors are converted to grayscale for a more subtle look.
+        New in this release: Color Themes! We've added 8 Cool themes for our cool users. From Ocean to Sunset to Neon - pick the vibe that matches your style. If you even have a style.
 
         Enjoy!
         """,
