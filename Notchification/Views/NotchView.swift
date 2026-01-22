@@ -132,7 +132,8 @@ struct NotchView: View {
 
     /// Base color for minimal mode - first active process color
     private var baseStrokeColor: Color {
-        notchState.activeProcesses.first?.color ?? .white
+        let color = notchState.activeProcesses.first?.color ?? .white
+        return styleSettings.grayscaleMode ? color.toGrayscale() : color
     }
 
     /// Current highlight color based on which process is animating
@@ -145,11 +146,13 @@ struct NotchView: View {
 
         // For multiple processes, use actual colors to cycle between them
         // For single process, use the lighter wave color like the regular progress bar
+        let color: Color
         if processes.count > 1 {
-            return processes[index].color
+            color = processes[index].color
         } else {
-            return processes[index].waveColor
+            color = processes[index].waveColor
         }
+        return styleSettings.grayscaleMode ? color.toGrayscale() : color
     }
 
     /// Whether to show the base stroke layer (only for single process)
@@ -172,7 +175,8 @@ struct NotchView: View {
         let processes = notchState.activeProcesses
         guard !processes.isEmpty, previousWaveIndex >= 0 else { return .clear }
         let index = previousWaveIndex % processes.count
-        return processes[index].color
+        let color = processes[index].color
+        return styleSettings.grayscaleMode ? color.toGrayscale() : color
     }
 
     var body: some View {
@@ -815,7 +819,18 @@ struct ProcessRow: View {
     var onDismiss: ((ProcessType) -> Void)?
 
     @ObservedObject private var processMonitor = ProcessMonitor.shared
+    @ObservedObject private var styleSettings = StyleSettings.shared
     @State private var isHovering: Bool = false
+
+    /// The process color, converted to grayscale if grayscale mode is enabled
+    private var effectiveColor: Color {
+        styleSettings.grayscaleMode ? process.color.toGrayscale() : process.color
+    }
+
+    /// The process wave color, converted to grayscale if grayscale mode is enabled
+    private var effectiveWaveColor: Color {
+        styleSettings.grayscaleMode ? process.waveColor.toGrayscale() : process.waveColor
+    }
 
     /// Get progress for processes that support it (reactive via processMonitor observation)
     private var progress: Double? {
@@ -836,10 +851,10 @@ struct ProcessRow: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .fontWeight(.bold)
-                        .foregroundColor(process.color)
+                        .foregroundColor(effectiveColor)
                         .padding(1)
                 } else {
-                    ProcessLogo(processType: process)
+                    ProcessLogo(processType: process, color: effectiveColor)
                 }
             }
             .frame(width: logoSize, height: logoSize)
@@ -854,22 +869,22 @@ struct ProcessRow: View {
                 HStack(spacing: 2) {
                     AnimatedProgressBar(
                         isActive: isExpanded,
-                        baseColor: process.color,
-                        waveColor: process.waveColor,
+                        baseColor: effectiveColor,
+                        waveColor: effectiveWaveColor,
                         progress: progress
                     )
                     .frame(height: progressBarHeight)
 
                     Text("\(displayPercent)")
                         .font(.system(size: max(11, progressBarHeight * 1.8), weight: .bold, design: .monospaced))
-                        .foregroundColor(process.color)
+                        .foregroundColor(effectiveColor)
                         .fixedSize()
                 }
             } else {
                 AnimatedProgressBar(
                     isActive: isExpanded,
-                    baseColor: process.color,
-                    waveColor: process.waveColor,
+                    baseColor: effectiveColor,
+                    waveColor: effectiveWaveColor,
                     progress: progress
                 )
                 .frame(height: progressBarHeight)
@@ -896,8 +911,8 @@ struct ProcessRow: View {
             HStack(spacing: 4) {
                 AnimatedProgressBar(
                     isActive: isExpanded,
-                    baseColor: process.color,
-                    waveColor: process.waveColor,
+                    baseColor: effectiveColor,
+                    waveColor: effectiveWaveColor,
                     progress: nil
                 )
                 .frame(height: progressBarHeight)
@@ -905,15 +920,15 @@ struct ProcessRow: View {
                 // Time countdown (e.g., "15m", "1h")
                 Text(event.formattedTimeUntil)
                     .font(.system(size: max(11, progressBarHeight * 1.8), weight: .bold, design: .monospaced))
-                    .foregroundColor(process.color)
+                    .foregroundColor(effectiveColor)
                     .fixedSize()
             }
         } else {
             // Fallback - just show animated progress bar
             AnimatedProgressBar(
                 isActive: isExpanded,
-                baseColor: process.color,
-                waveColor: process.waveColor,
+                baseColor: effectiveColor,
+                waveColor: effectiveWaveColor,
                 progress: nil
             )
             .frame(height: progressBarHeight)
@@ -925,45 +940,51 @@ struct ProcessRow: View {
 
 struct ProcessLogo: View {
     let processType: ProcessType
+    var color: Color? = nil  // Optional override color (for grayscale mode)
+
+    /// The effective color to use - override if provided, otherwise process default
+    private var effectiveColor: Color {
+        color ?? processType.color
+    }
 
     var body: some View {
         switch processType {
         case .claudeCode, .claudeApp:
-            ClaudeLogo()
+            ClaudeLogo(color: effectiveColor)
         case .androidStudio:
-            AndroidStudioLogo()
+            AndroidStudioLogo(color: effectiveColor)
         case .xcode:
-            XcodeLogo()
+            XcodeLogo(color: effectiveColor)
         case .finder:
-            FinderLogo()
+            FinderLogo(color: effectiveColor)
         case .opencode:
-            OpencodeLogo()
+            OpencodeLogo(color: effectiveColor)
         case .codex:
-            CodexLogo()
+            CodexLogo(color: effectiveColor)
         case .dropbox:
-            DropboxLogo()
+            DropboxLogo(color: effectiveColor)
         case .googleDrive:
-            GoogleDriveLogo()
+            GoogleDriveLogo(color: effectiveColor)
         case .oneDrive:
-            OneDriveLogo()
+            OneDriveLogo(color: effectiveColor)
         case .icloud:
-            iCloudLogo()
+            iCloudLogo(color: effectiveColor)
         case .installer:
-            InstallerLogo()
+            InstallerLogo(color: effectiveColor)
         case .appStore:
-            AppStoreLogo()
+            AppStoreLogo(color: effectiveColor)
         case .automator:
-            AutomatorLogo()
+            AutomatorLogo(color: effectiveColor)
         case .scriptEditor:
-            ScriptEditorLogo()
+            ScriptEditorLogo(color: effectiveColor)
         case .downloads:
-            DownloadsLogo()
+            DownloadsLogo(color: effectiveColor)
         case .davinciResolve:
-            DaVinciResolveLogo()
+            DaVinciResolveLogo(color: effectiveColor)
         case .teams:
-            TeamsLogo()
+            TeamsLogo(color: effectiveColor)
         case .calendar:
-            CalendarLogo()
+            CalendarLogo(color: effectiveColor)
         case .preview:
             PreviewLogo()
         }
@@ -973,12 +994,14 @@ struct ProcessLogo: View {
 // MARK: - Calendar Logo
 
 struct CalendarLogo: View {
+    var color: Color = ProcessType.calendar.color
+
     var body: some View {
         Image(systemName: "calendar")
             .resizable()
             .aspectRatio(contentMode: .fit)
             .fontWeight(.medium)
-            .foregroundColor(ProcessType.calendar.color)
+            .foregroundColor(color)
     }
 }
 
@@ -998,45 +1021,53 @@ struct PreviewLogo: View {
 // MARK: - Teams Logo
 
 struct TeamsLogo: View {
+    var color: Color = .white
+
     var body: some View {
         Image(systemName: "video.fill")
             .resizable()
             .aspectRatio(contentMode: .fit)
             .symbolRenderingMode(.monochrome)
-            .foregroundColor(.white)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - DaVinci Resolve Logo
 
 struct DaVinciResolveLogo: View {
+    var color: Color = ProcessType.davinciResolve.color
+
     var body: some View {
         Image("davinciresolve")
             .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.davinciResolve.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Downloads Logo
 
 struct DownloadsLogo: View {
+    var color: Color = ProcessType.downloads.color
+
     var body: some View {
         Image(systemName: "arrow.down")
             .resizable()
             .aspectRatio(contentMode: .fit)
             .fontWeight(.bold)
-            .foregroundColor(ProcessType.downloads.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Android Studio Logo
 
 struct AndroidStudioLogo: View {
+    var color: Color = ProcessType.androidStudio.color
+
     var body: some View {
         AndroidStudioLogoShape()
-            .fill(ProcessType.androidStudio.color)
+            .fill(color)
     }
 }
 
@@ -1110,9 +1141,11 @@ struct AndroidStudioLogoShape: Shape {
 // MARK: - Xcode Logo
 
 struct XcodeLogo: View {
+    var color: Color = ProcessType.xcode.color
+
     var body: some View {
         XcodeLogoShape()
-            .fill(ProcessType.xcode.color)
+            .fill(color)
     }
 }
 
@@ -1213,127 +1246,149 @@ struct XcodeLogoShape: Shape {
 // MARK: - Finder Logo
 
 struct FinderLogo: View {
+    var color: Color = ProcessType.finder.color
+
     var body: some View {
         Image("findericon")
             .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.finder.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Opencode Logo
 
 struct OpencodeLogo: View {
+    var color: Color = ProcessType.opencode.color
+
     var body: some View {
         Image("opencodeicon")
             .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.opencode.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Codex Logo
 
 struct CodexLogo: View {
+    var color: Color = ProcessType.codex.color
+
     var body: some View {
         Image("codexicon")
             .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.codex.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Dropbox Logo
 
 struct DropboxLogo: View {
+    var color: Color = ProcessType.dropbox.color
+
     var body: some View {
         Image("dropboxicon")
             .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.dropbox.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Google Drive Logo
 
 struct GoogleDriveLogo: View {
+    var color: Color = ProcessType.googleDrive.color
+
     var body: some View {
         Image(systemName: "externaldrive.fill")
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.googleDrive.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - OneDrive Logo
 
 struct OneDriveLogo: View {
+    var color: Color = ProcessType.oneDrive.color
+
     var body: some View {
         Image(systemName: "cloud.fill")
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.oneDrive.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - iCloud Logo
 
 struct iCloudLogo: View {
+    var color: Color = ProcessType.icloud.color
+
     var body: some View {
         Image("icloudlogo")
             .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.icloud.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Installer Logo
 
 struct InstallerLogo: View {
+    var color: Color = ProcessType.installer.color
+
     var body: some View {
         // Package/box icon using SF Symbol
         Image(systemName: "shippingbox.fill")
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.installer.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - App Store Logo
 
 struct AppStoreLogo: View {
+    var color: Color = ProcessType.appStore.color
+
     var body: some View {
         Image("appstoreicon")
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(ProcessType.appStore.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Automator Logo
 
 struct AutomatorLogo: View {
+    var color: Color = ProcessType.automator.color
+
     var body: some View {
         Text("A")
             .font(.system(size: 18, weight: .bold, design: .rounded))
-            .foregroundColor(ProcessType.automator.color)
+            .foregroundColor(color)
     }
 }
 
 // MARK: - Script Editor Logo
 
 struct ScriptEditorLogo: View {
+    var color: Color = .white
+
     var body: some View {
         Image("codeicon")
             .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundColor(.white)
+            .foregroundColor(color)
     }
 }
 
@@ -1523,9 +1578,11 @@ struct AnimatedProgressBar: View {
 // MARK: - Claude Logo Shape
 
 struct ClaudeLogo: View {
+    var color: Color = ProcessType.claudeCode.color
+
     var body: some View {
         ClaudeLogoShape()
-            .fill(ProcessType.claudeCode.color)
+            .fill(color)
     }
 }
 

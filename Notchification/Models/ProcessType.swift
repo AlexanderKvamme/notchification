@@ -141,3 +141,25 @@ enum GrayscalePattern {
     case dots
     case diagonalStripes
 }
+
+// MARK: - Grayscale Color Extension
+
+extension Color {
+    /// Converts a color to grayscale using the standard luminance formula
+    /// Uses perceived brightness weights: 0.299*R + 0.587*G + 0.114*B
+    func toGrayscale() -> Color {
+        // Convert to NSColor to access RGB components
+        guard let nsColor = NSColor(self).usingColorSpace(.sRGB) else {
+            return self
+        }
+
+        let red = nsColor.redComponent
+        let green = nsColor.greenComponent
+        let blue = nsColor.blueComponent
+
+        // Standard luminance formula for perceived brightness
+        let luminance = 0.299 * red + 0.587 * green + 0.114 * blue
+
+        return Color(white: luminance)
+    }
+}

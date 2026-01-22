@@ -493,6 +493,11 @@ final class StyleSettings: ObservableObject {
         didSet { UserDefaults.standard.set(minimalStrokeWidth, forKey: "minimalStrokeWidth") }
     }
 
+    /// When true, converts all notch colors to grayscale
+    @Published var grayscaleMode: Bool {
+        didSet { UserDefaults.standard.set(grayscaleMode, forKey: "grayscaleMode") }
+    }
+
     private init() {
         // Migrate from old minimalStyle boolean if needed
         if let styleString = UserDefaults.standard.string(forKey: "notchStyle"),
@@ -513,6 +518,7 @@ final class StyleSettings: ObservableObject {
         self.trimTopOnNotchDisplay = UserDefaults.standard.object(forKey: "trimTopOnNotchDisplay") as? Bool ?? false
         self.horizontalOffset = UserDefaults.standard.object(forKey: "horizontalOffset") as? CGFloat ?? 0
         self.minimalStrokeWidth = UserDefaults.standard.object(forKey: "minimalStrokeWidth") as? CGFloat ?? 4
+        self.grayscaleMode = UserDefaults.standard.object(forKey: "grayscaleMode") as? Bool ?? false
     }
 
     /// Get the built-in (MacBook) display

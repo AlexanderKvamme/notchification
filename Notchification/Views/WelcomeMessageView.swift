@@ -17,14 +17,14 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.35",
+        version: "1.0.37",
         title: "What's New",
         body: """
         Hello Notification Family!
 
-        Quick update: The notch now shows on your laptop when no external display is connected. Also, the calendar button in the menu now toggles on/off.
+        New in this release: Grayscale Mode! Find it in Settings > Appearance. When enabled, all notch colors are converted to grayscale for a more subtle look.
 
-        Have a good one, fellas.
+        Enjoy!
         """,
         signoff: "— Alexander"
     )

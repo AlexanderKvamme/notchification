@@ -371,6 +371,11 @@ struct AppearanceSettingsTab: View {
                             in: 2...10,
                             step: 1)
                 }
+
+                Toggle("Grayscale Mode", isOn: $styleSettings.grayscaleMode)
+                Text("Convert all notch colors to grayscale")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section {
