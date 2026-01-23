@@ -68,6 +68,9 @@ final class ProcessMonitor: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             logger.info("⏰ System woke from sleep - restarting monitoring")
+            #if DEBUG
+            print("⏰ DEBUG: didWakeNotification fired")
+            #endif
             self?.restartMonitoring()
         }
 
@@ -78,6 +81,9 @@ final class ProcessMonitor: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             logger.info("⏰ Session became active - restarting monitoring")
+            #if DEBUG
+            print("⏰ DEBUG: sessionDidBecomeActiveNotification fired")
+            #endif
             self?.restartMonitoring()
         }
 
@@ -88,6 +94,9 @@ final class ProcessMonitor: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             logger.info("⏰ Screens woke up - restarting monitoring")
+            #if DEBUG
+            print("⏰ DEBUG: screensDidWakeNotification fired")
+            #endif
             self?.restartMonitoring()
         }
     }
@@ -103,12 +112,15 @@ final class ProcessMonitor: ObservableObject {
     private func checkMorningOverview() {
         let settings = CalendarSettings.shared
 
+        logger.info("📅 Checking morning overview conditions...")
         if settings.shouldShowMorningOverview() {
             logger.info("📅 Morning overview: Conditions met, showing calendar")
             settings.markMorningOverviewShown()
             DispatchQueue.main.async {
                 DebugSettings.shared.showMorningOverview = true
             }
+        } else {
+            logger.info("📅 Morning overview: Conditions NOT met, skipping")
         }
     }
 

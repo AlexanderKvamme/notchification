@@ -158,26 +158,65 @@ final class CalendarSettings: ObservableObject {
     /// Check if we should show the morning overview right now
     /// Returns true if: enabled, authorized, within morning hours, and not shown today yet
     func shouldShowMorningOverview() -> Bool {
+        #if DEBUG
+        print("📅 shouldShowMorningOverview check:")
+        print("  - enableMorningOverview: \(enableMorningOverview)")
+        print("  - authorizationStatus: \(authorizationStatus)")
+        #endif
+
         // Must be enabled
-        guard enableMorningOverview else { return false }
+        guard enableMorningOverview else {
+            #if DEBUG
+            print("  ❌ Feature disabled")
+            #endif
+            return false
+        }
 
         // Must have calendar access
-        guard authorizationStatus == .authorized else { return false }
+        guard authorizationStatus == .authorized else {
+            #if DEBUG
+            print("  ❌ Calendar not authorized")
+            #endif
+            return false
+        }
 
         // Check if current time is within morning hours
         let calendar = Calendar.current
         let now = Date()
         let hour = calendar.component(.hour, from: now)
 
-        guard hour >= morningStartHour && hour < morningEndHour else { return false }
+        #if DEBUG
+        print("  - Current hour: \(hour), Range: \(morningStartHour)-\(morningEndHour)")
+        #endif
+
+        guard hour >= morningStartHour && hour < morningEndHour else {
+            #if DEBUG
+            print("  ❌ Outside morning hours")
+            #endif
+            return false
+        }
 
         // Check if we've already shown it today
         if let lastShown = lastMorningOverviewDate {
+            #if DEBUG
+            print("  - Last shown: \(lastShown)")
+            print("  - Is today: \(calendar.isDateInToday(lastShown))")
+            #endif
             if calendar.isDateInToday(lastShown) {
+                #if DEBUG
+                print("  ❌ Already shown today")
+                #endif
                 return false  // Already shown today
             }
+        } else {
+            #if DEBUG
+            print("  - Last shown: never")
+            #endif
         }
 
+        #if DEBUG
+        print("  ✅ All conditions met!")
+        #endif
         return true
     }
 

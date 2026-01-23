@@ -34,6 +34,7 @@ struct NotchView: View {
     @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
     @State private var isCameraHovered: Bool = false  // Track camera hover for frame expansion
     @State private var morningOverviewMouseEntered: Bool = false  // Track if mouse entered morning overview
+    @State private var morningOverviewShowTime: Date? = nil  // When morning overview was shown (for minimum display time)
     @State private var welcomeMessageMouseEntered: Bool = false  // Track if mouse entered welcome message
     @State private var welcomeMessageContentHeight: CGFloat = 200  // Dynamic height for welcome message
 
@@ -304,9 +305,22 @@ struct NotchView: View {
         }
         .onChange(of: debugSettings.showMorningOverview) { _, showOverview in
             if showOverview {
+                morningOverviewShowTime = Date()  // Record when we started showing it
+                #if DEBUG
+                print("📅 Morning overview: Starting to show (time: \(Date()))")
+                #endif
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)) {
                     isExpanded = true
                 }
+            } else {
+                #if DEBUG
+                if let showTime = morningOverviewShowTime {
+                    let displayDuration = Date().timeIntervalSince(showTime)
+                    print("📅 Morning overview: Dismissed after \(String(format: "%.1f", displayDuration))s")
+                }
+                #endif
+                morningOverviewShowTime = nil  // Reset when hidden
+                morningOverviewMouseEntered = false
             }
         }
         .onChange(of: debugSettings.showWelcomeMessage) { _, showMessage in
@@ -727,11 +741,33 @@ struct NotchView: View {
             if hovering {
                 // Mouse entered the calendar area
                 morningOverviewMouseEntered = true
+                #if DEBUG
+                print("📅 Morning overview: Mouse entered")
+                #endif
             } else if morningOverviewMouseEntered {
-                // Mouse left after having entered - dismiss
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    DebugSettings.shared.showMorningOverview = false
-                    DebugSettings.shared.useMockCalendarData = false
+                // Mouse left after having entered - only dismiss if shown for at least 3 seconds
+                let minimumDisplayTime: TimeInterval = 3.0
+                let elapsed = morningOverviewShowTime.map { Date().timeIntervalSince($0) } ?? 0
+
+                #if DEBUG
+                print("📅 Morning overview: Mouse left (elapsed: \(String(format: "%.1f", elapsed))s, minimum: \(minimumDisplayTime)s)")
+                #endif
+
+                if elapsed >= minimumDisplayTime {
+                    // Sufficient time has passed - allow dismiss
+                    #if DEBUG
+                    print("📅 Morning overview: Auto-dismissing")
+                    #endif
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        DebugSettings.shared.showMorningOverview = false
+                        DebugSettings.shared.useMockCalendarData = false
+                        morningOverviewMouseEntered = false
+                    }
+                } else {
+                    // Not enough time - just clear the entered flag but keep showing
+                    #if DEBUG
+                    print("📅 Morning overview: Blocking premature dismiss")
+                    #endif
                     morningOverviewMouseEntered = false
                 }
             }
