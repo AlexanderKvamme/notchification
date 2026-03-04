@@ -20,7 +20,7 @@ struct WelcomeMessage {
         version: "1.0.38",
         title: "What's New",
         body: """
-        Hello Notification FAMILY!
+        Hello Notchification FAMILY!
 
         New in this release: Color Themes! We've added 8 Cool themes for our cool users. From Ocean to Sunset to Neon - pick the vibe that matches your style. If you even have a style.
 

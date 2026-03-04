@@ -147,7 +147,7 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
     /// Check if Claude Code CLI is working by scanning terminal apps
     private func isClaudeCodeWorking() -> Bool {
         let scanner = TerminalScanner(
-            lineCount: 20,
+            lineCount: 25,  // Claude Code 2.x spreads status across multiple lines
             scanAllSessions: true,  // Check all sessions (Claude may be in background tab)
             useiTermContents: false  // Use 'text' (visible screen) - faster
         )
@@ -184,14 +184,20 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
     }
 
     /// Check if Claude-specific patterns appear in the last lines of any session
-    /// Claude shows: "✢ Dilly-dallying… (esc to interrupt · thinking)"
-    /// Claude thinking shows: "✻ Frosting... (ctrl+c to interrupt • 1m 13s • ↓ 5.1k tokens)"
-    /// Claude wrangling: "· Wrangling… (ctrl+c to interrupt · thought for...)"
+    ///
+    /// Claude Code 2.x layout (spinner and interrupt on SEPARATE lines):
+    ///   "✻ Working… (9m 3s · ↓ 11.7k tokens · thought for 15s)"
+    ///   "  esc to interrupt"
+    ///
+    /// Claude Code 1.x layout (spinner and interrupt on SAME line):
+    ///   "✢ Dilly-dallying… (esc to interrupt · thinking)"
+    ///   "· Wrangling… (ctrl+c to interrupt · thought for...)"
+    ///
     /// Codex shows: "• Working (1s • esc to interrupt)" - note the timing pattern "(Xs •"
     /// Key difference: Codex has timing pattern like "(5s •" while Claude doesn't
     private func hasClaudePattern(in output: String, scanner: TerminalScanner) -> Bool {
         let sessions = scanner.parseSessions(from: output)
-        let checkLineCount = 7
+        let checkLineCount = 10  // Increased to cover Claude 2.x multi-line layout
 
         for session in sessions {
             let lastLines = Array(session.lastLines.suffix(checkLineCount))
@@ -204,13 +210,12 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
             }
 
             for line in lastLines {
-                // Must have "esc" or "ctrl" somewhere in the line (different interrupt methods)
-                // Normal mode: "esc to interrupt"
-                // Thinking mode: "ctrl+c to interrupt"
-                guard line.contains("esc") || line.contains("ctrl") else { continue }
-
-                // Check the first few characters for a spinner symbol
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
+                let lowercasedLine = trimmed.lowercased()
+
+                // Must have "esc" or "ctrl" somewhere in the line (different interrupt methods)
+                guard lowercasedLine.contains("esc") || lowercasedLine.contains("ctrl") else { continue }
+
                 let prefix = String(trimmed.prefix(5))  // Check first 5 chars
 
                 if debug {
@@ -230,7 +235,17 @@ final class ClaudeCodeDetector: ObservableObject, Detector {
                     // Bullet without Codex timing pattern - could be Claude, so continue checking
                 }
 
-                // Match if any Claude spinner appears at the start
+                // Claude Code 2.x: "esc to interrupt" appears on its own standalone line
+                // (no spinner prefix on this line - spinner is on a separate line above)
+                // Use contains instead of == to handle extra content (stats, key symbols, etc.)
+                if lowercasedLine.contains("esc to interrupt") || lowercasedLine.contains("ctrl+c to interrupt") {
+                    if debug {
+                        print("🔶 MATCH (standalone interrupt line): \(line.prefix(100))")
+                    }
+                    return true
+                }
+
+                // Claude Code 1.x: spinner + "esc to interrupt" on the same line
                 for spinner in claudeSpinners {
                     if trimmed.hasPrefix(String(spinner)) {
                         if debug {
