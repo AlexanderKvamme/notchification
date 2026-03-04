@@ -17,12 +17,16 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.38",
+        version: "1.0.39",
         title: "What's New",
         body: """
         Hello Notchification FAMILY!
 
-        New in this release: Color Themes! We've added 8 Cool themes for our cool users. From Ocean to Sunset to Neon - pick the vibe that matches your style. If you even have a style.
+        Two fixes in this one:
+
+        Claude Code 2.x is now properly detected. The new version changed its output format and we kept up.
+
+        Morning Overview also got a fix — it was being a bit shy about showing up. Not anymore.
 
         Enjoy!
         """,

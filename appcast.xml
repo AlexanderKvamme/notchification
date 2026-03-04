@@ -3,6 +3,25 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.39</title>
+            <pubDate>Tue, 04 Mar 2026 15:51:00 +0100</pubDate>
+            <sparkle:version>39</sparkle:version>
+            <sparkle:shortVersionString>1.0.39</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.39.zip"
+                sparkle:edSignature="iavGewfhgMxmQjw3x/TDqOc+q7mWY0FwwbqNeBtAsnC8s3HOUkIXrEe6Hp14sKkZ9rp9w7VBPuw0Ioxyjzd8Bg=="
+                length="3019230"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.39</h2>
+                <ul>
+                    <li>Fixed Claude Code 2.x detection (new output format now supported)</li>
+                    <li>Fixed Morning Overview not showing up reliably</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.38</title>
             <pubDate>Wed, 22 Jan 2026 19:10:00 +0100</pubDate>
             <sparkle:version>38</sparkle:version>
