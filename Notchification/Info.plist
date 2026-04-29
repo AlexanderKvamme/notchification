@@ -14,6 +14,8 @@
 	<string>Notchification uses the camera to show a preview before your Teams meetings so you can check your appearance.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Notchification uses your calendar to show upcoming meeting reminders in the notch.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Notchification monitors your Downloads folder to show active browser download progress in the notch.</string>
 	<key>ATSApplicationFontsPath</key>
 	<string>.</string>
 </dict>

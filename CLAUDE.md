@@ -246,7 +246,7 @@ Files:
 | **Camera** | User enables "Microsoft Teams" toggle | `SettingsView.swift` → `handleCameraPermission()` |
 | **Accessibility** | Never prompted (read-only check) | User must manually grant in System Settings |
 | **Automation** | Only checked in DEBUG builds | `PermissionsChecker` (does not run in release) |
-| **Downloads folder** | Never (app not sandboxed) | N/A |
+| **Downloads folder** | Auto-prompted on first access (macOS Sequoia TCC) | `DownloadDetector` accessing `~/Downloads` |
 
 ### Entitlements (`Notchification.entitlements`)
 
