@@ -3,6 +3,25 @@
     <channel>
         <title>Notchification</title>
         <item>
+            <title>1.0.40</title>
+            <pubDate>Wed, 29 Apr 2026 20:50:00 +0200</pubDate>
+            <sparkle:version>40</sparkle:version>
+            <sparkle:shortVersionString>1.0.40</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://featurefest.dev/notchification/Notchification-1.0.40.zip"
+                sparkle:edSignature="qnOMfiu9XFeMxS/FDURTbyHFGGwTcMrH795JeUhfwwEglevI+jqAw8sWJyYBMxGkarx83RQf4Obldl/nLgEAAg=="
+                length="3572855"
+                type="application/octet-stream" />
+            <description><![CDATA[
+                <h2>What's New in 1.0.40</h2>
+                <ul>
+                    <li>New: Warp support — detect AI tools thinking and working inside Warp</li>
+                    <li>Added a clean white Warp indicator in the notch</li>
+                </ul>
+            ]]></description>
+        </item>
+        <item>
             <title>1.0.39</title>
             <pubDate>Tue, 04 Mar 2026 15:51:00 +0100</pubDate>
             <sparkle:version>39</sparkle:version>

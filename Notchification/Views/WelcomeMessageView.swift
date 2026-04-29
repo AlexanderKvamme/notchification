@@ -17,16 +17,14 @@ struct WelcomeMessage {
 
     /// Current message to show - update this with each release
     static let current = WelcomeMessage(
-        version: "1.0.39",
+        version: "1.0.40",
         title: "What's New",
         body: """
         Hello Notchification FAMILY!
 
-        Two fixes in this one:
+        This one adds Warp support.
 
-        Claude Code 2.x is now properly detected. The new version changed its output format and we kept up.
-
-        Morning Overview also got a fix — it was being a bit shy about showing up. Not anymore.
+        Notchification can now detect when AI tools are thinking or working inside Warp, with a clean white Warp indicator in the notch.
 
         Enjoy!
         """,
