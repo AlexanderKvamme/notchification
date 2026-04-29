@@ -33,6 +33,7 @@ struct NotchView: View {
     @State private var previousWaveIndex: Int = -1  // Previous color (shown as background while next animates)
     @State private var isPendingDismiss: Bool = false  // Wait for animation to complete before hiding
     @State private var isCameraHovered: Bool = false  // Track camera hover for frame expansion
+    @State private var notchFillOpacity: CGFloat = 0  // Black fill fades in over process color on appear
     @State private var morningOverviewMouseEntered: Bool = false  // Track if mouse entered morning overview
     @State private var morningOverviewShowTime: Date? = nil  // When morning overview was shown (for minimum display time)
     @State private var welcomeMessageMouseEntered: Bool = false  // Track if mouse entered welcome message
@@ -1010,6 +1011,8 @@ struct ProcessLogo: View {
             OpencodeLogo(color: effectiveColor)
         case .codex:
             CodexLogo(color: effectiveColor)
+        case .warp:
+            WarpLogo(color: effectiveColor)
         case .dropbox:
             DropboxLogo(color: effectiveColor)
         case .googleDrive:
@@ -1037,6 +1040,20 @@ struct ProcessLogo: View {
         case .preview:
             PreviewLogo()
         }
+    }
+}
+
+// MARK: - Warp Logo
+
+struct WarpLogo: View {
+    var color: Color = .white
+
+    var body: some View {
+        Image("warplogo")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundColor(.white)
     }
 }
 

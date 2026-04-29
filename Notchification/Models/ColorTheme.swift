@@ -256,6 +256,7 @@ extension ProcessType {
         case .finder: return 3
         case .opencode: return 4
         case .codex: return 0
+        case .warp: return 4
         case .dropbox: return 1
         case .googleDrive: return 2
         case .oneDrive: return 3

@@ -31,6 +31,7 @@ final class ProcessMonitor: ObservableObject {
     private let finderDetector = FinderDetector()
     private let opencodeDetector = OpencodeDetector()
     private let codexDetector = CodexDetector()
+    private let warpDetector = WarpDetector()
     private let dropboxDetector = DropboxDetector()
     private let googleDriveDetector = GoogleDriveDetector()
     private let oneDriveDetector = OneDriveDetector()
@@ -177,6 +178,7 @@ final class ProcessMonitor: ObservableObject {
         finderDetector.reset()
         opencodeDetector.reset()
         codexDetector.reset()
+        warpDetector.reset()
         dropboxDetector.reset()
         googleDriveDetector.reset()
         oneDriveDetector.reset()
@@ -215,6 +217,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackCodex {
             codexDetector.poll()
+        }
+        if trackingSettings.trackWarp {
+            warpDetector.poll()
         }
         if trackingSettings.trackDropbox {
             dropboxDetector.poll()
@@ -287,6 +292,11 @@ final class ProcessMonitor: ObservableObject {
             .store(in: &cancellables)
 
         codexDetector.$isActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateActiveProcesses() }
+            .store(in: &cancellables)
+
+        warpDetector.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateActiveProcesses() }
             .store(in: &cancellables)
@@ -417,6 +427,15 @@ final class ProcessMonitor: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] enabled in
                 if !enabled { self?.codexDetector.reset() }
+                self?.updateActiveProcesses()
+            }
+            .store(in: &cancellables)
+
+        trackingSettings.$trackWarp
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                if !enabled { self?.warpDetector.reset() }
                 self?.updateActiveProcesses()
             }
             .store(in: &cancellables)
@@ -560,6 +579,9 @@ final class ProcessMonitor: ObservableObject {
         }
         if trackingSettings.trackCodex && codexDetector.isActive {
             currentlyActive.insert(.codex)
+        }
+        if trackingSettings.trackWarp && warpDetector.isActive {
+            currentlyActive.insert(.warp)
         }
         if trackingSettings.trackDropbox && dropboxDetector.isActive {
             currentlyActive.insert(.dropbox)

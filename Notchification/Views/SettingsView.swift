@@ -91,6 +91,7 @@ struct AppsSettingsTab: View {
                 Toggle("Claude (App)", isOn: $trackingSettings.trackClaudeApp)
                 Toggle("Codex (CLI)", isOn: $trackingSettings.trackCodex)
                 Toggle("Opencode (CLI)", isOn: $trackingSettings.trackOpencode)
+                Toggle("Warp", isOn: $trackingSettings.trackWarp)
             }
 
             Section("Development") {

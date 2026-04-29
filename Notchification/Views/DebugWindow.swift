@@ -97,6 +97,7 @@ struct DebugPanelView: View {
                 Toggle("Finder", isOn: $debugSettings.debugFinder)
                 Toggle("Opencode", isOn: $debugSettings.debugOpencode)
                 Toggle("Codex", isOn: $debugSettings.debugCodex)
+                Toggle("Warp", isOn: $debugSettings.debugWarp)
 
                 Divider()
 

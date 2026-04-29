@@ -123,6 +123,9 @@ struct DebugMenuView: View {
             Toggle("Codex", isOn: $debugSettings.debugCodex)
                 .toggleStyle(.switch)
                 .padding(.trailing, 8)
+            Toggle("Warp", isOn: $debugSettings.debugWarp)
+                .toggleStyle(.switch)
+                .padding(.trailing, 8)
             Toggle("Automator", isOn: $debugSettings.debugAutomator)
                 .toggleStyle(.switch)
                 .padding(.trailing, 8)
@@ -214,6 +217,9 @@ final class DebugSettings: ObservableObject {
     @Published var debugCodex: Bool {
         didSet { UserDefaults.standard.set(debugCodex, forKey: "debugCodex") }
     }
+    @Published var debugWarp: Bool {
+        didSet { UserDefaults.standard.set(debugWarp, forKey: "debugWarp") }
+    }
     @Published var debugAutomator: Bool {
         didSet { UserDefaults.standard.set(debugAutomator, forKey: "debugAutomator") }
     }
@@ -260,6 +266,7 @@ final class DebugSettings: ObservableObject {
         self.debugFinder = UserDefaults.standard.object(forKey: "debugFinder") as? Bool ?? true
         self.debugOpencode = UserDefaults.standard.object(forKey: "debugOpencode") as? Bool ?? false
         self.debugCodex = UserDefaults.standard.object(forKey: "debugCodex") as? Bool ?? false
+        self.debugWarp = UserDefaults.standard.object(forKey: "debugWarp") as? Bool ?? false
         self.debugAutomator = UserDefaults.standard.object(forKey: "debugAutomator") as? Bool ?? false
         self.debugDownloads = UserDefaults.standard.object(forKey: "debugDownloads") as? Bool ?? false
         self.debugDaVinciResolve = UserDefaults.standard.object(forKey: "debugDaVinciResolve") as? Bool ?? false
@@ -297,6 +304,9 @@ final class TrackingSettings: ObservableObject {
     }
     @Published var trackCodex: Bool {
         didSet { UserDefaults.standard.set(trackCodex, forKey: "trackCodex") }
+    }
+    @Published var trackWarp: Bool {
+        didSet { UserDefaults.standard.set(trackWarp, forKey: "trackWarp") }
     }
     @Published var trackDropbox: Bool {
         didSet { UserDefaults.standard.set(trackDropbox, forKey: "trackDropbox") }
@@ -372,6 +382,7 @@ final class TrackingSettings: ObservableObject {
         case .finder: return Binding(get: { self.trackFinder }, set: { self.trackFinder = $0 })
         case .opencode: return Binding(get: { self.trackOpencode }, set: { self.trackOpencode = $0 })
         case .codex: return Binding(get: { self.trackCodex }, set: { self.trackCodex = $0 })
+        case .warp: return Binding(get: { self.trackWarp }, set: { self.trackWarp = $0 })
         case .dropbox: return Binding(get: { self.trackDropbox }, set: { self.trackDropbox = $0 })
         case .googleDrive: return Binding(get: { self.trackGoogleDrive }, set: { self.trackGoogleDrive = $0 })
         case .oneDrive: return Binding(get: { self.trackOneDrive }, set: { self.trackOneDrive = $0 })
@@ -396,6 +407,7 @@ final class TrackingSettings: ObservableObject {
         self.trackFinder = UserDefaults.standard.object(forKey: "trackFinder") as? Bool ?? false
         self.trackOpencode = UserDefaults.standard.object(forKey: "trackOpencode") as? Bool ?? false
         self.trackCodex = UserDefaults.standard.object(forKey: "trackCodex") as? Bool ?? false
+        self.trackWarp = UserDefaults.standard.object(forKey: "trackWarp") as? Bool ?? false
         self.trackDropbox = UserDefaults.standard.object(forKey: "trackDropbox") as? Bool ?? false
         self.trackGoogleDrive = UserDefaults.standard.object(forKey: "trackGoogleDrive") as? Bool ?? false
         self.trackOneDrive = UserDefaults.standard.object(forKey: "trackOneDrive") as? Bool ?? false
@@ -849,6 +861,7 @@ enum MockProcessType: String, CaseIterable {
     case finder = "Finder"
     case opencode = "Opencode"
     case codex = "Codex"
+    case warp = "Warp"
     case dropbox = "Dropbox"
     case googleDrive = "Google Drive"
     case oneDrive = "OneDrive"
@@ -870,6 +883,7 @@ enum MockProcessType: String, CaseIterable {
         case .finder: return .finder
         case .opencode: return .opencode
         case .codex: return .codex
+        case .warp: return .warp
         case .dropbox: return .dropbox
         case .googleDrive: return .googleDrive
         case .oneDrive: return .oneDrive
@@ -886,7 +900,7 @@ enum MockProcessType: String, CaseIterable {
 
     /// Returns 5 random process types for demo purposes
     var fiveRandomProcessTypes: [ProcessType] {
-        let allTypes: [ProcessType] = [.claudeCode, .claudeApp, .androidStudio, .xcode, .finder, .opencode, .codex, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
+        let allTypes: [ProcessType] = [.claudeCode, .claudeApp, .androidStudio, .xcode, .finder, .opencode, .codex, .warp, .dropbox, .googleDrive, .oneDrive, .icloud, .installer, .appStore]
         return Array(allTypes.shuffled().prefix(5))
     }
 }

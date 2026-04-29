@@ -17,6 +17,7 @@ final class ConfettiState: ObservableObject {
     @Published var finderTrigger: Int = 0
     @Published var opencodeTrigger: Int = 0
     @Published var codexTrigger: Int = 0
+    @Published var warpTrigger: Int = 0
     @Published var dropboxTrigger: Int = 0
     @Published var googleDriveTrigger: Int = 0
     @Published var oneDriveTrigger: Int = 0
@@ -38,6 +39,7 @@ final class ConfettiState: ObservableObject {
         case .finder: finderTrigger += 1
         case .opencode: opencodeTrigger += 1
         case .codex: codexTrigger += 1
+        case .warp: warpTrigger += 1
         case .dropbox: dropboxTrigger += 1
         case .googleDrive: googleDriveTrigger += 1
         case .oneDrive: oneDriveTrigger += 1
@@ -513,6 +515,7 @@ struct ConfettiOverlayView: View {
                     ConfettiEmitterView(trigger: $confettiState.finderTrigger, color: styleSettings.selectedTheme.color(for: .finder))
                     ConfettiEmitterView(trigger: $confettiState.opencodeTrigger, color: styleSettings.selectedTheme.color(for: .opencode))
                     ConfettiEmitterView(trigger: $confettiState.codexTrigger, color: styleSettings.selectedTheme.color(for: .codex))
+                    ConfettiEmitterView(trigger: $confettiState.warpTrigger, color: styleSettings.selectedTheme.color(for: .warp))
                     ConfettiEmitterView(trigger: $confettiState.dropboxTrigger, color: styleSettings.selectedTheme.color(for: .dropbox))
                     ConfettiEmitterView(trigger: $confettiState.googleDriveTrigger, color: styleSettings.selectedTheme.color(for: .googleDrive))
                     ConfettiEmitterView(trigger: $confettiState.oneDriveTrigger, color: styleSettings.selectedTheme.color(for: .oneDrive))
